@@ -1,0 +1,7 @@
+{
+  "name": "Nirnoy Care",
+  "description": "A Bangladesh-first doctor appointment and practice management platform with AI assistance.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
