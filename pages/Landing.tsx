@@ -11,6 +11,14 @@ export const Landing: React.FC = () => {
     navigate('/search');
   };
 
+  // Smooth scroll to features
+  const scrollToFeatures = () => {
+    const element = document.getElementById('features');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-teal-500/20 selection:text-teal-900">
       
@@ -95,7 +103,7 @@ export const Landing: React.FC = () => {
       </section>
 
       {/* --- Bento Grid Features --- */}
-      <section className="py-20 container mx-auto px-4">
+      <section id="features" className="py-20 container mx-auto px-4">
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(220px,auto)]">
             
             {/* Box 1: Verified Doctors */}
@@ -236,7 +244,7 @@ export const Landing: React.FC = () => {
                      <button onClick={() => navigate('/login')} className="bg-teal-500 hover:bg-teal-400 text-slate-900 px-8 py-4 rounded-xl font-bold transition shadow-[0_0_20px_rgba(20,184,166,0.3)] hover:shadow-[0_0_30px_rgba(20,184,166,0.5)]">
                         Join as Doctor
                      </button>
-                     <button className="px-8 py-4 rounded-xl font-bold border border-slate-700 hover:bg-slate-800 transition text-slate-300">
+                     <button onClick={scrollToFeatures} className="px-8 py-4 rounded-xl font-bold border border-slate-700 hover:bg-slate-800 transition text-slate-300">
                         View Features
                      </button>
                   </div>
@@ -292,7 +300,7 @@ export const Landing: React.FC = () => {
                   </div>
                </div>
                <div className="flex gap-8 text-sm font-bold text-slate-500">
-                  <button onClick={() => navigate('/')} className="hover:text-slate-900 transition">About</button>
+                  <button onClick={() => navigate('/about')} className="hover:text-slate-900 transition">About</button>
                   <button onClick={() => navigate('/search')} className="hover:text-slate-900 transition">Doctors</button>
                   <button onClick={() => navigate('/privacy')} className="hover:text-slate-900 transition">Privacy</button>
                   <button onClick={() => navigate('/')} className="hover:text-slate-900 transition">Contact</button>
