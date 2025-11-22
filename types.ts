@@ -61,6 +61,7 @@ export interface PatientSummary {
   totalVisits: number;
   condition: string;
   phone: string;
+  riskLevel?: 'High' | 'Medium' | 'Low';
 }
 
 export interface Doctor {
@@ -76,6 +77,10 @@ export interface Doctor {
   bio: string;
   nextAvailable?: string;
   gender?: string;
+  aiSettings?: {
+    autoDraftRx: boolean;
+    languagePreference: 'Bangla' | 'English';
+  }
 }
 
 export interface Appointment {
@@ -101,4 +106,48 @@ export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
   timestamp: number;
+}
+
+// --- Copilot Types ---
+
+export interface InboxMessage {
+  id: string;
+  sender: string;
+  preview: string;
+  fullText: string;
+  category: 'Emergency' | 'Clarification' | 'Admin';
+  timestamp: string;
+  isRead: boolean;
+}
+
+export interface LearningResource {
+  id: string;
+  title: string;
+  type: 'Guideline' | 'Article' | 'Case';
+  summary: string;
+  source: string;
+}
+
+export interface AnalyticMetric {
+  label: string;
+  value: string | number;
+  trend: 'up' | 'down' | 'neutral';
+  trendValue: string;
+  description?: string;
+}
+
+export interface ClinicalNote {
+  chiefComplaint: string;
+  history: string;
+  examination: string; // Vitals, observations
+  diagnosis: string;
+  plan: string;
+}
+
+export interface PatientCohort {
+  id: string;
+  name: string;
+  count: number;
+  description: string;
+  action: string;
 }
