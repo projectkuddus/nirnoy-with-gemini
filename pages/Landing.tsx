@@ -292,10 +292,10 @@ export const Landing: React.FC = () => {
                   </div>
                </div>
                <div className="flex gap-8 text-sm font-bold text-slate-500">
-                  <a href="#" className="hover:text-slate-900 transition">About</a>
-                  <a href="#" className="hover:text-slate-900 transition">Doctors</a>
-                  <a href="#" className="hover:text-slate-900 transition">Privacy</a>
-                  <a href="#" className="hover:text-slate-900 transition">Contact</a>
+                  <button onClick={() => navigate('/')} className="hover:text-slate-900 transition">About</button>
+                  <button onClick={() => navigate('/search')} className="hover:text-slate-900 transition">Doctors</button>
+                  <button onClick={() => navigate('/privacy')} className="hover:text-slate-900 transition">Privacy</button>
+                  <button onClick={() => navigate('/')} className="hover:text-slate-900 transition">Contact</button>
                </div>
                <div className="flex gap-4">
                   <a href="#" className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-100 hover:shadow-md transition-all">

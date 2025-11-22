@@ -8,6 +8,7 @@ import { DoctorSearch } from './pages/DoctorSearch';
 import { PatientDashboard } from './pages/PatientDashboard';
 import { DoctorDashboard } from './pages/DoctorDashboard';
 import { DoctorProfile } from './pages/DoctorProfile';
+import { Privacy } from './pages/Privacy';
 import { VoiceAgent } from './components/VoiceAgent';
 import { UserRole } from './types';
 
@@ -84,6 +85,7 @@ const AppContent: React.FC = () => {
         />
         <Route path="/search" element={<DoctorSearch />} />
         <Route path="/doctors/:id" element={<DoctorProfile />} />
+        <Route path="/privacy" element={<Privacy />} />
         
         {/* Protected Routes */}
         <Route 
