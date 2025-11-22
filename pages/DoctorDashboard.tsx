@@ -50,6 +50,21 @@ const REVENUE_DATA = [
     { name: 'Fri', revenue: 2800 },
 ];
 
+const ACQUISITION_DATA = [
+    { name: 'Nirnoy Search', value: 45, color: '#0D9488' },
+    { name: 'Referrals', value: 30, color: '#6366F1' },
+    { name: 'Facebook', value: 15, color: '#3B82F6' },
+    { name: 'Walk-in', value: 10, color: '#94A3B8' },
+];
+
+const PATIENT_VITALS_TREND = [
+    { date: 'Jan', bpSys: 140 },
+    { date: 'Mar', bpSys: 135 },
+    { date: 'Jun', bpSys: 130 },
+    { date: 'Sep', bpSys: 128 },
+    { date: 'Oct', bpSys: 130 },
+];
+
 // --- Components ---
 
 const SidebarItem: React.FC<{ icon: string; label: string; active: boolean; onClick: () => void; badge?: number }> = ({ icon, label, active, onClick, badge }) => (
@@ -102,6 +117,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const [vitals, setVitals] = useState({ bp: '', hr: '', temp: '', weight: '' });
   const [rxDraft, setRxDraft] = useState('');
   const [generatedDocs, setGeneratedDocs] = useState<{ type: string, content: string } | null>(null);
+  const [showVitalsTrend, setShowVitalsTrend] = useState(false);
 
   // --- Cohort State (Patient Copilot) ---
   const [cohorts, setCohorts] = useState<PatientCohort[]>([]);
@@ -110,6 +126,14 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   // --- Inbox State ---
   const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>(MOCK_INBOX);
   
+  // --- Settings State ---
+  const [aiSettings, setAiSettings] = useState({
+      autoDraft: true,
+      triageStrictness: 'Medium', // Low, Medium, High
+      patientEduLanguage: 'Bangla',
+      allowDataLearning: false
+  });
+
   // --- AI Copilot State ---
   const [aiChatHistory, setAiChatHistory] = useState<ChatMessage[]>([
       { role: 'model', text: "Hello Doctor. I am Nirnoy Copilot. I'm analyzing your schedule and patient data. How can I help optimize your practice today?", timestamp: Date.now() }
@@ -153,7 +177,9 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
           contextData += ` Patient: ${p?.name} (${p?.age}y). Condition: ${p?.condition}. Current Notes: ${JSON.stringify(notes)}. Vitals: ${JSON.stringify(vitals)}.`;
       } else if (activeTab === 'analytics') {
           contextData += ` Metrics: Revenue 42k, Retention 68%.`;
-      } 
+      } else if (activeTab === 'settings') {
+          contextData += ` AI Settings: ${JSON.stringify(aiSettings)}`;
+      }
 
       const response = activeTab === 'library' 
           ? await searchMedicalGuidelines(userText)
@@ -183,7 +209,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       setIsAiThinking(true);
       const edu = await generatePatientEducation(notes.assessment, rxDraft);
       setGeneratedDocs({ type: 'Bangla Instructions', content: edu });
-      setAiChatHistory(prev => [...prev, { role: 'model', text: "I've generated patient instructions in Bangla. You can print or SMS this.", timestamp: Date.now() }]);
+      setAiChatHistory(prev => [...prev, { role: 'model', text: `I've generated patient instructions in ${aiSettings.patientEduLanguage}. You can print or SMS this.`, timestamp: Date.now() }]);
       setIsAiThinking(false);
   };
 
@@ -368,6 +394,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Revenue Chart */}
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm min-h-[300px]">
                   <h3 className="font-bold text-slate-800 mb-4">Revenue Trend</h3>
                   <ResponsiveContainer width="100%" height={250}>
@@ -387,7 +414,30 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
                   </ResponsiveContainer>
               </div>
 
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              {/* Channel Attribution (New) */}
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm min-h-[300px]">
+                  <h3 className="font-bold text-slate-800 mb-4">Patient Acquisition</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                          <Pie 
+                            data={ACQUISITION_DATA} 
+                            cx="50%" cy="50%" 
+                            innerRadius={60} 
+                            outerRadius={80} 
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {ACQUISITION_DATA.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                          <RechartsTooltip />
+                      </PieChart>
+                  </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
                   <h3 className="font-bold text-slate-800 mb-4">Fee Optimization (AI)</h3>
                   <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 mb-4">
                       <p className="text-sm text-blue-800 leading-relaxed">
@@ -431,7 +481,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
               </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto w-full mb-10">
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:border-teal-300 transition cursor-pointer">
                   <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase mb-2 inline-block">Update</span>
                   <h3 className="font-bold text-slate-800 mb-2">Dengue Management Protocol 2024</h3>
@@ -442,6 +492,15 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
                   <h3 className="font-bold text-slate-800 mb-2">Hypertension in Diabetics</h3>
                   <p className="text-sm text-slate-500">Latest evidence on ACE inhibitors vs ARBs selection.</p>
               </div>
+          </div>
+
+          {/* Case Reflection Mode */}
+          <div className="max-w-5xl mx-auto w-full bg-indigo-50 rounded-xl p-6 border border-indigo-100">
+              <h3 className="font-bold text-indigo-900 mb-2 flex items-center gap-2"><i className="fas fa-lightbulb"></i> Case Reflection Mode</h3>
+              <p className="text-sm text-indigo-800 mb-4">Save interesting anonymized cases to your personal library for future learning.</p>
+              <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition">
+                  + Add Case Reflection
+              </button>
           </div>
       </div>
   );
@@ -485,7 +544,24 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
                   {/* Left: Vitals & History */}
                   <div className="w-1/4 bg-slate-50 border-r border-slate-200 p-4 overflow-y-auto custom-scrollbar">
                       <div className="mb-6">
-                          <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Vitals Input</h4>
+                          <div className="flex justify-between items-center mb-3">
+                             <h4 className="text-xs font-bold text-slate-500 uppercase">Vitals Input</h4>
+                             <button onClick={() => setShowVitalsTrend(!showVitalsTrend)} className="text-xs text-teal-600 font-bold hover:underline">
+                                 {showVitalsTrend ? 'Hide Trend' : 'View Trend'}
+                             </button>
+                          </div>
+                          
+                          {showVitalsTrend && (
+                              <div className="h-32 mb-4 bg-white rounded-lg border border-slate-200 p-2">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                      <LineChart data={PATIENT_VITALS_TREND}>
+                                          <Line type="monotone" dataKey="bpSys" stroke="#0d9488" strokeWidth={2} dot={false} />
+                                          <CartesianGrid stroke="#eee" vertical={false} />
+                                      </LineChart>
+                                  </ResponsiveContainer>
+                              </div>
+                          )}
+
                           <div className="space-y-3">
                               <input type="text" placeholder="BP (e.g. 120/80)" className="w-full p-2 border rounded text-sm" value={vitals.bp} onChange={e => setVitals({...vitals, bp: e.target.value})} />
                               <div className="grid grid-cols-2 gap-2">
@@ -654,6 +730,105 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       </div>
   );
 
+  const renderSettings = () => (
+      <div className="max-w-4xl mx-auto animate-fade-in pb-12">
+          <div className="mb-8">
+              <h2 className="text-2xl font-bold text-slate-800">Personalization & Control</h2>
+              <p className="text-slate-500">Manage how Nirnoy Copilot assists you.</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+              {/* AI Behavior */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50">
+                      <h3 className="font-bold text-slate-700">AI Copilot Behavior</h3>
+                  </div>
+                  <div className="p-6 space-y-6">
+                      <div className="flex items-center justify-between">
+                          <div>
+                              <h4 className="font-bold text-slate-800 text-sm">Auto-Draft Prescriptions</h4>
+                              <p className="text-xs text-slate-500">Allow AI to suggest medicine drafts based on diagnosis.</p>
+                          </div>
+                          <button 
+                              onClick={() => setAiSettings({...aiSettings, autoDraft: !aiSettings.autoDraft})}
+                              className={`w-12 h-6 rounded-full transition p-1 ${aiSettings.autoDraft ? 'bg-teal-500' : 'bg-slate-300'}`}
+                          >
+                              <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition ${aiSettings.autoDraft ? 'translate-x-6' : ''}`}></div>
+                          </button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                          <div>
+                              <h4 className="font-bold text-slate-800 text-sm">Patient Education Language</h4>
+                              <p className="text-xs text-slate-500">Default language for generated patient instructions.</p>
+                          </div>
+                          <div className="flex gap-2">
+                              <button 
+                                onClick={() => setAiSettings({...aiSettings, patientEduLanguage: 'Bangla'})}
+                                className={`px-3 py-1 text-xs font-bold rounded border ${aiSettings.patientEduLanguage === 'Bangla' ? 'bg-teal-50 border-teal-500 text-teal-700' : 'border-slate-200 text-slate-500'}`}
+                              >
+                                  Bangla
+                              </button>
+                              <button 
+                                onClick={() => setAiSettings({...aiSettings, patientEduLanguage: 'English'})}
+                                className={`px-3 py-1 text-xs font-bold rounded border ${aiSettings.patientEduLanguage === 'English' ? 'bg-teal-50 border-teal-500 text-teal-700' : 'border-slate-200 text-slate-500'}`}
+                              >
+                                  English
+                              </button>
+                          </div>
+                      </div>
+
+                       <div className="flex items-center justify-between">
+                          <div>
+                              <h4 className="font-bold text-slate-800 text-sm">Inbox Triage Strictness</h4>
+                              <p className="text-xs text-slate-500">How aggressively should AI flag messages as 'Emergency'.</p>
+                          </div>
+                          <select 
+                            value={aiSettings.triageStrictness}
+                            onChange={(e) => setAiSettings({...aiSettings, triageStrictness: e.target.value})}
+                            className="bg-white border border-slate-200 rounded-lg text-xs px-3 py-1 outline-none focus:border-teal-500"
+                          >
+                              <option>Low</option>
+                              <option>Medium</option>
+                              <option>High</option>
+                          </select>
+                      </div>
+                  </div>
+              </div>
+
+              {/* Data Privacy */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 bg-slate-50">
+                      <h3 className="font-bold text-slate-700">Data & Privacy</h3>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <div className="flex items-center justify-between p-4 border border-slate-100 rounded-xl bg-slate-50/50">
+                          <div>
+                              <h4 className="font-bold text-slate-800 text-sm">Export Practice Data</h4>
+                              <p className="text-xs text-slate-500">Download all patient records and logs in CSV format.</p>
+                          </div>
+                          <button className="text-xs bg-white border border-slate-300 px-4 py-2 rounded-lg font-bold hover:bg-slate-100">
+                              Export CSV
+                          </button>
+                      </div>
+                      <div className="flex items-center justify-between p-4 border border-slate-100 rounded-xl bg-slate-50/50">
+                          <div>
+                              <h4 className="font-bold text-slate-800 text-sm">Anonymize for Learning</h4>
+                              <p className="text-xs text-slate-500">Allow AI to use de-identified case patterns to improve your 'Learning Copilot'.</p>
+                          </div>
+                          <button 
+                              onClick={() => setAiSettings({...aiSettings, allowDataLearning: !aiSettings.allowDataLearning})}
+                              className={`w-12 h-6 rounded-full transition p-1 ${aiSettings.allowDataLearning ? 'bg-teal-500' : 'bg-slate-300'}`}
+                          >
+                              <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition ${aiSettings.allowDataLearning ? 'translate-x-6' : ''}`}></div>
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+  );
+
   // --- Main Layout ---
   return (
     <div className="flex h-screen bg-slate-900 text-slate-300 font-sans overflow-hidden">
@@ -706,13 +881,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
               {activeTab === 'inbox' && renderInbox()}
               {activeTab === 'analytics' && renderAnalytics()}
               {activeTab === 'library' && renderLibrary()}
-              
-              {activeTab === 'settings' && (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                      <i className="fas fa-tools text-4xl mb-4 opacity-20"></i>
-                      <p>General Settings Module</p>
-                  </div>
-              )}
+              {activeTab === 'settings' && renderSettings()}
           </div>
        </div>
 
