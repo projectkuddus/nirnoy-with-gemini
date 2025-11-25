@@ -10,7 +10,6 @@ import { DoctorDashboard } from './pages/DoctorDashboard';
 import { DoctorProfile } from './pages/DoctorProfile';
 import { Privacy } from './pages/Privacy';
 import { About } from './pages/About';
-import { VoiceAgent } from './components/VoiceAgent';
 import { UserRole } from './types';
 
 interface LayoutProps {
@@ -24,14 +23,13 @@ const Layout: React.FC<LayoutProps> = ({ children, role, handleLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Hide Navbar and Voice Agent on Doctor Dashboard to give it a "Cockpit" feel
+  // Hide Navbar on Doctor Dashboard to give it a "Cockpit" feel
   const isDoctorDashboard = location.pathname === '/doctor-dashboard';
 
   return (
     <>
       {!isDoctorDashboard && <Navbar role={role} onLogout={handleLogout} navigate={navigate} />}
       {children}
-      {!isDoctorDashboard && <VoiceAgent />}
     </>
   );
 };

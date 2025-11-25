@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { HomeVoiceSection } from '../components/HomeVoiceSection';
 
 export const Landing: React.FC = () => {
   const navigate = useNavigate();
@@ -101,6 +102,9 @@ export const Landing: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* --- VOICE AGENT SECTION --- */}
+      <HomeVoiceSection />
 
       {/* --- Bento Grid Features --- */}
       <section id="features" className="py-20 container mx-auto px-4">
