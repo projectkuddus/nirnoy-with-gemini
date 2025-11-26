@@ -4,6 +4,7 @@ import { MOCK_DOCTORS } from '../data/mockData';
 import { BookingModal } from '../components/BookingModal';
 import { Chamber } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import PageHeader from '../components/PageHeader';
 
 export const DoctorProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -76,7 +77,7 @@ export const DoctorProfile: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -89,7 +90,7 @@ export const DoctorProfile: React.FC = () => {
             <i className="fas fa-user-md text-3xl text-slate-300"></i>
           </div>
           <h1 className="text-xl font-bold text-slate-800 mb-2">{t.notFound}</h1>
-          <button onClick={() => navigate('/search')} className="text-teal-600 font-medium">
+          <button onClick={() => navigate('/search')} className="text-blue-600 font-medium">
             <i className="fas fa-arrow-left mr-2"></i>{t.goBack}
           </button>
         </div>
@@ -100,27 +101,28 @@ export const DoctorProfile: React.FC = () => {
   const primaryChamber = doctor.chambers?.[0];
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 lg:pb-8">
+    <div className="min-h-screen bg-slate-50">
+      <PageHeader showNav={true} />
       
-      {/* Compact Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="flex items-center gap-3 py-3">
-            <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+      {/* Doctor Info Header */}
+      <div className="bg-white border-b border-slate-100 sticky top-16 z-30">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex items-center gap-4 py-4">
+            <button onClick={() => navigate(-1)} className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center">
               <i className="fas fa-arrow-left"></i>
             </button>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-slate-800 truncate">{doctor.name}</p>
+              <p className="font-black text-slate-800 truncate text-lg">{doctor.name}</p>
               <p className="text-xs text-slate-500 truncate">{doctor.specialties?.join(', ')}</p>
             </div>
-            <button className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+            <button className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition flex items-center justify-center">
               <i className="fas fa-share-alt"></i>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="max-w-7xl mx-auto px-6 py-8 pt-4">
         
         {/* Profile Card - Compact */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-4">
@@ -133,23 +135,23 @@ export const DoctorProfile: React.FC = () => {
                   alt={doctor.name}
                   className="w-24 h-24 rounded-xl object-cover bg-slate-100"
                 />
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white">
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
                   <i className="fas fa-check text-white text-xs"></i>
                 </div>
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <h1 className="text-lg font-bold text-slate-800 mb-0.5">{doctor.name}</h1>
-                <p className="text-sm text-teal-600 font-medium mb-1">{doctor.degrees}</p>
+                <h1 className="text-lg font-black text-slate-800 mb-0.5">{doctor.name}</h1>
+                <p className="text-sm text-blue-600 font-medium mb-1">{doctor.degrees}</p>
                 <div className="flex flex-wrap gap-1 mb-2">
                   {doctor.specialties?.slice(0, 2).map((s: string) => (
                     <span key={s} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{s}</span>
                   ))}
                 </div>
                 <div className="flex items-center gap-1 text-xs">
-                  <i className="fas fa-check-circle text-emerald-500"></i>
-                  <span className="text-emerald-600 font-medium">{t.verified}</span>
+                  <i className="fas fa-check-circle text-green-500"></i>
+                  <span className="text-green-600 font-medium">{t.verified}</span>
                   <span className="text-slate-400 ml-1">• {doctor.bmdcNumber}</span>
                 </div>
               </div>
@@ -177,15 +179,15 @@ export const DoctorProfile: React.FC = () => {
 
           {/* Quick Book - Primary Chamber */}
           {primaryChamber && (
-            <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 border-t border-teal-100">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-t border-blue-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-teal-600 font-medium mb-0.5">{primaryChamber.name}</p>
+                  <p className="text-xs text-blue-600 font-medium mb-0.5">{primaryChamber.name}</p>
                   <p className="text-sm text-slate-600">{primaryChamber.address}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-500">{t.fee}</p>
-                  <p className="text-xl font-bold text-teal-600">৳{primaryChamber.fee}</p>
+                  <p className="text-xl font-bold text-blue-600">৳{primaryChamber.fee}</p>
                 </div>
               </div>
               <button
@@ -193,7 +195,7 @@ export const DoctorProfile: React.FC = () => {
                   setSelectedChamber(primaryChamber);
                   setShowBooking(true);
                 }}
-                className="w-full mt-3 bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition flex items-center justify-center gap-2"
+                className="w-full mt-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-600 transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
               >
                 <i className="fas fa-calendar-check"></i>
                 {t.bookNow}
@@ -210,7 +212,7 @@ export const DoctorProfile: React.FC = () => {
               onClick={() => setActiveSection(tab)}
               className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition ${
                 activeSection === tab
-                  ? 'bg-teal-500 text-white'
+                  ? 'bg-blue-500 text-white'
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -230,7 +232,7 @@ export const DoctorProfile: React.FC = () => {
               {/* About */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-                  <i className="fas fa-info-circle text-teal-500"></i>
+                  <i className="fas fa-info-circle text-blue-500"></i>
                   {t.about}
                 </h3>
                 <p className="text-sm text-slate-600 leading-relaxed">{doctor.bio}</p>
@@ -239,13 +241,13 @@ export const DoctorProfile: React.FC = () => {
               {/* Qualifications */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                  <i className="fas fa-graduation-cap text-teal-500"></i>
+                  <i className="fas fa-graduation-cap text-blue-500"></i>
                   {t.qualifications}
                 </h3>
                 <div className="space-y-3">
                   {doctor.qualifications?.map((q: any, i: number) => (
                     <div key={i} className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center text-teal-600 font-bold text-sm flex-shrink-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold text-sm flex-shrink-0">
                         {i + 1}
                       </div>
                       <div>
@@ -266,7 +268,7 @@ export const DoctorProfile: React.FC = () => {
                   <h3 className="font-bold text-slate-800 mb-2 text-sm">{t.specialties}</h3>
                   <div className="flex flex-wrap gap-1">
                     {doctor.specialties?.map((s: string) => (
-                      <span key={s} className="px-2 py-1 bg-teal-50 text-teal-700 text-xs rounded-lg">{s}</span>
+                      <span key={s} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-lg">{s}</span>
                     ))}
                   </div>
                 </div>
@@ -293,7 +295,7 @@ export const DoctorProfile: React.FC = () => {
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-bold text-slate-800">{chamber.name}</h3>
                           {i === 0 && (
-                            <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs font-bold rounded-full">
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
                               {isBn ? 'প্রধান' : 'Primary'}
                             </span>
                           )}
@@ -344,7 +346,7 @@ export const DoctorProfile: React.FC = () => {
                         setSelectedChamber(chamber);
                         setShowBooking(true);
                       }}
-                      className="w-full bg-teal-600 text-white py-2.5 rounded-lg font-bold hover:bg-teal-700 transition"
+                      className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2.5 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-600 transition shadow-lg shadow-blue-500/25"
                     >
                       <i className="fas fa-calendar-plus mr-2"></i>
                       {t.bookNow}
@@ -391,7 +393,7 @@ export const DoctorProfile: React.FC = () => {
                 {doctor.reviews?.map((review: any) => (
                   <div key={review.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 font-bold">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
                         {review.name.charAt(0)}
                       </div>
                       <div className="flex-1">
@@ -427,7 +429,7 @@ export const DoctorProfile: React.FC = () => {
               setSelectedChamber(primaryChamber);
               setShowBooking(true);
             }}
-            className="flex-[2] bg-teal-600 text-white py-3.5 rounded-xl font-bold"
+            className="flex-[2] bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3.5 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-600 transition shadow-lg shadow-blue-500/25"
           >
             <i className="fas fa-calendar-check mr-2"></i>
             {t.bookNow}

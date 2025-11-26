@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import PageHeader from '../components/PageHeader';
 
 // ============ TYPES ============
 interface Appointment {
@@ -135,7 +136,7 @@ const LiveQueueCard: React.FC<{ appointment: Appointment; isBn: boolean }> = ({ 
   const isNow = currentSerial === appointment.serialNumber;
 
   return (
-    <div className={`bg-gradient-to-br ${isNow ? 'from-green-500 to-emerald-600' : isYourTurn ? 'from-amber-500 to-orange-600' : 'from-teal-500 to-emerald-600'} rounded-2xl p-5 text-white shadow-xl relative overflow-hidden`}>
+    <div className={`bg-gradient-to-br ${isNow ? 'from-green-500 to-emerald-600' : isYourTurn ? 'from-amber-500 to-orange-600' : 'from-blue-500 to-indigo-600'} rounded-2xl p-5 text-white shadow-xl relative overflow-hidden`}>
       {/* Background Animation */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full -translate-y-1/2 translate-x-1/2"></div>
@@ -295,28 +296,30 @@ export const MyAppointments: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-2xl mx-auto px-4 py-4">
+    <div className="min-h-screen bg-slate-50">
+      <PageHeader showNav={true} />
+      
+      {/* Page Title Header */}
+      <div className="bg-white border-b border-slate-100 sticky top-16 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button onClick={() => navigate('/my-health')} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 transition">
+            <div className="flex items-center gap-4">
+              <button onClick={() => navigate('/patient-dashboard')} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 transition">
                 <i className="fas fa-arrow-left text-slate-600"></i>
               </button>
-              <h1 className="text-lg font-bold text-slate-800">{t.title}</h1>
+              <h1 className="text-xl font-black text-slate-800">{t.title}</h1>
             </div>
             <button onClick={() => setShowNotificationModal(true)} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 transition relative">
               <i className="fas fa-bell text-slate-600"></i>
               {notificationSettings.sms || notificationSettings.push ? (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-teal-500 rounded-full"></span>
+                <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full"></span>
               ) : null}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 space-y-4">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         {/* Live Queue Alert */}
         {liveQueueAppointment && (
           <div>
@@ -337,8 +340,8 @@ export const MyAppointments: React.FC = () => {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition ${
-                activeTab === tab ? 'bg-teal-500 text-white shadow' : 'text-slate-600 hover:bg-slate-50'
+              className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition ${
+                activeTab === tab ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/25' : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
               {tab === 'upcoming' ? t.upcoming : t.past}
@@ -363,7 +366,7 @@ export const MyAppointments: React.FC = () => {
                       <p className="text-xs text-slate-400 mt-1">{apt.chamberName}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-teal-600">{formatDate(apt.date)}</p>
+                      <p className="font-bold text-blue-600">{formatDate(apt.date)}</p>
                       <p className="text-sm text-slate-500">{apt.time}</p>
                       <p className="text-xs text-slate-400 mt-1">{t.serial} #{apt.serialNumber}</p>
                     </div>
@@ -388,7 +391,7 @@ export const MyAppointments: React.FC = () => {
                       <button onClick={() => setShowCancelModal(apt.id)} className="px-3 py-1.5 text-red-600 text-sm font-medium hover:bg-red-50 rounded-lg transition">
                         {t.cancel}
                       </button>
-                      <button className="px-3 py-1.5 bg-teal-500 text-white text-sm font-medium rounded-lg hover:bg-teal-600 transition">
+                      <button className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-bold rounded-lg hover:from-blue-600 hover:to-indigo-600 transition shadow-lg shadow-blue-500/25">
                         {t.viewDetails}
                       </button>
                     </div>

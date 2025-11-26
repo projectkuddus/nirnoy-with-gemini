@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import PageHeader from '../components/PageHeader';
 
 type Step = 'personal' | 'professional' | 'verification' | 'review';
 
@@ -491,16 +492,17 @@ export const DoctorRegistration: React.FC = () => {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex items-center justify-center p-4">
+        <PageHeader />
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border border-slate-100 mt-24">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <i className="fas fa-check text-4xl text-green-600"></i>
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-4">{t.successTitle}</h2>
+          <h2 className="text-2xl font-black text-slate-800 mb-4">{t.successTitle}</h2>
           <p className="text-slate-600 mb-6">{t.successMessage}</p>
           <button
             onClick={() => navigate('/')}
-            className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition"
+            className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-600 transition shadow-lg shadow-blue-500/25"
           >
             {t.goHome}
           </button>
@@ -510,13 +512,14 @@ export const DoctorRegistration: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-slate-100">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      <PageHeader />
+      <div className="container mx-auto px-6 py-8 max-w-7xl pt-24">
         <div className="grid lg:grid-cols-3 gap-8">
           
           {/* Left Sidebar - Benefits */}
           <div className="hidden lg:block">
-            <div className="sticky top-8 bg-gradient-to-br from-teal-600 to-teal-700 rounded-3xl p-8 text-white shadow-xl">
+            <div className="sticky top-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl">
               <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6">
                 <i className="fas fa-user-md text-3xl"></i>
               </div>
@@ -527,25 +530,25 @@ export const DoctorRegistration: React.FC = () => {
                   <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                     <i className="fas fa-users"></i>
                   </div>
-                  <p className="text-teal-100">{t.benefit1}</p>
+                  <p className="text-blue-100">{t.benefit1}</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                     <i className="fas fa-list-ol"></i>
                   </div>
-                  <p className="text-teal-100">{t.benefit2}</p>
+                  <p className="text-blue-100">{t.benefit2}</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                     <i className="fas fa-robot"></i>
                   </div>
-                  <p className="text-teal-100">{t.benefit3}</p>
+                  <p className="text-blue-100">{t.benefit3}</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
                     <i className="fas fa-gift"></i>
                   </div>
-                  <p className="text-teal-100">{t.benefit4}</p>
+                  <p className="text-blue-100">{t.benefit4}</p>
                 </div>
               </div>
             </div>
@@ -571,7 +574,7 @@ export const DoctorRegistration: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
                           i < currentStepIndex ? 'bg-green-500 text-white' :
-                          i === currentStepIndex ? 'bg-teal-600 text-white' :
+                          i === currentStepIndex ? 'bg-blue-600 text-white' :
                           'bg-slate-200 text-slate-500'
                         }`}>
                           {i < currentStepIndex ? <i className="fas fa-check"></i> : i + 1}
@@ -611,7 +614,7 @@ export const DoctorRegistration: React.FC = () => {
                           value={data.nameEn}
                           onChange={(e) => updateData('nameEn', e.target.value)}
                           className={`w-full p-4 border-2 rounded-xl outline-none transition ${
-                            errors.nameEn ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-teal-500'
+                            errors.nameEn ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
                           }`}
                           placeholder="Dr. John Doe"
                         />
@@ -626,7 +629,7 @@ export const DoctorRegistration: React.FC = () => {
                           type="text"
                           value={data.nameBn}
                           onChange={(e) => updateData('nameBn', e.target.value)}
-                          className="w-full p-4 border-2 border-slate-200 rounded-xl outline-none focus:border-teal-500 transition"
+                          className="w-full p-4 border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 transition"
                           placeholder="ডা. জন ডো"
                         />
                       </div>
@@ -645,7 +648,7 @@ export const DoctorRegistration: React.FC = () => {
                               onClick={() => updateData('gender', g)}
                               className={`flex-1 p-4 rounded-xl border-2 font-bold transition ${
                                 data.gender === g
-                                  ? 'border-teal-500 bg-teal-50 text-teal-700'
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
                                   : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                               }`}
                             >
@@ -666,7 +669,7 @@ export const DoctorRegistration: React.FC = () => {
                           value={data.dateOfBirth}
                           onChange={(e) => updateData('dateOfBirth', e.target.value)}
                           className={`w-full p-4 border-2 rounded-xl outline-none transition ${
-                            errors.dateOfBirth ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-teal-500'
+                            errors.dateOfBirth ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
                           }`}
                         />
                         {errors.dateOfBirth && <p className="text-red-500 text-sm mt-1">{errors.dateOfBirth}</p>}
@@ -688,7 +691,7 @@ export const DoctorRegistration: React.FC = () => {
                               updateData('phone', value);
                             }}
                             className={`w-full p-4 border-2 rounded-xl outline-none transition ${
-                              errors.phone ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-teal-500'
+                              errors.phone ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
                             }`}
                             placeholder="01712345678"
                           />
@@ -712,7 +715,7 @@ export const DoctorRegistration: React.FC = () => {
                           type="email"
                           value={data.email}
                           onChange={(e) => updateData('email', e.target.value)}
-                          className="w-full p-4 border-2 border-slate-200 rounded-xl outline-none focus:border-teal-500 transition"
+                          className="w-full p-4 border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 transition"
                           placeholder="doctor@example.com"
                         />
                       </div>
@@ -729,7 +732,7 @@ export const DoctorRegistration: React.FC = () => {
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <i className="fas fa-graduation-cap text-teal-600"></i>
+                            <i className="fas fa-graduation-cap text-blue-600"></i>
                             {t.qualifications}
                           </h3>
                           <p className="text-sm text-slate-500">{t.qualificationsDesc}</p>
@@ -748,7 +751,7 @@ export const DoctorRegistration: React.FC = () => {
                             key={qual.id} 
                             className={`p-5 rounded-xl border-2 transition ${
                               qual.isPrimary 
-                                ? 'border-teal-300 bg-teal-50/50' 
+                                ? 'border-blue-300 bg-blue-50/50' 
                                 : 'border-slate-200 bg-white hover:border-slate-300'
                             }`}
                           >
@@ -758,7 +761,7 @@ export const DoctorRegistration: React.FC = () => {
                                   {isBn ? `ডিগ্রি ${index + 1}` : `Degree ${index + 1}`}
                                 </span>
                                 {qual.isPrimary && (
-                                  <span className="bg-teal-600 text-white text-xs px-2 py-0.5 rounded-full">
+                                  <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
                                     {t.primaryDegree}
                                   </span>
                                 )}
@@ -783,7 +786,7 @@ export const DoctorRegistration: React.FC = () => {
                                 <select
                                   value={qual.degree}
                                   onChange={(e) => updateQualification(qual.id, 'degree', e.target.value)}
-                                  className="w-full p-3 border-2 border-slate-200 rounded-lg outline-none focus:border-teal-500 transition bg-white"
+                                  className="w-full p-3 border-2 border-slate-200 rounded-lg outline-none focus:border-blue-500 transition bg-white"
                                 >
                                   <option value="">{t.selectDegree}</option>
                                   {DEGREES.map((d) => (
@@ -801,7 +804,7 @@ export const DoctorRegistration: React.FC = () => {
                                   type="text"
                                   value={qual.field}
                                   onChange={(e) => updateQualification(qual.id, 'field', e.target.value)}
-                                  className="w-full p-3 border-2 border-slate-200 rounded-lg outline-none focus:border-teal-500 transition"
+                                  className="w-full p-3 border-2 border-slate-200 rounded-lg outline-none focus:border-blue-500 transition"
                                   placeholder={t.fieldPlaceholder}
                                 />
                               </div>
@@ -827,7 +830,7 @@ export const DoctorRegistration: React.FC = () => {
                                   }}
                                   onFocus={() => !otherInstitutions[qual.id] && setShowInstitutionDropdown(qual.id)}
                                   className={`w-full p-3 pr-10 border-2 rounded-lg outline-none transition ${
-                                    errors[`qual_${qual.id}_institution`] ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-teal-500'
+                                    errors[`qual_${qual.id}_institution`] ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
                                   }`}
                                   placeholder={isBn ? 'প্রতিষ্ঠান খুঁজুন...' : 'Search institution...'}
                                 />
@@ -839,7 +842,7 @@ export const DoctorRegistration: React.FC = () => {
                                         setOtherInstitutions(prev => ({ ...prev, [qual.id]: false }));
                                         updateQualification(qual.id, 'institution', '');
                                       }}
-                                      className="text-teal-600 hover:text-teal-700"
+                                      className="text-blue-600 hover:text-blue-700"
                                     >
                                       <i className="fas fa-list"></i>
                                     </button>
@@ -865,7 +868,7 @@ export const DoctorRegistration: React.FC = () => {
                                           }
                                           setShowInstitutionDropdown(null);
                                         }}
-                                        className="w-full px-3 py-2 text-left hover:bg-teal-50 flex items-center justify-between text-sm"
+                                        className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center justify-between text-sm"
                                       >
                                         <div>
                                           <p className="font-medium text-slate-700">{inst.name}</p>
@@ -890,7 +893,7 @@ export const DoctorRegistration: React.FC = () => {
                                           updateQualification(qual.id, 'institution', institutionSearches[qual.id] || '');
                                           setShowInstitutionDropdown(null);
                                         }}
-                                        className="w-full p-3 text-center text-teal-600 hover:bg-teal-50"
+                                        className="w-full p-3 text-center text-blue-600 hover:bg-blue-50"
                                       >
                                         <i className="fas fa-plus mr-1"></i>
                                         {isBn ? 'অন্য প্রতিষ্ঠান যোগ করুন' : 'Add other institution'}
@@ -912,7 +915,7 @@ export const DoctorRegistration: React.FC = () => {
                                   type="number"
                                   value={qual.yearOfCompletion}
                                   onChange={(e) => updateQualification(qual.id, 'yearOfCompletion', e.target.value)}
-                                  className="w-full p-3 border-2 border-slate-200 rounded-lg outline-none focus:border-teal-500 transition"
+                                  className="w-full p-3 border-2 border-slate-200 rounded-lg outline-none focus:border-blue-500 transition"
                                   placeholder="2010"
                                   min="1950"
                                   max={new Date().getFullYear()}
@@ -926,7 +929,7 @@ export const DoctorRegistration: React.FC = () => {
                         <button
                           type="button"
                           onClick={addQualification}
-                          className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50/50 transition flex items-center justify-center gap-2"
+                          className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition flex items-center justify-center gap-2"
                         >
                           <i className="fas fa-plus-circle"></i>
                           {t.addDegree}
@@ -939,7 +942,7 @@ export const DoctorRegistration: React.FC = () => {
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <i className="fas fa-stethoscope text-teal-600"></i>
+                            <i className="fas fa-stethoscope text-blue-600"></i>
                             {t.specializations}
                           </h3>
                           <p className="text-sm text-slate-500">{t.specializationsDesc}</p>
@@ -958,14 +961,14 @@ export const DoctorRegistration: React.FC = () => {
                             key={spec.id} 
                             className={`flex items-center gap-3 p-3 rounded-xl border-2 transition ${
                               spec.isPrimary 
-                                ? 'border-teal-300 bg-teal-50/50' 
+                                ? 'border-blue-300 bg-blue-50/50' 
                                 : 'border-slate-200 bg-white'
                             }`}
                           >
                             <select
                               value={spec.name}
                               onChange={(e) => updateSpecialization(spec.id, 'name', e.target.value)}
-                              className="flex-1 p-3 border-2 border-slate-200 rounded-lg outline-none focus:border-teal-500 transition bg-white"
+                              className="flex-1 p-3 border-2 border-slate-200 rounded-lg outline-none focus:border-blue-500 transition bg-white"
                             >
                               <option value="">{t.selectSpecialty}</option>
                               {SPECIALTIES.map((s) => (
@@ -974,7 +977,7 @@ export const DoctorRegistration: React.FC = () => {
                             </select>
                             
                             {spec.isPrimary ? (
-                              <span className="bg-teal-600 text-white text-xs px-3 py-1.5 rounded-full whitespace-nowrap">
+                              <span className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-full whitespace-nowrap">
                                 {t.primarySpecialty}
                               </span>
                             ) : (
@@ -993,7 +996,7 @@ export const DoctorRegistration: React.FC = () => {
                         <button
                           type="button"
                           onClick={addSpecialization}
-                          className="w-full p-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50/50 transition flex items-center justify-center gap-2"
+                          className="w-full p-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition flex items-center justify-center gap-2"
                         >
                           <i className="fas fa-plus-circle"></i>
                           {t.addSpecialty}
@@ -1010,7 +1013,7 @@ export const DoctorRegistration: React.FC = () => {
                         type="number"
                         value={data.experienceYears}
                         onChange={(e) => updateData('experienceYears', e.target.value)}
-                        className="w-full p-4 border-2 border-slate-200 rounded-xl outline-none focus:border-teal-500 transition"
+                        className="w-full p-4 border-2 border-slate-200 rounded-xl outline-none focus:border-blue-500 transition"
                         placeholder="10"
                         min="0"
                         max="60"
@@ -1044,7 +1047,7 @@ export const DoctorRegistration: React.FC = () => {
                         value={data.bmdcNumber}
                         onChange={(e) => updateData('bmdcNumber', e.target.value.toUpperCase())}
                         className={`w-full p-4 border-2 rounded-xl outline-none transition ${
-                          errors.bmdcNumber ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-teal-500'
+                          errors.bmdcNumber ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
                         }`}
                         placeholder="A-12345"
                       />
@@ -1061,7 +1064,7 @@ export const DoctorRegistration: React.FC = () => {
                         value={data.nidNumber}
                         onChange={(e) => updateData('nidNumber', e.target.value.replace(/\D/g, ''))}
                         className={`w-full p-4 border-2 rounded-xl outline-none transition ${
-                          errors.nidNumber ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-teal-500'
+                          errors.nidNumber ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
                         }`}
                         placeholder="1234567890"
                         maxLength={17}
@@ -1074,7 +1077,7 @@ export const DoctorRegistration: React.FC = () => {
                       <label className="block text-sm font-bold text-slate-700 mb-2">
                         {t.profilePhoto} <span className="text-slate-400 font-normal">({t.optional})</span>
                       </label>
-                      <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-teal-400 transition cursor-pointer">
+                      <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition cursor-pointer">
                         <i className="fas fa-cloud-upload-alt text-4xl text-slate-300 mb-3"></i>
                         <p className="text-slate-500">{t.uploadPhoto}</p>
                         <p className="text-xs text-slate-400 mt-1">JPG, PNG (Max 2MB)</p>
@@ -1091,7 +1094,7 @@ export const DoctorRegistration: React.FC = () => {
                     {/* Personal Info */}
                     <div className="bg-slate-50 rounded-2xl p-6">
                       <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                        <i className="fas fa-user text-teal-600"></i> {t.step1}
+                        <i className="fas fa-user text-blue-600"></i> {t.step1}
                       </h4>
                       <div className="grid md:grid-cols-2 gap-4">
                         <div>
@@ -1116,12 +1119,12 @@ export const DoctorRegistration: React.FC = () => {
                     {/* Qualifications */}
                     <div className="bg-slate-50 rounded-2xl p-6">
                       <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                        <i className="fas fa-graduation-cap text-teal-600"></i> {t.qualifications}
+                        <i className="fas fa-graduation-cap text-blue-600"></i> {t.qualifications}
                       </h4>
                       <div className="space-y-3">
                         {data.qualifications.filter(q => q.degree).map((qual, index) => (
                           <div key={qual.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
-                            <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 font-bold text-sm">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">
                               {index + 1}
                             </div>
                             <div className="flex-1">
@@ -1135,7 +1138,7 @@ export const DoctorRegistration: React.FC = () => {
                               </p>
                             </div>
                             {qual.isPrimary && (
-                              <span className="bg-teal-100 text-teal-700 text-xs px-2 py-1 rounded-full">Primary</span>
+                              <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">Primary</span>
                             )}
                           </div>
                         ))}
@@ -1145,7 +1148,7 @@ export const DoctorRegistration: React.FC = () => {
                     {/* Specializations */}
                     <div className="bg-slate-50 rounded-2xl p-6">
                       <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                        <i className="fas fa-stethoscope text-teal-600"></i> {t.specializations}
+                        <i className="fas fa-stethoscope text-blue-600"></i> {t.specializations}
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {data.specializations.filter(s => s.name).map((spec) => (
@@ -1153,7 +1156,7 @@ export const DoctorRegistration: React.FC = () => {
                             key={spec.id} 
                             className={`px-3 py-1.5 rounded-full text-sm font-medium ${
                               spec.isPrimary 
-                                ? 'bg-teal-600 text-white' 
+                                ? 'bg-blue-600 text-white' 
                                 : 'bg-white border border-slate-200 text-slate-700'
                             }`}
                           >
@@ -1167,7 +1170,7 @@ export const DoctorRegistration: React.FC = () => {
                     {/* Verification */}
                     <div className="bg-slate-50 rounded-2xl p-6">
                       <h4 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
-                        <i className="fas fa-shield-alt text-teal-600"></i> {t.step3}
+                        <i className="fas fa-shield-alt text-blue-600"></i> {t.step3}
                       </h4>
                       <div className="grid md:grid-cols-2 gap-4">
                         <div>
@@ -1186,7 +1189,7 @@ export const DoctorRegistration: React.FC = () => {
                         type="checkbox"
                         checked={agreedToTerms}
                         onChange={(e) => setAgreedToTerms(e.target.checked)}
-                        className="w-5 h-5 mt-0.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                        className="w-5 h-5 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-sm text-slate-600">{t.termsAgree}</span>
                     </label>
@@ -1210,7 +1213,7 @@ export const DoctorRegistration: React.FC = () => {
                       type="button"
                       onClick={() => { handleSubmit(); setSubmitted(true); }}
                       disabled={!agreedToTerms || isSubmitting}
-                      className="flex-[2] py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-[2] py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? (
                         <><i className="fas fa-circle-notch fa-spin mr-2"></i> {t.submitting}</>
@@ -1222,7 +1225,7 @@ export const DoctorRegistration: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleNext}
-                      className="flex-[2] py-4 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 transition"
+                      className="flex-[2] py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
                     >
                       {t.next} <i className="fas fa-arrow-right ml-2"></i>
                     </button>
