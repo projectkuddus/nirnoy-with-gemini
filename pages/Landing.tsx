@@ -2,40 +2,121 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 
-// ============ ANIMATED HEALTH GRAPHIC ============
-const HealthGraphic: React.FC = () => (
-  <div className="relative w-full max-w-md mx-auto">
-    {/* Central Circle with Pulse */}
-    <div className="relative w-64 h-64 mx-auto">
-      {/* Outer rings */}
-      <div className="absolute inset-0 border-2 border-blue-100 rounded-full animate-ping opacity-20"></div>
-      <div className="absolute inset-4 border border-blue-200 rounded-full"></div>
-      <div className="absolute inset-8 border border-blue-100 rounded-full"></div>
-      
-      {/* Center */}
-      <div className="absolute inset-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-xl shadow-blue-500/30">
-        <div className="text-center text-white">
-          <i className="fas fa-heartbeat text-4xl mb-2"></i>
-          <p className="text-xs font-bold uppercase tracking-wider">Nirnoy</p>
+// ============ NIRNOY CORE GRAPHIC - Neural/Solar System Style ============
+const NirnoyCoreGraphic: React.FC = () => {
+  // Orbiting elements representing different healthcare aspects
+  const orbitingNodes = [
+    { icon: 'fa-user-md', label: 'ডাক্তার', angle: 0, orbit: 1, color: '#3b82f6' },
+    { icon: 'fa-hospital', label: 'হাসপাতাল', angle: 45, orbit: 2, color: '#0ea5e9' },
+    { icon: 'fa-calendar-check', label: 'অ্যাপয়েন্টমেন্ট', angle: 90, orbit: 1, color: '#3b82f6' },
+    { icon: 'fa-pills', label: 'ওষুধ', angle: 135, orbit: 2, color: '#0ea5e9' },
+    { icon: 'fa-heartbeat', label: 'স্বাস্থ্য', angle: 180, orbit: 1, color: '#3b82f6' },
+    { icon: 'fa-file-medical', label: 'রিপোর্ট', angle: 225, orbit: 2, color: '#0ea5e9' },
+    { icon: 'fa-clock', label: 'লাইভ কিউ', angle: 270, orbit: 1, color: '#3b82f6' },
+    { icon: 'fa-bell', label: 'নোটিফিকেশন', angle: 315, orbit: 2, color: '#0ea5e9' },
+  ];
+
+  return (
+    <div className="relative w-80 h-80 mx-auto">
+      {/* SVG for connection lines */}
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 320 320">
+        {/* Outer orbit ring */}
+        <circle cx="160" cy="160" r="140" fill="none" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
+        {/* Inner orbit ring */}
+        <circle cx="160" cy="160" r="100" fill="none" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
+        
+        {/* Neural connection lines from center to nodes */}
+        {orbitingNodes.map((node, i) => {
+          const radius = node.orbit === 1 ? 100 : 140;
+          const x = 160 + radius * Math.cos((node.angle * Math.PI) / 180);
+          const y = 160 + radius * Math.sin((node.angle * Math.PI) / 180);
+          return (
+            <line
+              key={i}
+              x1="160"
+              y1="160"
+              x2={x}
+              y2={y}
+              stroke="#dbeafe"
+              strokeWidth="2"
+              className="animate-pulse"
+              style={{ animationDelay: `${i * 0.2}s` }}
+            />
+          );
+        })}
+        
+        {/* Data flow particles on lines */}
+        {orbitingNodes.map((node, i) => {
+          const radius = node.orbit === 1 ? 100 : 140;
+          const x = 160 + radius * Math.cos((node.angle * Math.PI) / 180);
+          const y = 160 + radius * Math.sin((node.angle * Math.PI) / 180);
+          return (
+            <circle key={`particle-${i}`} r="3" fill="#3b82f6" opacity="0.6">
+              <animateMotion
+                dur={`${2 + i * 0.3}s`}
+                repeatCount="indefinite"
+                path={`M160,160 L${x},${y}`}
+              />
+            </circle>
+          );
+        })}
+      </svg>
+
+      {/* Outer glow ring */}
+      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/5 via-transparent to-blue-500/5 animate-spin" style={{ animationDuration: '20s' }}></div>
+
+      {/* Center Core - Nirnoy */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28">
+        {/* Pulse rings */}
+        <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping"></div>
+        <div className="absolute inset-2 rounded-full bg-blue-500/10 animate-pulse"></div>
+        
+        {/* Core */}
+        <div className="absolute inset-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full shadow-xl shadow-blue-500/40 flex items-center justify-center">
+          <div className="text-center text-white">
+            <span className="text-2xl font-bold block">ন</span>
+            <span className="text-[8px] font-bold uppercase tracking-widest">Nirnoy</span>
+          </div>
         </div>
       </div>
 
-      {/* Floating Icons */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
-        <i className="fas fa-user-md text-blue-500 text-lg"></i>
-      </div>
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
-        <i className="fas fa-calendar-check text-blue-500 text-lg"></i>
-      </div>
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
-        <i className="fas fa-notes-medical text-blue-500 text-lg"></i>
-      </div>
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
-        <i className="fas fa-clock text-blue-500 text-lg"></i>
-      </div>
+      {/* Orbiting Nodes */}
+      {orbitingNodes.map((node, i) => {
+        const radius = node.orbit === 1 ? 100 : 140;
+        const x = 160 + radius * Math.cos((node.angle * Math.PI) / 180);
+        const y = 160 + radius * Math.sin((node.angle * Math.PI) / 180);
+        
+        return (
+          <div
+            key={i}
+            className="absolute w-10 h-10 -ml-5 -mt-5 group"
+            style={{ left: x, top: y }}
+          >
+            <div 
+              className="w-full h-full bg-white rounded-xl shadow-lg border border-slate-100 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-xl cursor-default"
+              style={{ boxShadow: `0 4px 20px ${node.color}20` }}
+            >
+              <i className={`fas ${node.icon} text-sm`} style={{ color: node.color }}></i>
+            </div>
+            
+            {/* Tooltip */}
+            <div className="absolute left-1/2 -translate-x-1/2 -bottom-8 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              <span className="text-xs font-medium text-slate-600 bg-white px-2 py-1 rounded shadow-sm border border-slate-100">
+                {node.label}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Decorative corner elements */}
+      <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-blue-200 rounded-tl"></div>
+      <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-blue-200 rounded-tr"></div>
+      <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-blue-200 rounded-bl"></div>
+      <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-blue-200 rounded-br"></div>
     </div>
-  </div>
-);
+  );
+};
 
 // ============ VOICE AGENT CARD ============
 const VoiceAgentCard: React.FC<{
@@ -261,7 +342,7 @@ export const Landing: React.FC = () => {
 
             {/* Right: Health Graphic */}
             <div className="hidden lg:block">
-              <HealthGraphic />
+              <NirnoyCoreGraphic />
             </div>
           </div>
         </div>
