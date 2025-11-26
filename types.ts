@@ -7,11 +7,23 @@ export enum UserRole {
 }
 
 export enum AppointmentStatus {
-  BOOKED = 'BOOKED',
+  REQUESTED = 'REQUESTED',
+  CONFIRMED = 'CONFIRMED',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   NO_SHOW = 'NO_SHOW',
   CANCELLED = 'CANCELLED'
+}
+
+export enum VisitType {
+  NEW = 'NEW',
+  FOLLOW_UP = 'FOLLOW_UP',
+  REPORT_CHECK = 'REPORT_CHECK'
+}
+
+export enum ConsultationType {
+  CHAMBER = 'CHAMBER',
+  ONLINE = 'ONLINE'
 }
 
 export interface Chamber {
@@ -87,17 +99,21 @@ export interface Appointment {
   id: string;
   patientId: string;
   patientName: string;
-  patientAge: number;
-  patientGender: string;
+  patientAge?: number;
+  patientGender?: string;
+  patientPhone?: string;
   doctorId: string;
   doctorName?: string;
   chamberId: string; // Links to specific location
+  clinicName?: string;
   date: string;
   time: string;
   status: AppointmentStatus;
-  type: 'Chamber' | 'Online';
-  visitCategory?: 'New Consultation' | 'Follow-up' | 'Report Analysis' | 'Online Consult';
-  symptomSummary?: string;
+  visitType: VisitType;
+  consultationType: ConsultationType;
+  serialNumber?: number;
+  symptoms?: string;
+  fee?: number;
   prescription?: PrescriptionItem[];
   diagnosis?: string;
 }

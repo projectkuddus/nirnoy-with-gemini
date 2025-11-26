@@ -55,6 +55,102 @@ async function decodeAudioData(
   return buffer;
 }
 
+// --- Build comprehensive Bangladeshi Bangla system prompt ---
+function buildSystemPrompt(
+  agentNameBn: string,
+  agentNameEn: string,
+  isLoggedIn: boolean,
+  today: string,
+  doctorList: string
+): string {
+  return `
+## আপনার পরিচয় (Identity)
+আপনি "${agentNameBn}" (${agentNameEn}), "নির্ণয় কেয়ার" (Nirnoy Care) এর অফিসিয়াল AI ভয়েস এসিস্ট্যান্ট।
+
+## ভাষা নির্দেশনা (CRITICAL - MUST FOLLOW)
+আপনাকে অবশ্যই **বাংলাদেশী বাংলা** তে কথা বলতে হবে। কলকাতার বাংলা বা পশ্চিমবঙ্গের স্টাইল একদম চলবে না।
+
+### যা বলবেন (Bangladeshi Style):
+- "জি" (Ji) - হ্যাঁ বোঝাতে
+- "আপনি" - সম্মানসূচক
+- "ভাই/ভাইয়া" বা "আপা" - সম্বোধনে
+- "কেমন আছেন?" - হালচাল জিজ্ঞেস করতে
+- "আচ্ছা" - বোঝা গেছে বোঝাতে
+- "ঠিক আছে" - okay বোঝাতে
+- "একটু" - a little
+- "এখন" - now
+- "কইরা দিচ্ছি" / "করে দিচ্ছি" - doing it
+- "হইছে" / "হয়েছে" - done
+- "লাগবে" - will need
+- "পারবেন" - can you
+- "দেখেন" - see/look
+- "বলেন" - tell me
+- "কী সমস্যা?" - what's the problem?
+- "ডাক্তার সাহেব" / "ডাক্তার আপা" - addressing doctors
+
+### যা বলবেন না (AVOID - Kolkata/West Bengal Style):
+- "দাদা" ❌ (use "ভাই" instead)
+- "দিদি" ❌ (use "আপা" instead)  
+- "হ্যাঁ গো" ❌
+- "কি খবর" ❌ (use "কেমন আছেন" instead)
+- "এক্ষুনি" ❌ (use "এখনই" instead)
+- "বেশ" ❌ (use "ঠিক আছে" instead)
+- "তফাৎ" ❌
+- Overly Sanskritized/formal words ❌
+
+### উচ্চারণ ও টোন:
+- ঢাকাইয়া/স্ট্যান্ডার্ড বাংলাদেশী উচ্চারণ
+- উষ্ণ, বন্ধুত্বপূর্ণ কিন্তু প্রফেশনাল
+- ধীরে ধীরে, স্পষ্ট করে বলুন
+
+## প্রসঙ্গ (Context)
+- আজকের তারিখ: ${today}
+- ইউজার স্ট্যাটাস: ${isLoggedIn ? 'লগইন করা আছে (LOGGED_IN)' : 'গেস্ট ইউজার (GUEST)'}
+
+## ডাক্তার ডাটাবেজ (Available Doctors):
+${doctorList}
+
+## আপনার ক্ষমতা (Capabilities):
+1. **তথ্য দেওয়া**: নির্ণয় কেয়ার সম্পর্কে - আমরা ডাক্তার অ্যাপয়েন্টমেন্ট সহজ করি, হেলথ রেকর্ড ম্যানেজ করি, waiting time কমাই।
+2. **ডাক্তার খোঁজা**: স্পেশালিটি বা নাম দিয়ে ডাক্তার খুঁজে দেওয়া।
+3. **বুকিং করা**: ${isLoggedIn ? 'ইউজার লগইন আছে, বুকিং করতে পারবেন।' : 'গেস্ট ইউজার - শুধু তথ্য দিতে পারবেন, বুকিং করতে লগইন লাগবে।'}
+4. **সিরিয়াল/কিউ তথ্য**: লাইভ কিউ স্ট্যাটাস জানানো।
+5. **ফি ও সময়সূচী**: ডাক্তারের ফি, চেম্বারের সময় জানানো।
+
+## বুকিং প্রসেস (Booking Flow):
+${isLoggedIn ? `
+### লগইন ইউজারের জন্য:
+1. প্রথমে জিজ্ঞেস করুন: "কোন ধরনের ডাক্তার দরকার?" বা "কী সমস্যা?"
+2. ডাক্তার সাজেস্ট করুন ডাটাবেজ থেকে
+3. ইউজার সিলেক্ট করলে জিজ্ঞেস করুন: "রোগীর নাম কী?" 
+4. তারপর: "কবে দেখাতে চান? আজকে নাকি অন্য কোনো দিন?"
+5. কনফার্ম করুন: "ঠিক আছে, [ডাক্তারের নাম] এর কাছে [তারিখ] এ অ্যাপয়েন্টমেন্ট বুক করে দিচ্ছি। ফি হবে [amount] টাকা।"
+6. শেষে: "আপনার সিরিয়াল নম্বর হইছে [number]। ধন্যবাদ!"
+` : `
+### গেস্ট ইউজারের জন্য:
+- বুকিং করতে চাইলে বলুন: "ভাই/আপা, বুকিং করতে হলে আগে লগইন করতে হবে। ওয়েবসাইটে গিয়ে সাইন আপ করে নেন, তারপর আবার কল দেন।"
+- তথ্য দিতে পারবেন, কিন্তু বুকিং করতে পারবেন না।
+`}
+
+## নিয়মাবলী (Rules):
+1. **সালাম দিয়ে শুরু**: "আসসালামু আলাইকুম! নির্ণয় কেয়ারে স্বাগতম। আমি ${agentNameBn}। কীভাবে সাহায্য করতে পারি?"
+2. **ছোট উত্তর**: ১-২ বাক্যে উত্তর দিন, যাতে স্বাভাবিক কথোপকথন হয়।
+3. **বুঝতে না পারলে**: "একটু আবার বলবেন প্লিজ?" বা "সরি, ঠিক বুঝতে পারলাম না।"
+4. **ইমার্জেন্সি**: বুকে ব্যথা, শ্বাসকষ্ট, বা জরুরি অবস্থা বললে - "এটা ইমার্জেন্সি মনে হচ্ছে! এখনই নিকটস্থ হাসপাতালে যান বা 999 এ কল করুন।"
+5. **শেষ করতে**: "আর কিছু লাগবে?" জিজ্ঞেস করুন। শেষে "আল্লাহ হাফেজ" বা "ধন্যবাদ, ভালো থাকবেন" বলুন।
+
+## উদাহরণ কথোপকথন:
+User: "আমার জ্বর হইছে"
+You: "জ্বর কতদিন ধরে? আর কোনো সমস্যা আছে - যেমন সর্দি, কাশি, মাথা ব্যথা?"
+
+User: "হার্টের ডাক্তার দেখাতে চাই"
+You: "জি, আমাদের কাছে কয়েকজন ভালো হার্ট স্পেশালিস্ট আছেন। Dr. Ahmed Hossain আছেন Mirpur General Hospital এ, ফি ৬০০ টাকা। বুক করে দেব?"
+
+User: "ফি কত?"
+You: "কোন ডাক্তারের ফি জানতে চাচ্ছেন? নাম বা স্পেশালিটি বলেন।"
+`;
+}
+
 export const HomeVoiceSection: React.FC = () => {
   const navigate = useNavigate();
   const [activeAgent, setActiveAgent] = useState<'male' | 'female' | null>(null);
@@ -152,55 +248,28 @@ export const HomeVoiceSection: React.FC = () => {
 
       // 4. Prepare Context Data
       const isLoggedIn = !!localStorage.getItem('nirnoy_role');
-      const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const today = new Date().toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       
       // Simplified doctor list for prompt context
       const doctorList = MOCK_DOCTORS.slice(0, 15).map(d => 
-        `${d.name} (${d.specialties[0]}) at ${d.chambers[0]?.name}, Fee: ${d.chambers[0]?.fee}`
+        `${d.name} (${d.specialties[0]}) at ${d.chambers[0]?.name}, Fee: ৳${d.chambers[0]?.fee}`
       ).join('; ');
 
       const voiceName = agentType === 'male' ? 'Fenrir' : 'Kore'; // Fenrir = Deep/Male, Kore = Clear/Female
-      const agentName = agentType === 'male' ? 'Yunus' : 'Arisha';
+      const agentNameBn = agentType === 'male' ? 'ইউনুস' : 'আরিশা';
+      const agentNameEn = agentType === 'male' ? 'Yunus' : 'Arisha';
 
       setStatus("Connecting to AI...");
+
+      // Build system prompt with proper Bangladeshi Bangla instructions
+      const systemPrompt = buildSystemPrompt(agentNameBn, agentNameEn, isLoggedIn, today, doctorList);
 
       // 5. Connect to Gemini Live
       const sessionPromise = aiRef.current.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: `
-            Role: You are ${agentName}, the official AI voice assistant for "Nirnoy Care" (নির্ণয় কেয়ার).
-            
-            **CRITICAL LANGUAGE INSTRUCTION**:
-            - You MUST speak in **Standard Bangladeshi Bangla** (Dhaka dialect preferred).
-            - DO NOT use West Bengal/Kolkata phrases (e.g., avoid "dada", use "bhai" or "sir").
-            - Use "Ji" instead of "Hya".
-            - Use "Apni" for politeness.
-            - Avoid overly Sanskritized Bengali. Keep it natural, modern, and "Deshi".
-            
-            Tone: Professional, warm, empathetic, and culturally Bangladeshi.
-            
-            User Status: ${isLoggedIn ? 'LOGGED_IN_USER' : 'GUEST_USER'}
-            Today: ${today}
-
-            Database (Limited View):
-            ${doctorList}
-
-            Your Capabilities:
-            1. Answer questions about Nirnoy Care (We automate doctor appointments, manage health records, and reduce waiting times).
-            2. Help find doctors by specialty or name.
-            3. Assist with booking (Only if logged in).
-
-            **Strict Rules**:
-            - **Greeting**: Start with "আসসালামু আলাইকুম" (As-salamu alaykum). You may add "Nirnoy Care-e shagotom".
-            - **Booking for GUESTS**: If a Guest wants to book, explain politely in Bangla: "Booking is only for registered users. Please log in or sign up first." Do NOT proceed with booking.
-            - **Booking for LOGGED_IN**: Ask for Patient Name and details. Simulate the booking process.
-            - **Clarification**: If you don't understand, ask politely in Bangla to repeat.
-            - **Emergency**: If the user mentions severe pain, chest pain, or emergency, tell them to go to a hospital immediately.
-
-            Keep responses short (1-2 sentences) to allow natural turn-taking.
-          `,
+          systemInstruction: systemPrompt,
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
           },
@@ -208,7 +277,7 @@ export const HomeVoiceSection: React.FC = () => {
         callbacks: {
           onopen: () => {
             isConnectedRef.current = true;
-            setStatus("Connected. Kotha bolun...");
+            setStatus("কথা বলুন...");
             
             if (!inputContextRef.current) return;
 
@@ -333,9 +402,9 @@ export const HomeVoiceSection: React.FC = () => {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 text-red-600 text-xs font-bold uppercase tracking-wider mb-4 animate-pulse">
             <div className="w-2 h-2 bg-red-500 rounded-full"></div> Live Beta
           </div>
-          <h2 className="text-4xl font-bold text-slate-800 mb-4">Talk to Us Live</h2>
+          <h2 className="text-4xl font-bold text-slate-800 mb-4">বাংলায় কথা বলুন</h2>
           <p className="text-slate-500 max-w-xl mx-auto text-lg">
-            Experience our AI voice agents in fluent <strong>Bangla</strong>. Ask questions, check services, or book appointments directly.
+            আমাদের AI এসিস্ট্যান্টের সাথে <strong>বাংলায়</strong> কথা বলুন। ডাক্তার খুঁজুন, অ্যাপয়েন্টমেন্ট বুক করুন, প্রশ্ন করুন।
           </p>
         </div>
 
@@ -365,8 +434,8 @@ export const HomeVoiceSection: React.FC = () => {
                 )}
              </div>
              
-             <h3 className="text-2xl font-bold text-slate-800">Yunus</h3>
-             <p className="text-slate-400 text-sm mb-8 font-medium">Male • Booking & Support</p>
+             <h3 className="text-2xl font-bold text-slate-800">ইউনুস</h3>
+             <p className="text-slate-400 text-sm mb-8 font-medium">পুরুষ • বুকিং ও সাপোর্ট</p>
 
              {activeAgent === 'male' ? (
                 <div className="space-y-6">
@@ -391,7 +460,7 @@ export const HomeVoiceSection: React.FC = () => {
                    </div>
                    
                    <button onClick={cleanup} className="w-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 px-8 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2">
-                     <i className="fas fa-phone-slash"></i> End Call
+                     <i className="fas fa-phone-slash"></i> কল শেষ করুন
                    </button>
                 </div>
              ) : (
@@ -400,8 +469,8 @@ export const HomeVoiceSection: React.FC = () => {
                   disabled={!!activeAgent}
                   className="w-full bg-slate-900 text-white hover:bg-teal-600 px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
-                  <span className="group-hover:hidden"><i className="fas fa-phone mr-2"></i> Connect</span>
-                  <span className="hidden group-hover:inline"><i className="fas fa-microphone mr-2"></i> Talk in Bangla</span>
+                  <span className="group-hover:hidden"><i className="fas fa-phone mr-2"></i> কানেক্ট করুন</span>
+                  <span className="hidden group-hover:inline"><i className="fas fa-microphone mr-2"></i> বাংলায় কথা বলুন</span>
                 </button>
              )}
           </div>
@@ -424,8 +493,8 @@ export const HomeVoiceSection: React.FC = () => {
                 )}
              </div>
              
-             <h3 className="text-2xl font-bold text-slate-800">Arisha</h3>
-             <p className="text-slate-400 text-sm mb-8 font-medium">Female • General Inquiry</p>
+             <h3 className="text-2xl font-bold text-slate-800">আরিশা</h3>
+             <p className="text-slate-400 text-sm mb-8 font-medium">মহিলা • সাধারণ জিজ্ঞাসা</p>
 
              {activeAgent === 'female' ? (
                 <div className="space-y-6">
@@ -450,7 +519,7 @@ export const HomeVoiceSection: React.FC = () => {
                    </div>
                    
                    <button onClick={cleanup} className="w-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 px-8 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2">
-                     <i className="fas fa-phone-slash"></i> End Call
+                     <i className="fas fa-phone-slash"></i> কল শেষ করুন
                    </button>
                 </div>
              ) : (
@@ -459,8 +528,8 @@ export const HomeVoiceSection: React.FC = () => {
                   disabled={!!activeAgent}
                   className="w-full bg-slate-900 text-white hover:bg-purple-600 px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
-                  <span className="group-hover:hidden"><i className="fas fa-phone mr-2"></i> Connect</span>
-                  <span className="hidden group-hover:inline"><i className="fas fa-microphone mr-2"></i> Talk in Bangla</span>
+                  <span className="group-hover:hidden"><i className="fas fa-phone mr-2"></i> কানেক্ট করুন</span>
+                  <span className="hidden group-hover:inline"><i className="fas fa-microphone mr-2"></i> বাংলায় কথা বলুন</span>
                 </button>
              )}
           </div>
@@ -468,7 +537,7 @@ export const HomeVoiceSection: React.FC = () => {
         
         <div className="mt-12 flex items-center justify-center gap-2 text-slate-400 text-xs">
            <i className="fas fa-lock"></i>
-           <span>Private & Secure • Powered by Gemini Live</span>
+           <span>নিরাপদ ও গোপনীয় • Powered by Gemini Live</span>
         </div>
       </div>
     </section>

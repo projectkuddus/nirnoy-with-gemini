@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  role      String   // "PATIENT" | "DOCTOR" | "ADMIN"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctor    Doctor?
+  patient   Patient?
+}
+
+model Doctor {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  name            String
+  specialty       String
+  gender          String
+  degrees         String?
+  fee             Int
+  experienceYears Int?
+
+  user           User          @relation(fields: [userId], references: [id])
+  doctorClinics  DoctorClinic[]
+  appointments   Appointment[]
+}
+
+model Patient {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique
+  name        String
+  dateOfBirth DateTime?
+  gender      String?
+
+  user         User          @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+}
+
+model Clinic {
+  id      Int    @id @default(autoincrement())
+  name    String
+  area    String
+  city    String
+  address String
+
+  doctorClinics DoctorClinic[]
+  appointments  Appointment[]
+}
+
+model DoctorClinic {
+  id          Int    @id @default(autoincrement())
+  doctorId    Int
+  clinicId    Int
+  daysOfWeek  String  // e.g. "Sat,Mon,Wed"
+  startTime   String  // "10:00"
+  endTime     String  // "13:00"
+  slotMinutes Int
+
+  doctor Doctor @relation(fields: [doctorId], references: [id])
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+}
+
+model Appointment {
+  id              Int      @id @default(autoincrement())
+  patientId       Int
+  doctorId        Int
+  clinicId        Int
+  date            DateTime
+  startTime       String
+  endTime         String?
+  status          String   // "REQUESTED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW"
+  visitType       String   // "NEW" | "FOLLOW_UP" | "REPORT_CHECK"
+  consultationType String  @default("CHAMBER") // "CHAMBER" | "ONLINE"
+  serialNumber    Int?     // Queue serial for the day
+  patientName     String?  // For guest bookings or name override
+  patientPhone    String?  // For guest bookings
+  symptoms        String?  // Chief complaint
+  fee             Int?     // Fee at time of booking
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id])
+  doctor  Doctor  @relation(fields: [doctorId], references: [id])
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+}

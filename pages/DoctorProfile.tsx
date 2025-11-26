@@ -3,10 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { MOCK_DOCTORS } from '../data/mockData';
 import { BookingModal } from '../components/BookingModal';
 import { Chamber } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const DoctorProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { language } = useLanguage();
+  const isBn = language === 'bn';
+  
   const doctor = MOCK_DOCTORS.find(d => d.id === id);
   
   const [selectedChamber, setSelectedChamber] = useState<Chamber | null>(null);
@@ -14,6 +18,22 @@ export const DoctorProfile: React.FC = () => {
   // Check if the viewer is a doctor
   const role = localStorage.getItem('nirnoy_role');
   const isDoctorView = role === 'DOCTOR';
+
+  // Translations
+  const t = {
+    back: isBn ? 'পিছনে' : 'Back',
+    returnToDashboard: isBn ? 'ড্যাশবোর্ডে ফিরুন' : 'Return to Dashboard',
+    doctorNotFound: isBn ? 'ডাক্তার পাওয়া যায়নি' : 'Doctor Not Found',
+    notFoundDesc: isBn ? 'আপনি যে প্রোফাইলটি খুঁজছেন তা বিদ্যমান নেই।' : 'The profile you are looking for does not exist.',
+    goBack: isBn ? 'ফিরে যান' : 'Go Back',
+    patients: isBn ? 'রোগী' : 'Patients',
+    appointmentSchedule: isBn ? 'অ্যাপয়েন্টমেন্ট সময়সূচী' : 'Appointment Schedule',
+    minPerPatient: isBn ? 'মিনিট / রোগী' : 'min / patient',
+    bookAppointment: isBn ? 'অ্যাপয়েন্টমেন্ট বুক করুন' : 'Book Appointment',
+    verifyStatus: isBn ? 'যাচাই স্ট্যাটাস' : 'Verify Status',
+    bmdcVerified: isBn ? 'BMDC যাচাইকৃত' : 'BMDC Verified',
+    regNo: isBn ? 'রেজি নং' : 'Reg No',
+  };
 
   // Use local profile data if viewing self
   const savedProfile = localStorage.getItem('nirnoy_doctor_profile');
@@ -26,13 +46,13 @@ export const DoctorProfile: React.FC = () => {
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
         <div className="text-center">
           <i className="fas fa-user-slash text-6xl text-slate-300 mb-4"></i>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Doctor Not Found</h2>
-          <p className="text-slate-500 mb-6">The profile you are looking for does not exist.</p>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">{t.doctorNotFound}</h2>
+          <p className="text-slate-500 mb-6">{t.notFoundDesc}</p>
           <button 
              onClick={() => navigate(-1)}
              className="bg-primary text-white px-6 py-2 rounded-lg font-bold shadow-sm hover:bg-secondary transition"
           >
-             Go Back
+             {t.goBack}
           </button>
         </div>
       </div>
@@ -48,7 +68,7 @@ export const DoctorProfile: React.FC = () => {
                 onClick={() => navigate(-1)} 
                 className="text-white/80 hover:text-white flex items-center gap-2 font-bold bg-black/10 px-4 py-2 rounded-full backdrop-blur-sm transition hover:bg-black/20"
              >
-                <i className="fas fa-arrow-left"></i> Back
+                <i className="fas fa-arrow-left"></i> {t.back}
              </button>
           </div>
           {isDoctorView && (
@@ -57,7 +77,7 @@ export const DoctorProfile: React.FC = () => {
                    onClick={() => navigate('/doctor-dashboard')} 
                    className="bg-white text-teal-700 px-4 py-2 rounded-full font-bold shadow-lg text-sm flex items-center gap-2 hover:bg-teal-50 transition"
                 >
-                   <i className="fas fa-tachometer-alt"></i> Return to Dashboard
+                   <i className="fas fa-tachometer-alt"></i> {t.returnToDashboard}
                 </button>
              </div>
           )}
@@ -93,7 +113,7 @@ export const DoctorProfile: React.FC = () => {
                             <div className="flex text-yellow-400 text-xs">
                                <i className="fas fa-star"></i><i className="fas fa-star"></i><i className="fas fa-star"></i><i className="fas fa-star"></i><i className="fas fa-star-half-alt"></i>
                             </div>
-                            <span>{displayDoctor.patientCount}+ Patients</span>
+                            <span>{displayDoctor.patientCount}+ {t.patients}</span>
                          </div>
                       </div>
                    </div>
@@ -108,7 +128,7 @@ export const DoctorProfile: React.FC = () => {
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
              <div className="md:col-span-2 space-y-6">
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                   <i className="fas fa-calendar-alt text-primary"></i> Appointment Schedule
+                   <i className="fas fa-calendar-alt text-primary"></i> {t.appointmentSchedule}
                 </h2>
                 
                 {displayDoctor.chambers.map((chamber: Chamber) => (
@@ -130,7 +150,7 @@ export const DoctorProfile: React.FC = () => {
                          </div>
                          <div className="flex items-center gap-2">
                             <i className="far fa-hourglass text-slate-400"></i>
-                            <span>{chamber.slotDuration} min / patient</span>
+                            <span>{chamber.slotDuration} {t.minPerPatient}</span>
                          </div>
                       </div>
 
@@ -138,7 +158,7 @@ export const DoctorProfile: React.FC = () => {
                         onClick={() => setSelectedChamber(chamber)}
                         className="w-full bg-primary text-white py-3 rounded-xl font-bold hover:bg-secondary transition shadow-lg shadow-teal-500/20"
                       >
-                         Book Appointment
+                         {t.bookAppointment}
                       </button>
                    </div>
                 ))}
@@ -146,12 +166,12 @@ export const DoctorProfile: React.FC = () => {
 
              <div className="space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                   <h3 className="font-bold text-slate-800 mb-4">Verify Status</h3>
+                   <h3 className="font-bold text-slate-800 mb-4">{t.verifyStatus}</h3>
                    <div className="flex items-center gap-3 text-green-600 bg-green-50 p-3 rounded-lg border border-green-100 mb-3">
                       <i className="fas fa-check-circle text-xl"></i>
                       <div>
-                         <p className="font-bold text-sm">BMDC Verified</p>
-                         <p className="text-xs opacity-80">Reg No: A-12345</p>
+                         <p className="font-bold text-sm">{t.bmdcVerified}</p>
+                         <p className="text-xs opacity-80">{t.regNo}: A-12345</p>
                       </div>
                    </div>
                 </div>

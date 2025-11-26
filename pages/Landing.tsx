@@ -2,10 +2,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HomeVoiceSection } from '../components/HomeVoiceSection';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const Landing: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const { t, language } = useLanguage();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,6 +21,15 @@ export const Landing: React.FC = () => {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  // Specialty tags with translations
+  const specialtyTags = [
+    { key: 'spec.cardiology', en: 'Cardiology' },
+    { key: 'spec.neurology', en: 'Neurology' },
+    { key: 'spec.orthopedics', en: 'Orthopedics' },
+    { key: 'spec.medicine', en: 'Medicine' },
+    { key: 'spec.dermatology', en: 'Dermatology' },
+  ];
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-teal-500/20 selection:text-teal-900">
@@ -40,17 +51,17 @@ export const Landing: React.FC = () => {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </span>
-            <span className="text-[11px] font-bold text-slate-600 tracking-widest uppercase group-hover:text-teal-700 transition-colors">Dhaka Live Queue Active</span>
+            <span className="text-[11px] font-bold text-slate-600 tracking-widest uppercase group-hover:text-teal-700 transition-colors">{t('hero.badge')}</span>
           </div>
 
           {/* Main Headline */}
           <h1 className="text-5xl md:text-8xl font-bold text-slate-900 mb-8 tracking-tight leading-[1.1]">
-            Healthcare, <br className="md:hidden" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-blue-600 to-purple-600 animate-gradient-x">Synchronized.</span>
+            {t('hero.title1')} <br className="md:hidden" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-blue-600 to-purple-600 animate-gradient-x">{t('hero.title2')}</span>
           </h1>
           
           <p className="text-lg md:text-2xl text-slate-500 mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-            Experience the future of booking. Real-time doctor availability, live serial tracking, and AI-powered health records.
+            {t('hero.subtitle')}
           </p>
 
           {/* Search Command Center */}
@@ -64,7 +75,7 @@ export const Landing: React.FC = () => {
                      <input 
                         type="text" 
                         className="w-full h-full outline-none text-lg text-slate-800 placeholder:text-slate-400 bg-transparent font-medium"
-                        placeholder="Search doctors, specialties..."
+                        placeholder={t('hero.searchPlaceholder')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                      />
@@ -75,13 +86,13 @@ export const Landing: React.FC = () => {
                   <div className="w-full md:w-auto flex items-center px-4 h-16 md:border-none border-t border-slate-100">
                      <i className="fas fa-map-marker-alt text-slate-400 text-xl mr-3 group-focus-within:text-teal-500 transition-colors"></i>
                      <select className="h-full outline-none bg-transparent text-slate-600 font-bold cursor-pointer hover:text-slate-800 transition">
-                        <option>Dhaka</option>
-                        <option>Chittagong</option>
+                        <option>{t('common.dhaka')}</option>
+                        <option>{t('common.chittagong')}</option>
                      </select>
                   </div>
 
                   <button type="submit" className="w-full md:w-auto bg-slate-900 hover:bg-black text-white h-14 px-8 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-teal-500/30 flex items-center justify-center gap-2 group/btn">
-                     <span>Find</span>
+                     <span>{t('hero.find')}</span>
                      <i className="fas fa-arrow-right text-sm transform -rotate-45 group-hover/btn:rotate-0 transition-transform"></i>
                   </button>
                </div>
@@ -89,13 +100,13 @@ export const Landing: React.FC = () => {
             
             {/* Quick Chips */}
             <div className="mt-8 flex flex-wrap justify-center gap-3 opacity-80">
-               {['Cardiology', 'Neurology', 'Orthopedics', 'Medicine', 'Dermatology'].map((tag) => (
+               {specialtyTags.map((tag) => (
                   <button 
-                    key={tag}
+                    key={tag.key}
                     onClick={() => navigate('/search')}
                     className="px-4 py-1.5 rounded-full bg-white border border-slate-200 text-slate-500 text-xs font-bold hover:border-teal-400 hover:text-teal-600 hover:shadow-md transition-all transform hover:-translate-y-0.5"
                   >
-                     {tag}
+                     {t(tag.key)}
                   </button>
                ))}
             </div>
@@ -117,13 +128,13 @@ export const Landing: React.FC = () => {
                      <div className="inline-flex items-center justify-center h-14 w-14 bg-blue-50 rounded-2xl text-blue-600 text-2xl mb-6 group-hover:scale-110 transition-transform duration-500">
                         <i className="fas fa-user-md"></i>
                      </div>
-                     <h3 className="text-3xl font-bold text-slate-800 mb-3">Top Specialists</h3>
+                     <h3 className="text-3xl font-bold text-slate-800 mb-3">{t('features.topSpecialists')}</h3>
                      <p className="text-slate-500 text-lg max-w-md leading-relaxed">
-                        Instant access to 500+ BMDC verified experts from Square, Evercare, and PG Hospital.
+                        {t('features.topSpecialistsDesc')}
                      </p>
                   </div>
                   <div className="mt-8 flex items-center gap-2 text-blue-600 font-bold group-hover:translate-x-2 transition-transform">
-                     Book Appointment <i className="fas fa-arrow-right"></i>
+                     {t('features.bookAppointment')} <i className="fas fa-arrow-right"></i>
                   </div>
                </div>
                
@@ -156,9 +167,9 @@ export const Landing: React.FC = () => {
                      <div className="h-14 w-14 bg-teal-500/20 rounded-2xl flex items-center justify-center text-teal-400 text-2xl mb-6 border border-teal-500/30 group-hover:rotate-12 transition-transform duration-500">
                         <i className="fas fa-brain"></i>
                      </div>
-                     <h3 className="text-2xl font-bold mb-3">Health Intelligence</h3>
+                     <h3 className="text-2xl font-bold mb-3">{t('features.healthIntelligence')}</h3>
                      <p className="text-slate-400 text-sm leading-relaxed">
-                        Nirnoy AI analyzes your prescriptions and vitals to provide personalized health insights.
+                        {t('features.healthIntelligenceDesc')}
                      </p>
                   </div>
                   <div className="mt-4 bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 backdrop-blur-sm">
@@ -166,7 +177,7 @@ export const Landing: React.FC = () => {
                         <i className="fas fa-sparkles text-yellow-400 text-xs"></i>
                         <span className="text-[10px] font-bold text-slate-300 uppercase">Insight</span>
                      </div>
-                     <p className="text-xs text-slate-300 italic">"Your BP trend is improving..."</p>
+                     <p className="text-xs text-slate-300 italic">{language === 'bn' ? '"আপনার BP ট্রেন্ড উন্নতি হচ্ছে..."' : '"Your BP trend is improving..."'}</p>
                   </div>
                </div>
                <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-teal-500 rounded-full blur-[80px] opacity-20 group-hover:opacity-30 transition duration-500"></div>
@@ -178,9 +189,9 @@ export const Landing: React.FC = () => {
                   <div className="h-14 w-14 bg-white/20 rounded-2xl flex items-center justify-center text-white text-2xl mb-6 backdrop-blur-md border border-white/30">
                      <i className="fas fa-clock"></i>
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">Live Queue</h3>
+                  <h3 className="text-2xl font-bold mb-2">{t('features.liveQueue')}</h3>
                   <p className="text-teal-50 text-sm opacity-90">
-                     Track your serial in real-time. No more waiting for hours at the chamber.
+                     {t('features.liveQueueDesc')}
                   </p>
                </div>
                
@@ -188,11 +199,11 @@ export const Landing: React.FC = () => {
                   <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4">
                      <div className="flex justify-between items-end">
                         <div>
-                           <p className="text-[10px] uppercase font-bold text-teal-100 mb-1">Current Serial</p>
+                           <p className="text-[10px] uppercase font-bold text-teal-100 mb-1">{t('features.currentSerial')}</p>
                            <p className="text-4xl font-bold">12</p>
                         </div>
                         <div className="text-right">
-                           <p className="text-[10px] uppercase font-bold text-teal-100 mb-1">Your Serial</p>
+                           <p className="text-[10px] uppercase font-bold text-teal-100 mb-1">{t('features.yourSerial')}</p>
                            <p className="text-xl font-bold opacity-70">18</p>
                         </div>
                      </div>
@@ -206,9 +217,9 @@ export const Landing: React.FC = () => {
             {/* Box 4: The Process (Full Width) */}
             <div className="md:col-span-2 bg-[#F8FAFC] rounded-[2rem] p-10 border border-slate-200 shadow-sm hover:shadow-lg transition-shadow duration-300 flex items-center relative overflow-hidden">
                <div className="relative z-10 max-w-lg">
-                  <h3 className="text-2xl font-bold text-slate-800 mb-3">Seamless Experience</h3>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-3">{t('features.seamlessExperience')}</h3>
                   <p className="text-slate-500 mb-6">
-                     From finding the right doctor to getting digital prescriptions, we've automated the entire workflow.
+                     {t('features.seamlessExperienceDesc')}
                   </p>
                   <div className="flex items-center gap-4">
                      <div className="flex -space-x-3">
@@ -218,7 +229,7 @@ export const Landing: React.FC = () => {
                            </div>
                         ))}
                      </div>
-                     <span className="text-sm font-bold text-slate-600">10k+ Appointments Booked</span>
+                     <span className="text-sm font-bold text-slate-600">10k+ {t('features.appointmentsBooked')}</span>
                   </div>
                </div>
                <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white via-transparent to-transparent pointer-events-none"></div>
@@ -236,20 +247,20 @@ export const Landing: React.FC = () => {
             <div className="flex flex-col md:flex-row items-center justify-between gap-16">
                <div className="max-w-xl">
                   <div className="inline-block bg-teal-900/50 border border-teal-700/50 rounded-lg px-3 py-1 mb-6">
-                     <span className="text-teal-400 font-bold tracking-widest uppercase text-[10px]">For Medical Professionals</span>
+                     <span className="text-teal-400 font-bold tracking-widest uppercase text-[10px]">{t('cta.forProfessionals')}</span>
                   </div>
                   <h2 className="text-5xl font-bold mb-6 leading-tight">
-                     Your Practice, <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-400">Supercharged.</span>
+                     {t('cta.title1')} <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-400">{t('cta.title2')}</span>
                   </h2>
                   <p className="text-slate-400 text-lg mb-10 leading-relaxed">
-                     Stop managing queues on paper. Get a digital cockpit with live serial tracking, patient history ledger, and powerful AI summaries tailored for your clinical needs.
+                     {t('cta.description')}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-4">
                      <button onClick={() => navigate('/login')} className="bg-teal-500 hover:bg-teal-400 text-slate-900 px-8 py-4 rounded-xl font-bold transition shadow-[0_0_20px_rgba(20,184,166,0.3)] hover:shadow-[0_0_30px_rgba(20,184,166,0.5)]">
-                        Join as Doctor
+                        {t('cta.joinAsDoctor')}
                      </button>
                      <button onClick={scrollToFeatures} className="px-8 py-4 rounded-xl font-bold border border-slate-700 hover:bg-slate-800 transition text-slate-300">
-                        View Features
+                        {t('cta.viewFeatures')}
                      </button>
                   </div>
                </div>
@@ -262,9 +273,9 @@ export const Landing: React.FC = () => {
                   <div className="absolute top-10 left-0 w-64 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-2xl p-5 shadow-2xl transform rotate-[-6deg] hover:rotate-0 transition duration-500 z-10">
                      <div className="flex items-center justify-between mb-4">
                         <div className="h-8 w-8 bg-teal-500 rounded-lg flex items-center justify-center"><i className="fas fa-users"></i></div>
-                        <span className="text-xs font-bold text-slate-400">Daily Traffic</span>
+                        <span className="text-xs font-bold text-slate-400">{language === 'bn' ? 'দৈনিক ট্রাফিক' : 'Daily Traffic'}</span>
                      </div>
-                     <div className="text-3xl font-bold mb-1">42 <span className="text-sm font-normal text-slate-500">Patients</span></div>
+                     <div className="text-3xl font-bold mb-1">42 <span className="text-sm font-normal text-slate-500">{language === 'bn' ? 'রোগী' : 'Patients'}</span></div>
                      <div className="h-1 w-full bg-slate-700 rounded-full overflow-hidden mt-2">
                         <div className="h-full w-3/4 bg-teal-500 rounded-full"></div>
                      </div>
@@ -274,14 +285,14 @@ export const Landing: React.FC = () => {
                   <div className="absolute bottom-10 right-0 w-72 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-2xl p-5 shadow-2xl transform rotate-[3deg] hover:rotate-0 transition duration-500 z-20">
                      <div className="flex items-center gap-3 mb-4">
                         <div className="h-8 w-8 bg-purple-500 rounded-lg flex items-center justify-center"><i className="fas fa-robot"></i></div>
-                        <span className="text-xs font-bold text-slate-400">AI Assistant</span>
+                        <span className="text-xs font-bold text-slate-400">{language === 'bn' ? 'AI সহকারী' : 'AI Assistant'}</span>
                      </div>
                      <div className="space-y-2">
                         <div className="bg-slate-700/50 p-2 rounded text-[10px] text-slate-300">
-                           "Based on history, patient shows signs of..."
+                           {language === 'bn' ? '"ইতিহাসের উপর ভিত্তি করে, রোগীর লক্ষণ দেখা যাচ্ছে..."' : '"Based on history, patient shows signs of..."'}
                         </div>
                         <div className="bg-slate-700/50 p-2 rounded text-[10px] text-slate-300 opacity-60">
-                           "Drug interaction warning detected..."
+                           {language === 'bn' ? '"ওষুধের মিথস্ক্রিয়া সতর্কতা সনাক্ত হয়েছে..."' : '"Drug interaction warning detected..."'}
                         </div>
                      </div>
                   </div>
@@ -299,15 +310,15 @@ export const Landing: React.FC = () => {
                      <i className="fas fa-heartbeat"></i>
                   </div>
                   <div>
-                     <span className="font-bold text-xl text-slate-900 block leading-none">Nirnoy Care</span>
-                     <span className="text-[10px] font-bold text-teal-600 tracking-widest uppercase">Intelligent Healthcare</span>
+                     <span className="font-bold text-xl text-slate-900 block leading-none">{t('nav.brand')}</span>
+                     <span className="text-[10px] font-bold text-teal-600 tracking-widest uppercase">{t('footer.tagline')}</span>
                   </div>
                </div>
                <div className="flex gap-8 text-sm font-bold text-slate-500">
-                  <button onClick={() => navigate('/about')} className="hover:text-slate-900 transition">About</button>
-                  <button onClick={() => navigate('/search')} className="hover:text-slate-900 transition">Doctors</button>
-                  <button onClick={() => navigate('/privacy')} className="hover:text-slate-900 transition">Privacy</button>
-                  <button onClick={() => navigate('/')} className="hover:text-slate-900 transition">Contact</button>
+                  <button onClick={() => navigate('/about')} className="hover:text-slate-900 transition">{t('footer.about')}</button>
+                  <button onClick={() => navigate('/search')} className="hover:text-slate-900 transition">{t('footer.doctors')}</button>
+                  <button onClick={() => navigate('/privacy')} className="hover:text-slate-900 transition">{t('footer.privacy')}</button>
+                  <button onClick={() => navigate('/')} className="hover:text-slate-900 transition">{t('footer.contact')}</button>
                </div>
                <div className="flex gap-4">
                   <a href="#" className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-100 hover:shadow-md transition-all">
@@ -319,7 +330,7 @@ export const Landing: React.FC = () => {
                </div>
             </div>
             <div className="text-center mt-12 text-slate-400 text-xs">
-               &copy; {new Date().getFullYear()} Nirnoy Health Tech Ltd. Proudly made in Bangladesh 🇧🇩
+               &copy; {new Date().getFullYear()} {t('footer.copyright')}
             </div>
          </div>
       </footer>
