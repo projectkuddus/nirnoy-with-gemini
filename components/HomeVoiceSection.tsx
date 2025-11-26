@@ -1,60 +1,84 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MOCK_DOCTORS } from '../data/mockData';
 
-// --- Audio Helpers ---
+// ============ CONFIGURATION ============
+// For production, set this in your environment or use a config service
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
-function createBlob(data: Float32Array): Blob {
-  const l = data.length;
-  const int16 = new Int16Array(l);
-  for (let i = 0; i < l; i++) {
-    const s = Math.max(-1, Math.min(1, data[i]));
-    int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+// Check if we have a valid API key
+const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
+
+// ============ AUDIO HELPERS ============
+
+// Convert Float32Array to PCM16 blob for Gemini
+function float32ToPCM16Blob(float32Data: Float32Array): { data: string; mimeType: string } {
+  const int16 = new Int16Array(float32Data.length);
+  for (let i = 0; i < float32Data.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Data[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
   }
   
-  let binary = '';
   const bytes = new Uint8Array(int16.buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
+  
   return {
     data: btoa(binary),
     mimeType: 'audio/pcm;rate=16000',
   };
 }
 
-function decode(base64: string) {
+// Decode base64 to Uint8Array
+function base64ToUint8Array(base64: string): Uint8Array {
   const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes;
 }
 
-async function decodeAudioData(
+// Decode PCM16 to AudioBuffer
+async function pcm16ToAudioBuffer(
   data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
+  audioContext: AudioContext,
+  sampleRate: number = 24000
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
+  const int16Data = new Int16Array(data.buffer);
+  const float32Data = new Float32Array(int16Data.length);
+  
+  for (let i = 0; i < int16Data.length; i++) {
+    float32Data[i] = int16Data[i] / 32768.0;
   }
-  return buffer;
+  
+  const audioBuffer = audioContext.createBuffer(1, float32Data.length, sampleRate);
+  audioBuffer.getChannelData(0).set(float32Data);
+  
+  return audioBuffer;
 }
 
-// --- Get Time-Based Greeting ---
+// Downsample audio to 16kHz
+function downsampleBuffer(buffer: Float32Array, inputSampleRate: number, outputSampleRate: number): Float32Array {
+  if (inputSampleRate === outputSampleRate) {
+    return buffer;
+  }
+  
+  const ratio = inputSampleRate / outputSampleRate;
+  const newLength = Math.round(buffer.length / ratio);
+  const result = new Float32Array(newLength);
+  
+  for (let i = 0; i < newLength; i++) {
+    const index = Math.round(i * ratio);
+    result[i] = buffer[Math.min(index, buffer.length - 1)];
+  }
+  
+  return result;
+}
+
+// ============ TIME-BASED GREETING ============
 function getTimeBasedGreeting(): string {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return 'সুপ্রভাত';
@@ -63,348 +87,495 @@ function getTimeBasedGreeting(): string {
   return 'শুভ রাত্রি';
 }
 
-// --- Build comprehensive Bangladeshi Bangla system prompt ---
-function buildSystemPrompt(
-  agentNumber: number,
-  isLoggedIn: boolean,
-  today: string,
-  doctorList: string,
-  greeting: string
-): string {
+// ============ SYSTEM PROMPT ============
+function buildSystemPrompt(agentNumber: number, isLoggedIn: boolean): string {
+  const today = new Date().toLocaleDateString('bn-BD', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  const greeting = getTimeBasedGreeting();
+  
+  // Get doctor list for context
+  const doctorList = MOCK_DOCTORS.slice(0, 10).map(d => 
+    `${d.name} (${d.specialties[0]}) - ${d.chambers[0]?.name}, ফি: ৳${d.chambers[0]?.fee}`
+  ).join('\n');
+
   return `
-## আপনার পরিচয় (Identity)
-আপনি "Nirnoy ${agentNumber}", "নির্ণয় কেয়ার" (Nirnoy Care) এর অফিসিয়াল AI ভয়েস এসিস্ট্যান্ট।
+## আপনার পরিচয়
+আপনি "Nirnoy ${agentNumber}", নির্ণয় কেয়ার (Nirnoy Care) এর AI ভয়েস এসিস্ট্যান্ট।
 
-## ভাষা নির্দেশনা (CRITICAL - MUST FOLLOW)
-আপনাকে অবশ্যই **খাঁটি বাংলাদেশী বাংলা** তে কথা বলতে হবে। কলকাতার বাংলা বা পশ্চিমবঙ্গের স্টাইল একদম চলবে না।
+## গুরুত্বপূর্ণ নির্দেশনা
+- শুধুমাত্র বাংলাদেশী বাংলায় কথা বলুন
+- প্রথমেই বলুন: "আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। আমি Nirnoy ${agentNumber}। কীভাবে সাহায্য করতে পারি?"
+- সংক্ষিপ্ত উত্তর দিন (১-২ বাক্য)
+- "জি", "আচ্ছা", "ঠিক আছে" ব্যবহার করুন
 
-### সালাম ও অভিবাদন (GREETING - MUST START WITH):
-কল শুরু করতেই প্রথমে বলুন: "আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। আমি Nirnoy ${agentNumber}। কীভাবে সাহায্য করতে পারি?"
+## আজকের তারিখ
+${today}
 
-### যা বলবেন (Bangladeshi Style):
-- "জি" (Ji) - হ্যাঁ বোঝাতে
-- "আপনি" - সম্মানসূচক
-- "ভাই/ভাইয়া" বা "আপা" - সম্বোধনে (যথাযথ হলে)
-- "কেমন আছেন?" - হালচাল জিজ্ঞেস করতে
-- "আচ্ছা" - বোঝা গেছে বোঝাতে
-- "ঠিক আছে" - okay বোঝাতে
-- "একটু" - a little
-- "এখন" - now
-- "কইরা দিচ্ছি" / "করে দিচ্ছি" - doing it
-- "হইছে" / "হয়েছে" - done
-- "লাগবে" - will need
-- "পারবেন" - can you
-- "দেখেন" - see/look
-- "বলেন" - tell me
-- "কী সমস্যা?" - what's the problem?
-- "ডাক্তার সাহেব" / "ডাক্তার আপা" - addressing doctors
-
-### যা বলবেন না (AVOID - Kolkata/West Bengal Style):
-- "দাদা" ❌ (use "ভাই" instead)
-- "দিদি" ❌ (use "আপা" instead)  
-- "হ্যাঁ গো" ❌
-- "কি খবর" ❌ (use "কেমন আছেন" instead)
-- "এক্ষুনি" ❌ (use "এখনই" instead)
-- "বেশ" ❌ (use "ঠিক আছে" instead)
-- "তফাৎ" ❌
-- Overly Sanskritized/formal words ❌
-
-### উচ্চারণ ও টোন:
-- ঢাকাইয়া/স্ট্যান্ডার্ড বাংলাদেশী উচ্চারণ
-- উষ্ণ, বন্ধুত্বপূর্ণ কিন্তু প্রফেশনাল
-- ধীরে ধীরে, স্পষ্ট করে বলুন
-
-## প্রসঙ্গ (Context)
-- আজকের তারিখ: ${today}
-- ইউজার স্ট্যাটাস: ${isLoggedIn ? 'লগইন করা আছে (LOGGED_IN)' : 'গেস্ট ইউজার (GUEST)'}
-
-## ডাক্তার ডাটাবেজ (Available Doctors):
+## ডাক্তার তালিকা
 ${doctorList}
 
-## আপনার ক্ষমতা (Capabilities):
-1. **নির্ণয় সম্পর্কে তথ্য**: আমরা ডাক্তার অ্যাপয়েন্টমেন্ট সহজ করি, হেলথ রেকর্ড ম্যানেজ করি, waiting time কমাই।
-2. **ডাক্তার খোঁজা**: স্পেশালিটি বা নাম দিয়ে ডাক্তার খুঁজে দেওয়া।
-3. **অ্যাপয়েন্টমেন্ট বুকিং**: ${isLoggedIn ? 'ইউজার লগইন আছে, সরাসরি বুকিং করতে পারবেন।' : 'গেস্ট ইউজার - OTP দিয়ে ভেরিফাই করে বুকিং করতে পারবেন।'}
-4. **লাইভ কিউ তথ্য**: সিরিয়াল ও ওয়েটিং টাইম জানানো।
-5. **ফি ও সময়সূচী**: ডাক্তারের ফি, চেম্বারের সময় জানানো।
-6. **প্রাথমিক স্বাস্থ্য তথ্য**: সাধারণ প্রশ্নের উত্তর দেওয়া (কিন্তু ডায়াগনোসিস না)।
+## আপনার কাজ
+1. ডাক্তার খোঁজায় সাহায্য করা
+2. অ্যাপয়েন্টমেন্ট বুকিং করা
+3. ফি ও সময়সূচী জানানো
+4. সাধারণ স্বাস্থ্য প্রশ্নের উত্তর দেওয়া
 
-## বুকিং প্রসেস (Booking Flow):
-${isLoggedIn ? `
-### লগইন ইউজারের জন্য:
-1. প্রথমে জিজ্ঞেস করুন: "কোন ধরনের ডাক্তার দরকার?" বা "কী সমস্যা?"
-2. ডাক্তার সাজেস্ট করুন ডাটাবেজ থেকে
-3. ইউজার সিলেক্ট করলে জিজ্ঞেস করুন: "রোগীর নাম কী?" 
-4. তারপর: "কবে দেখাতে চান? আজকে নাকি অন্য কোনো দিন?"
-5. কনফার্ম করুন: "ঠিক আছে, [ডাক্তারের নাম] এর কাছে [তারিখ] এ অ্যাপয়েন্টমেন্ট বুক করে দিচ্ছি। ফি হবে [amount] টাকা।"
-6. শেষে: "আপনার সিরিয়াল নম্বর হইছে [number]। ধন্যবাদ!"
-` : `
-### গেস্ট ইউজারের জন্য (OTP দিয়ে বুকিং):
-1. প্রথমে বলুন: "বুকিং করতে আপনার মোবাইল নম্বর দরকার হবে।"
-2. মোবাইল নম্বর নিন: "আপনার মোবাইল নম্বরটা বলেন প্লিজ?"
-3. নম্বর পেলে বলুন: "ঠিক আছে, আপনার নম্বরে একটা OTP পাঠাচ্ছি। কয়েক সেকেন্ড অপেক্ষা করুন।"
-4. OTP ভেরিফাই করুন: "OTP টা বলেন প্লিজ?"
-5. ভেরিফাই হলে বুকিং করুন এবং বলুন: "অ্যাকাউন্ট তৈরি হয়ে গেছে! এখন বুকিং করে দিচ্ছি।"
-`}
+## বুকিং প্রক্রিয়া
+${isLoggedIn ? 
+'ইউজার লগইন আছে। সরাসরি নাম ও তারিখ জিজ্ঞেস করে বুকিং করুন।' : 
+'গেস্ট ইউজার। প্রথমে মোবাইল নম্বর নিন, তারপর OTP ভেরিফাই করে বুকিং করুন।'}
 
-## নিয়মাবলী (Rules):
-1. **সালাম দিয়ে শুরু**: কল শুরু হলেই "আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। আমি Nirnoy ${agentNumber}। কীভাবে সাহায্য করতে পারি?"
-2. **ছোট উত্তর**: ১-২ বাক্যে উত্তর দিন, যাতে স্বাভাবিক কথোপকথন হয়।
-3. **বুঝতে না পারলে**: "একটু আবার বলবেন প্লিজ?" বা "সরি, ঠিক বুঝতে পারলাম না।"
-4. **ইমার্জেন্সি**: বুকে ব্যথা, শ্বাসকষ্ট, বা জরুরি অবস্থা বললে - "এটা ইমার্জেন্সি মনে হচ্ছে! এখনই নিকটস্থ হাসপাতালে যান বা 999 এ কল করুন।"
-5. **শেষ করতে**: "আর কিছু লাগবে?" জিজ্ঞেস করুন। শেষে "আল্লাহ হাফেজ" বা "ধন্যবাদ, ভালো থাকবেন" বলুন।
+## জরুরি অবস্থা
+বুকে ব্যথা, শ্বাসকষ্ট বললে বলুন: "এটা ইমার্জেন্সি! এখনই 999 এ কল করুন বা নিকটস্থ হাসপাতালে যান।"
 
-## উদাহরণ কথোপকথন:
-User: "আমার জ্বর হইছে"
-You: "জ্বর কতদিন ধরে? আর কোনো সমস্যা আছে - যেমন সর্দি, কাশি, মাথা ব্যথা?"
-
-User: "হার্টের ডাক্তার দেখাতে চাই"
-You: "জি, আমাদের কাছে কয়েকজন ভালো হার্ট স্পেশালিস্ট আছেন। Dr. Ahmed Hossain আছেন Mirpur General Hospital এ, ফি ৬০০ টাকা। বুক করে দেব?"
-
-User: "ফি কত?"
-You: "কোন ডাক্তারের ফি জানতে চাচ্ছেন? নাম বা স্পেশালিটি বলেন।"
-
-User: "নির্ণয় কী?"
-You: "নির্ণয় হলো বাংলাদেশের জন্য তৈরি একটা হেলথকেয়ার প্ল্যাটফর্ম। এখানে আপনি সেরা ডাক্তারদের খুঁজে পাবেন, অ্যাপয়েন্টমেন্ট বুক করতে পারবেন, আর আপনার সব হেলথ রেকর্ড এক জায়গায় রাখতে পারবেন।"
+## শেষ করতে
+"আর কিছু লাগবে?" জিজ্ঞেস করুন। শেষে "আল্লাহ হাফেজ" বা "ধন্যবাদ, ভালো থাকবেন" বলুন।
 `;
 }
 
+// ============ VOICE AGENT TYPES ============
+type AgentStatus = 'idle' | 'connecting' | 'connected' | 'speaking' | 'listening' | 'error';
+
+interface VoiceAgentState {
+  activeAgent: 1 | 2 | null;
+  status: AgentStatus;
+  statusText: string;
+  volume: number;
+  error: string | null;
+}
+
+// ============ MAIN COMPONENT ============
 export const HomeVoiceSection: React.FC = () => {
   const navigate = useNavigate();
-  const [activeAgent, setActiveAgent] = useState<1 | 2 | null>(null);
-  const [status, setStatus] = useState('Ready');
-  const [volume, setVolume] = useState(0);
-  const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const aiRef = useRef<GoogleGenAI | null>(null);
-  const sessionPromiseRef = useRef<Promise<any> | null>(null);
-  const isConnectedRef = useRef(false);
   
-  // Audio Contexts
-  const inputContextRef = useRef<AudioContext | null>(null);
-  const outputContextRef = useRef<AudioContext | null>(null);
-  
-  // Playback Queue
-  const nextStartTimeRef = useRef<number>(0);
-  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  const streamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const [state, setState] = useState<VoiceAgentState>({
+    activeAgent: null,
+    status: 'idle',
+    statusText: 'প্রস্তুত',
+    volume: 0,
+    error: null,
+  });
 
-  useEffect(() => {
-    if (process.env.API_KEY) {
-      aiRef.current = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Refs for audio handling
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | ScriptProcessorNode | null>(null);
+  const websocketRef = useRef<WebSocket | null>(null);
+  const audioQueueRef = useRef<AudioBufferSourceNode[]>([]);
+  const nextPlayTimeRef = useRef<number>(0);
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    // Stop all audio sources
+    audioQueueRef.current.forEach(source => {
+      try { source.stop(); } catch (e) {}
+    });
+    audioQueueRef.current = [];
+    
+    // Close WebSocket
+    if (websocketRef.current) {
+      try { websocketRef.current.close(); } catch (e) {}
+      websocketRef.current = null;
     }
-    return () => cleanup();
+    
+    // Stop media stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    
+    // Disconnect worklet
+    if (workletNodeRef.current) {
+      try { workletNodeRef.current.disconnect(); } catch (e) {}
+      workletNodeRef.current = null;
+    }
+    
+    // Close audio context
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try { audioContextRef.current.close(); } catch (e) {}
+      audioContextRef.current = null;
+    }
+    
+    nextPlayTimeRef.current = 0;
+    
+    setState({
+      activeAgent: null,
+      status: 'idle',
+      statusText: 'প্রস্তুত',
+      volume: 0,
+      error: null,
+    });
   }, []);
 
-  const cleanup = () => {
-    isConnectedRef.current = false;
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (processorRef.current) {
-      try { processorRef.current.disconnect(); } catch(e) {}
-      processorRef.current = null;
-    }
-    if (inputContextRef.current) {
-        if (inputContextRef.current.state !== 'closed') {
-            try { inputContextRef.current.close(); } catch(e) {}
-        }
-        inputContextRef.current = null;
-    }
-    if (outputContextRef.current) {
-        if (outputContextRef.current.state !== 'closed') {
-            try { outputContextRef.current.close(); } catch(e) {}
-        }
-        outputContextRef.current = null;
-    }
-    
-    sourcesRef.current.forEach(s => {
-      try { s.stop(); } catch (e) {}
-    });
-    sourcesRef.current.clear();
-    
-    setActiveAgent(null);
-    setIsAgentSpeaking(false);
-    setVolume(0);
-    setStatus('Ready');
-    nextStartTimeRef.current = 0;
-  };
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => cleanup();
+  }, [cleanup]);
 
+  // Start voice session
   const startSession = async (agentNumber: 1 | 2) => {
-    if (!aiRef.current) {
-      setError("Missing API Key. Voice feature unavailable.");
+    // Check API key
+    if (!hasValidApiKey) {
+      setState(prev => ({
+        ...prev,
+        error: 'API Key কনফিগার করা হয়নি। .env ফাইলে VITE_GEMINI_API_KEY সেট করুন।',
+        status: 'error',
+        statusText: 'কনফিগারেশন ত্রুটি',
+      }));
       return;
     }
-    
+
     try {
-      // 1. Reset State safely
       cleanup();
-      setError(null);
-      setActiveAgent(agentNumber);
-      setStatus("কানেক্ট হচ্ছে...");
-
-      // 2. Initialize Audio Contexts (Must be after user gesture)
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       
-      inputContextRef.current = new AudioContextClass({ sampleRate: 16000 });
-      outputContextRef.current = new AudioContextClass({ sampleRate: 24000 });
+      setState({
+        activeAgent: agentNumber,
+        status: 'connecting',
+        statusText: 'কানেক্ট হচ্ছে...',
+        volume: 0,
+        error: null,
+      });
 
-      // Explicitly resume contexts (crucial for browser autoplay policies)
-      try {
-        await inputContextRef.current.resume();
-        await outputContextRef.current.resume();
-      } catch (e) {
-        console.warn("AudioContext resume failed", e);
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000, // Request 16kHz if supported
+        } 
+      });
+      mediaStreamRef.current = stream;
+
+      // Create audio context
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioContext = new AudioContextClass({ sampleRate: 24000 });
+      audioContextRef.current = audioContext;
+      
+      // Resume context (required for some browsers)
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      // Get user login status
+      const isLoggedIn = !!localStorage.getItem('nirnoy_role');
+      const systemPrompt = buildSystemPrompt(agentNumber, isLoggedIn);
+
+      // Connect to Gemini Live API via WebSocket
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
+      
+      const ws = new WebSocket(wsUrl);
+      websocketRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        
+        // Send setup message
+        const setupMessage = {
+          setup: {
+            model: 'models/gemini-2.0-flash-exp',
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: agentNumber === 1 ? 'Aoede' : 'Kore'
+                  }
+                }
+              }
+            },
+            systemInstruction: {
+              parts: [{ text: systemPrompt }]
+            }
+          }
+        };
+        
+        ws.send(JSON.stringify(setupMessage));
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          // Handle setup complete
+          if (data.setupComplete) {
+            console.log('Setup complete, starting audio capture');
+            
+            setState(prev => ({
+              ...prev,
+              status: 'listening',
+              statusText: 'কথা বলুন...',
+            }));
+            
+            // Start capturing audio
+            startAudioCapture(stream, audioContext, ws);
+          }
+          
+          // Handle audio response
+          if (data.serverContent?.modelTurn?.parts) {
+            for (const part of data.serverContent.modelTurn.parts) {
+              if (part.inlineData?.data) {
+                setState(prev => ({ ...prev, status: 'speaking', statusText: 'বলছে...' }));
+                
+                const audioData = base64ToUint8Array(part.inlineData.data);
+                const audioBuffer = await pcm16ToAudioBuffer(audioData, audioContext, 24000);
+                
+                playAudioBuffer(audioBuffer, audioContext);
+              }
+            }
+          }
+          
+          // Handle turn complete
+          if (data.serverContent?.turnComplete) {
+            setState(prev => ({ ...prev, status: 'listening', statusText: 'কথা বলুন...' }));
+          }
+          
+        } catch (e) {
+          console.error('Message parse error:', e);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setState(prev => ({
+          ...prev,
+          error: 'সংযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।',
+          status: 'error',
+          statusText: 'ত্রুটি',
+        }));
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket closed');
+        if (state.status !== 'error') {
+          cleanup();
+        }
+      };
+
+    } catch (err: any) {
+      console.error('Session start error:', err);
+      
+      let errorMessage = 'ভয়েস এজেন্ট শুরু করা যাচ্ছে না।';
+      if (err.name === 'NotAllowedError') {
+        errorMessage = 'মাইক্রোফোন পারমিশন দিন।';
+      } else if (err.name === 'NotFoundError') {
+        errorMessage = 'মাইক্রোফোন পাওয়া যাচ্ছে না।';
       }
       
-      // 3. Get Microphone Stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      // 4. Prepare Context Data
-      const isLoggedIn = !!localStorage.getItem('nirnoy_role');
-      const today = new Date().toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-      const greeting = getTimeBasedGreeting();
-      
-      // Simplified doctor list for prompt context
-      const doctorList = MOCK_DOCTORS.slice(0, 15).map(d => 
-        `${d.name} (${d.specialties[0]}) at ${d.chambers[0]?.name}, Fee: ৳${d.chambers[0]?.fee}`
-      ).join('; ');
-
-      // Both agents use same voice for consistency - just different number
-      const voiceName = agentNumber === 1 ? 'Fenrir' : 'Kore';
-
-      setStatus("AI সাথে কানেক্ট হচ্ছে...");
-
-      // Build system prompt
-      const systemPrompt = buildSystemPrompt(agentNumber, isLoggedIn, today, doctorList, greeting);
-
-      // 5. Connect to Gemini Live
-      const sessionPromise = aiRef.current.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-        config: {
-          responseModalities: [Modality.AUDIO],
-          systemInstruction: systemPrompt,
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
-          },
-        },
-        callbacks: {
-          onopen: () => {
-            isConnectedRef.current = true;
-            setStatus("কথা বলুন...");
-            
-            if (!inputContextRef.current) return;
-
-            // Setup Audio Pipeline
-            const source = inputContextRef.current.createMediaStreamSource(stream);
-            const processor = inputContextRef.current.createScriptProcessor(4096, 1, 1);
-            processorRef.current = processor;
-            
-            processor.onaudioprocess = (e) => {
-              if (!isConnectedRef.current) return;
-              
-              const inputData = e.inputBuffer.getChannelData(0);
-              
-              // Volume visualization
-              let sum = 0;
-              for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
-              const rms = Math.sqrt(sum/inputData.length);
-              setVolume(Math.min(1, rms * 5));
-
-              // Send to API
-              const pcmBlob = createBlob(inputData);
-              sessionPromiseRef.current?.then(session => {
-                session.sendRealtimeInput({ media: pcmBlob });
-              }).catch(err => {
-                  console.debug("Send Error:", err);
-              });
-            };
-
-            source.connect(processor);
-            processor.connect(inputContextRef.current.destination);
-          },
-          onmessage: async (message: LiveServerMessage) => {
-             // Handle Audio Output
-             const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-             if (base64Audio && outputContextRef.current) {
-                setIsAgentSpeaking(true);
-                const ctx = outputContextRef.current;
-                
-                if (nextStartTimeRef.current < ctx.currentTime) {
-                    nextStartTimeRef.current = ctx.currentTime;
-                }
-                
-                try {
-                    const audioBuffer = await decodeAudioData(
-                    decode(base64Audio),
-                    ctx,
-                    24000,
-                    1
-                    );
-                    
-                    const source = ctx.createBufferSource();
-                    source.buffer = audioBuffer;
-                    source.connect(ctx.destination);
-                    
-                    source.onended = () => {
-                        sourcesRef.current.delete(source);
-                        if (sourcesRef.current.size === 0) {
-                            setIsAgentSpeaking(false);
-                        }
-                    };
-
-                    source.start(nextStartTimeRef.current);
-                    nextStartTimeRef.current += audioBuffer.duration;
-                    sourcesRef.current.add(source);
-                } catch (e) {
-                    console.error("Audio Decode Error", e);
-                }
-             }
-             
-             // Handle Interruption
-             if (message.serverContent?.interrupted) {
-                console.log("Interrupted by user");
-                sourcesRef.current.forEach(s => {
-                    try { s.stop(); } catch (e) {}
-                });
-                sourcesRef.current.clear();
-                if (outputContextRef.current) {
-                    nextStartTimeRef.current = outputContextRef.current.currentTime;
-                }
-                setIsAgentSpeaking(false);
-             }
-          },
-          onclose: () => {
-            setStatus("সংযোগ বিচ্ছিন্ন");
-            cleanup();
-          },
-          onerror: (e) => {
-            console.error("Gemini Live Error:", e);
-            setError("সংযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
-            setStatus("Error");
-            cleanup();
-          }
-        }
-      });
-
-      sessionPromiseRef.current = sessionPromise;
-      
-      // Handle connection errors immediately
-      sessionPromise.catch(err => {
-          console.error("Connection Failed:", err);
-          setError("ভয়েস সার্ভিসে কানেক্ট করা যাচ্ছে না।");
-          cleanup();
-      });
-
-    } catch (err) {
-      console.error("Session Start Error:", err);
-      setError("মাইক্রোফোন এক্সেস করা যাচ্ছে না। পারমিশন চেক করুন।");
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+        status: 'error',
+        statusText: 'ত্রুটি',
+      }));
       cleanup();
     }
+  };
+
+  // Start audio capture and send to WebSocket
+  const startAudioCapture = (stream: MediaStream, audioContext: AudioContext, ws: WebSocket) => {
+    const source = audioContext.createMediaStreamSource(stream);
+    
+    // Use ScriptProcessorNode (deprecated but widely supported)
+    const bufferSize = 4096;
+    const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+    workletNodeRef.current = processor;
+    
+    let audioBuffer: Float32Array[] = [];
+    const SEND_INTERVAL = 100; // Send every 100ms
+    let lastSendTime = Date.now();
+    
+    processor.onaudioprocess = (event) => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      
+      const inputData = event.inputBuffer.getChannelData(0);
+      
+      // Calculate volume for visualization
+      let sum = 0;
+      for (let i = 0; i < inputData.length; i++) {
+        sum += inputData[i] * inputData[i];
+      }
+      const rms = Math.sqrt(sum / inputData.length);
+      setState(prev => ({ ...prev, volume: Math.min(1, rms * 5) }));
+      
+      // Downsample to 16kHz if needed
+      const inputSampleRate = audioContext.sampleRate;
+      const downsampled = downsampleBuffer(new Float32Array(inputData), inputSampleRate, 16000);
+      audioBuffer.push(downsampled);
+      
+      // Send audio every SEND_INTERVAL ms
+      const now = Date.now();
+      if (now - lastSendTime >= SEND_INTERVAL && audioBuffer.length > 0) {
+        // Combine buffers
+        const totalLength = audioBuffer.reduce((acc, buf) => acc + buf.length, 0);
+        const combined = new Float32Array(totalLength);
+        let offset = 0;
+        for (const buf of audioBuffer) {
+          combined.set(buf, offset);
+          offset += buf.length;
+        }
+        
+        // Convert to PCM16 and send
+        const pcmBlob = float32ToPCM16Blob(combined);
+        
+        try {
+          ws.send(JSON.stringify({
+            realtimeInput: {
+              mediaChunks: [{
+                mimeType: pcmBlob.mimeType,
+                data: pcmBlob.data
+              }]
+            }
+          }));
+        } catch (e) {
+          console.error('Send error:', e);
+        }
+        
+        audioBuffer = [];
+        lastSendTime = now;
+      }
+    };
+    
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+  };
+
+  // Play audio buffer
+  const playAudioBuffer = (buffer: AudioBuffer, audioContext: AudioContext) => {
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    
+    // Schedule playback
+    const currentTime = audioContext.currentTime;
+    const startTime = Math.max(currentTime, nextPlayTimeRef.current);
+    
+    source.start(startTime);
+    nextPlayTimeRef.current = startTime + buffer.duration;
+    
+    audioQueueRef.current.push(source);
+    
+    source.onended = () => {
+      const index = audioQueueRef.current.indexOf(source);
+      if (index > -1) {
+        audioQueueRef.current.splice(index, 1);
+      }
+      
+      // Check if all audio finished
+      if (audioQueueRef.current.length === 0) {
+        setState(prev => {
+          if (prev.status === 'speaking') {
+            return { ...prev, status: 'listening', statusText: 'কথা বলুন...' };
+          }
+          return prev;
+        });
+      }
+    };
+  };
+
+  // Render volume bars
+  const renderVolumeBars = (isActive: boolean, isSpeaking: boolean) => {
+    return [...Array(6)].map((_, i) => {
+      let height = '15%';
+      if (isActive) {
+        if (isSpeaking) {
+          height = `${Math.max(20, Math.random() * 100)}%`;
+        } else {
+          height = `${Math.max(15, state.volume * 100 * (0.5 + Math.random() * 0.5))}%`;
+        }
+      }
+      
+      return (
+        <div
+          key={i}
+          className={`w-1 rounded-full transition-all duration-75 ${
+            isActive ? (isSpeaking ? 'bg-blue-500' : 'bg-green-500') : 'bg-slate-300'
+          }`}
+          style={{ height }}
+        />
+      );
+    });
+  };
+
+  // Render agent card
+  const renderAgentCard = (agentNumber: 1 | 2) => {
+    const isActive = state.activeAgent === agentNumber;
+    const isOtherActive = state.activeAgent !== null && state.activeAgent !== agentNumber;
+    const isSpeaking = isActive && state.status === 'speaking';
+    const isBlue = agentNumber === 1;
+    
+    return (
+      <div className={`relative bg-white rounded-2xl p-6 border-2 transition-all duration-300 ${
+        isActive 
+          ? isBlue ? 'border-blue-500 shadow-xl shadow-blue-500/10' : 'border-slate-800 shadow-xl shadow-slate-800/10'
+          : isOtherActive 
+            ? 'border-slate-100 opacity-50' 
+            : isBlue ? 'border-slate-200 hover:border-blue-300 hover:shadow-lg' : 'border-slate-200 hover:border-slate-400 hover:shadow-lg'
+      }`}>
+        {/* Active indicator */}
+        {isActive && (
+          <div className="absolute top-3 right-3">
+            <span className="flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+            </span>
+          </div>
+        )}
+        
+        {/* Agent icon */}
+        <div className="w-20 h-20 mx-auto mb-4 relative">
+          <div className={`absolute inset-0 rounded-full ${isBlue ? 'bg-blue-100' : 'bg-slate-100'}`}></div>
+          <div className="absolute inset-1 bg-white rounded-full flex items-center justify-center">
+            <i className={`fas fa-headset text-3xl ${isBlue ? 'text-blue-500' : 'text-slate-600'}`}></i>
+          </div>
+          {isSpeaking && (
+            <div className={`absolute inset-0 rounded-full border-2 ${isBlue ? 'border-blue-400' : 'border-slate-600'} animate-ping opacity-30`}></div>
+          )}
+        </div>
+        
+        <h3 className="text-lg font-bold text-slate-800 text-center mb-1">Nirnoy {agentNumber}</h3>
+        <p className="text-sm text-slate-500 text-center mb-6">AI স্বাস্থ্য সহায়ক</p>
+        
+        {isActive ? (
+          <div className="space-y-4">
+            {/* Volume visualization */}
+            <div className="h-12 bg-slate-50 rounded-xl flex items-center justify-center gap-1 px-4">
+              {renderVolumeBars(true, isSpeaking)}
+            </div>
+            
+            {/* Status */}
+            <p className={`text-center text-sm font-medium animate-pulse ${isBlue ? 'text-blue-600' : 'text-slate-600'}`}>
+              <i className={`${isSpeaking ? 'fas fa-volume-up' : 'fas fa-microphone'} mr-2`}></i>
+              {state.statusText}
+            </p>
+            
+            {/* End call button */}
+            <button 
+              onClick={cleanup}
+              className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition flex items-center justify-center gap-2"
+            >
+              <i className="fas fa-phone-slash"></i> শেষ করুন
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={() => startSession(agentNumber)}
+            disabled={isOtherActive}
+            className={`w-full py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
+              isBlue 
+                ? 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300' 
+                : 'bg-slate-800 text-white hover:bg-slate-900 disabled:bg-slate-400'
+            } disabled:cursor-not-allowed`}
+          >
+            <i className="fas fa-phone"></i> কথা বলুন
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -425,138 +596,25 @@ export const HomeVoiceSection: React.FC = () => {
           </p>
         </div>
 
-        {error && (
+        {/* Error message */}
+        {state.error && (
           <div className="max-w-md mx-auto mb-8 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm flex items-center justify-center gap-2">
-             <i className="fas fa-exclamation-circle"></i> {error}
+            <i className="fas fa-exclamation-circle"></i> {state.error}
+          </div>
+        )}
+
+        {/* API Key warning */}
+        {!hasValidApiKey && (
+          <div className="max-w-md mx-auto mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+            <p className="font-bold mb-1"><i className="fas fa-exclamation-triangle mr-2"></i>API Key প্রয়োজন</p>
+            <p className="text-xs">ভয়েস এজেন্ট ব্যবহার করতে <code className="bg-amber-100 px-1 rounded">.env</code> ফাইলে <code className="bg-amber-100 px-1 rounded">VITE_GEMINI_API_KEY</code> সেট করুন।</p>
           </div>
         )}
 
         {/* Voice Agent Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-          
-          {/* Nirnoy 1 */}
-          <div className={`relative bg-white rounded-2xl p-6 border-2 transition-all duration-300 ${
-            activeAgent === 1 
-              ? 'border-blue-500 shadow-xl shadow-blue-500/10' 
-              : activeAgent === 2 
-                ? 'border-slate-100 opacity-50' 
-                : 'border-slate-200 hover:border-blue-300 hover:shadow-lg'
-          }`}>
-            {activeAgent === 1 && (
-              <div className="absolute top-3 right-3">
-                <span className="flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                </span>
-              </div>
-            )}
-            
-            <div className="w-20 h-20 mx-auto mb-4 relative">
-              <div className="absolute inset-0 bg-blue-100 rounded-full"></div>
-              <div className="absolute inset-1 bg-white rounded-full flex items-center justify-center">
-                <i className="fas fa-headset text-3xl text-blue-500"></i>
-              </div>
-              {activeAgent === 1 && isAgentSpeaking && (
-                <div className="absolute inset-0 rounded-full border-2 border-blue-400 animate-ping opacity-30"></div>
-              )}
-            </div>
-             
-            <h3 className="text-lg font-bold text-slate-800 text-center mb-1">Nirnoy 1</h3>
-            <p className="text-sm text-slate-500 text-center mb-6">AI স্বাস্থ্য সহায়ক</p>
-
-            {activeAgent === 1 ? (
-              <div className="space-y-4">
-                <div className="h-12 bg-slate-50 rounded-xl flex items-center justify-center gap-1 px-4">
-                  {[...Array(6)].map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={`w-1 rounded-full transition-all duration-75 ${isAgentSpeaking ? 'bg-blue-500' : 'bg-slate-300'}`}
-                      style={{ height: isAgentSpeaking ? `${Math.max(20, Math.random() * 100)}%` : `${Math.max(15, volume * Math.random() * 100)}%` }}
-                    ></div>
-                  ))}
-                </div>
-                 
-                <p className="text-center text-sm text-blue-600 font-medium animate-pulse">
-                  <i className={isAgentSpeaking ? "fas fa-volume-up mr-2" : "fas fa-microphone mr-2"}></i>
-                  {status}
-                </p>
-                 
-                <button onClick={cleanup} className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition flex items-center justify-center gap-2">
-                  <i className="fas fa-phone-slash"></i> শেষ করুন
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => startSession(1)} 
-                disabled={activeAgent === 2}
-                className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition flex items-center justify-center gap-2 disabled:bg-blue-300 disabled:cursor-not-allowed"
-              >
-                <i className="fas fa-phone"></i> কথা বলুন
-              </button>
-            )}
-          </div>
-
-          {/* Nirnoy 2 */}
-          <div className={`relative bg-white rounded-2xl p-6 border-2 transition-all duration-300 ${
-            activeAgent === 2 
-              ? 'border-slate-800 shadow-xl shadow-slate-800/10' 
-              : activeAgent === 1 
-                ? 'border-slate-100 opacity-50' 
-                : 'border-slate-200 hover:border-slate-400 hover:shadow-lg'
-          }`}>
-            {activeAgent === 2 && (
-              <div className="absolute top-3 right-3">
-                <span className="flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                </span>
-              </div>
-            )}
-             
-            <div className="w-20 h-20 mx-auto mb-4 relative">
-              <div className="absolute inset-0 bg-slate-100 rounded-full"></div>
-              <div className="absolute inset-1 bg-white rounded-full flex items-center justify-center">
-                <i className="fas fa-headset text-3xl text-slate-600"></i>
-              </div>
-              {activeAgent === 2 && isAgentSpeaking && (
-                <div className="absolute inset-0 rounded-full border-2 border-slate-600 animate-ping opacity-30"></div>
-              )}
-            </div>
-             
-            <h3 className="text-lg font-bold text-slate-800 text-center mb-1">Nirnoy 2</h3>
-            <p className="text-sm text-slate-500 text-center mb-6">AI স্বাস্থ্য সহায়ক</p>
-
-            {activeAgent === 2 ? (
-              <div className="space-y-4">
-                <div className="h-12 bg-slate-50 rounded-xl flex items-center justify-center gap-1 px-4">
-                  {[...Array(6)].map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={`w-1 rounded-full transition-all duration-75 ${isAgentSpeaking ? 'bg-slate-600' : 'bg-slate-300'}`}
-                      style={{ height: isAgentSpeaking ? `${Math.max(20, Math.random() * 100)}%` : `${Math.max(15, volume * Math.random() * 100)}%` }}
-                    ></div>
-                  ))}
-                </div>
-                 
-                <p className="text-center text-sm text-slate-600 font-medium animate-pulse">
-                  <i className={isAgentSpeaking ? "fas fa-volume-up mr-2" : "fas fa-microphone mr-2"}></i>
-                  {status}
-                </p>
-                 
-                <button onClick={cleanup} className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition flex items-center justify-center gap-2">
-                  <i className="fas fa-phone-slash"></i> শেষ করুন
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => startSession(2)} 
-                disabled={activeAgent === 1}
-                className="w-full py-3 bg-slate-800 text-white rounded-xl font-medium hover:bg-slate-900 transition flex items-center justify-center gap-2 disabled:bg-slate-400 disabled:cursor-not-allowed"
-              >
-                <i className="fas fa-phone"></i> কথা বলুন
-              </button>
-            )}
-          </div>
+          {renderAgentCard(1)}
+          {renderAgentCard(2)}
         </div>
 
         {/* Info */}
@@ -575,3 +633,5 @@ export const HomeVoiceSection: React.FC = () => {
     </section>
   );
 };
+
+export default HomeVoiceSection;
