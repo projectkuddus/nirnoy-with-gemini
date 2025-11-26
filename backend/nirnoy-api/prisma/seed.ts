@@ -1,11 +1,245 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma, Specialty, Clinic, Doctor } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// ==================== DATA GENERATORS ====================
+
+// Male Bangladeshi Names
+const MALE_FIRST_NAMES = [
+  'Abul', 'Abdul', 'Mohammad', 'Md.', 'Ahmed', 'Hasan', 'Hussain', 'Karim', 'Rahim', 'Rashid',
+  'Faruk', 'Jahangir', 'Kabir', 'Latif', 'Manzur', 'Nazrul', 'Omar', 'Quasem', 'Rafiq', 'Salam',
+  'Tariq', 'Ullah', 'Wahid', 'Yakub', 'Zahir', 'Alamgir', 'Badrul', 'Delwar', 'Enamul', 'Fazlul',
+  'Golam', 'Habibur', 'Imran', 'Jamal', 'Khairul', 'Liton', 'Mamun', 'Nazmul', 'Obaidul', 'Parvez',
+  'Qamrul', 'Rezaul', 'Shafiqul', 'Tanvir', 'Uttam', 'Wasim', 'Yusuf', 'Ziaur', 'Anwar', 'Belal',
+  'Chowdhury', 'Dulal', 'Ehsan', 'Firoz', 'Gias', 'Helal', 'Iqbal', 'Jewel', 'Kamrul', 'Lokman',
+  'Masud', 'Nurul', 'Osman', 'Probir', 'Quazi', 'Ruhul', 'Selim', 'Touhid', 'Ujjal', 'Vikram'
+];
+
+const MALE_LAST_NAMES = [
+  'Khan', 'Ahmed', 'Hossain', 'Rahman', 'Islam', 'Uddin', 'Alam', 'Mia', 'Sarker', 'Chowdhury',
+  'Talukder', 'Sikder', 'Mondal', 'Sheikh', 'Bhuiyan', 'Khandaker', 'Siddique', 'Kamal', 'Hassan', 'Kabir',
+  'Akter', 'Begum', 'Sultana', 'Khatun', 'Parveen', 'Jahan', 'Nahar', 'Ara', 'Yasmin', 'Fatima'
+];
+
+// Female Bangladeshi Names
+const FEMALE_FIRST_NAMES = [
+  'Fatima', 'Ayesha', 'Khadija', 'Maryam', 'Zainab', 'Hafsa', 'Amina', 'Sadia', 'Nusrat', 'Taslima',
+  'Rabeya', 'Salma', 'Nasreen', 'Shamima', 'Rehana', 'Farida', 'Laila', 'Roksana', 'Shirin', 'Parvin',
+  'Monira', 'Hasina', 'Khaleda', 'Dilara', 'Farzana', 'Gulshan', 'Hosneara', 'Ismat', 'Jasmine', 'Kamrun',
+  'Lubna', 'Mahfuza', 'Nahid', 'Popy', 'Quamrun', 'Ruma', 'Sabina', 'Tania', 'Umme', 'Wahida',
+  'Yasmin', 'Zakia', 'Afroza', 'Bilkis', 'Chameli', 'Dolly', 'Eti', 'Ferdousi', 'Gulnahar', 'Halima'
+];
+
+const FEMALE_LAST_NAMES = [
+  'Akter', 'Begum', 'Sultana', 'Khatun', 'Parveen', 'Jahan', 'Nahar', 'Ara', 'Yasmin', 'Fatima',
+  'Khan', 'Ahmed', 'Hossain', 'Rahman', 'Islam', 'Chowdhury', 'Siddiqua', 'Kamal', 'Hassan', 'Kabir'
+];
+
+// Specialties with sub-specializations
+const SPECIALTIES_DATA = [
+  { name: 'Cardiology', subs: ['Interventional Cardiology', 'Electrophysiology', 'Heart Failure', 'Preventive Cardiology', 'Cardiac Imaging'] },
+  { name: 'Medicine', subs: ['Internal Medicine', 'Diabetes & Endocrinology', 'Infectious Disease', 'Geriatric Medicine', 'Rheumatology'] },
+  { name: 'Gynecology', subs: ['Obstetrics', 'Reproductive Medicine', 'Gynecologic Oncology', 'Maternal-Fetal Medicine', 'Minimally Invasive Surgery'] },
+  { name: 'Pediatrics', subs: ['Neonatology', 'Pediatric Cardiology', 'Pediatric Neurology', 'Pediatric Oncology', 'Pediatric Surgery'] },
+  { name: 'Orthopedics', subs: ['Joint Replacement', 'Spine Surgery', 'Sports Medicine', 'Trauma Surgery', 'Hand Surgery'] },
+  { name: 'Neurology', subs: ['Stroke', 'Epilepsy', 'Movement Disorders', 'Neuromuscular Disease', 'Headache Medicine'] },
+  { name: 'Dermatology', subs: ['Cosmetic Dermatology', 'Pediatric Dermatology', 'Dermatologic Surgery', 'Hair Disorders', 'Skin Cancer'] },
+  { name: 'ENT', subs: ['Otology', 'Rhinology', 'Head & Neck Surgery', 'Pediatric ENT', 'Voice Disorders'] },
+  { name: 'Ophthalmology', subs: ['Cataract Surgery', 'Glaucoma', 'Retina', 'Cornea', 'Pediatric Ophthalmology'] },
+  { name: 'Psychiatry', subs: ['Child Psychiatry', 'Addiction Medicine', 'Geriatric Psychiatry', 'Forensic Psychiatry', 'Consultation-Liaison'] },
+  { name: 'Gastroenterology', subs: ['Hepatology', 'Endoscopy', 'IBD', 'Motility Disorders', 'Pancreatic Disease'] },
+  { name: 'Urology', subs: ['Urologic Oncology', 'Female Urology', 'Pediatric Urology', 'Andrology', 'Kidney Stones'] },
+  { name: 'Nephrology', subs: ['Dialysis', 'Kidney Transplant', 'Glomerular Disease', 'Hypertension', 'Pediatric Nephrology'] },
+  { name: 'Pulmonology', subs: ['Critical Care', 'Sleep Medicine', 'Interventional Pulmonology', 'Asthma', 'COPD'] },
+  { name: 'Oncology', subs: ['Medical Oncology', 'Surgical Oncology', 'Radiation Oncology', 'Hematologic Oncology', 'Palliative Care'] },
+  { name: 'Endocrinology', subs: ['Diabetes', 'Thyroid Disorders', 'Obesity Medicine', 'Bone & Mineral', 'Reproductive Endocrinology'] },
+  { name: 'Surgery', subs: ['General Surgery', 'Laparoscopic Surgery', 'Colorectal Surgery', 'Breast Surgery', 'Bariatric Surgery'] },
+  { name: 'Neurosurgery', subs: ['Brain Tumor', 'Spine Surgery', 'Pediatric Neurosurgery', 'Vascular Neurosurgery', 'Functional Neurosurgery'] },
+  { name: 'Plastic Surgery', subs: ['Reconstructive Surgery', 'Cosmetic Surgery', 'Hand Surgery', 'Burn Surgery', 'Craniofacial Surgery'] },
+  { name: 'Dental', subs: ['Orthodontics', 'Periodontics', 'Endodontics', 'Prosthodontics', 'Oral Surgery'] },
+];
+
+// Dhaka Hospitals/Clinics
+const DHAKA_HOSPITALS = [
+  { name: 'Bangabandhu Sheikh Mujib Medical University (BSMMU)', area: 'Shahbag', type: 'Government' },
+  { name: 'Dhaka Medical College Hospital', area: 'Shahbag', type: 'Government' },
+  { name: 'Sir Salimullah Medical College Hospital', area: 'Mitford', type: 'Government' },
+  { name: 'National Institute of Cardiovascular Diseases (NICVD)', area: 'Sher-e-Bangla Nagar', type: 'Government' },
+  { name: 'National Institute of Neurosciences', area: 'Sher-e-Bangla Nagar', type: 'Government' },
+  { name: 'National Institute of Cancer Research', area: 'Mohakhali', type: 'Government' },
+  { name: 'Square Hospital', area: 'Panthapath', type: 'Private' },
+  { name: 'United Hospital', area: 'Gulshan', type: 'Private' },
+  { name: 'Apollo Hospital Dhaka', area: 'Bashundhara', type: 'Private' },
+  { name: 'Evercare Hospital', area: 'Bashundhara', type: 'Private' },
+  { name: 'Ibn Sina Hospital', area: 'Dhanmondi', type: 'Private' },
+  { name: 'Labaid Hospital', area: 'Dhanmondi', type: 'Private' },
+  { name: 'Popular Hospital', area: 'Dhanmondi', type: 'Private' },
+  { name: 'Green Life Hospital', area: 'Green Road', type: 'Private' },
+  { name: 'Central Hospital', area: 'Dhanmondi', type: 'Private' },
+  { name: 'Holy Family Red Crescent Hospital', area: 'Eskaton', type: 'Private' },
+  { name: 'BIRDEM Hospital', area: 'Shahbag', type: 'Private' },
+  { name: 'Bangladesh Eye Hospital', area: 'Dhanmondi', type: 'Private' },
+  { name: 'National Heart Foundation', area: 'Mirpur', type: 'Private' },
+  { name: 'Asgar Ali Hospital', area: 'Gandaria', type: 'Private' },
+  { name: 'Japan Bangladesh Friendship Hospital', area: 'Uttara', type: 'Private' },
+  { name: 'Anwer Khan Modern Hospital', area: 'Dhanmondi', type: 'Private' },
+  { name: 'Comfort Hospital', area: 'Malibagh', type: 'Private' },
+  { name: 'Delta Hospital', area: 'Mirpur', type: 'Private' },
+  { name: 'City Hospital', area: 'Shantinagar', type: 'Private' },
+  { name: 'Medinova Medical Services', area: 'Malibagh', type: 'Private' },
+  { name: 'Bangladesh Medical College Hospital', area: 'Dhanmondi', type: 'Private' },
+  { name: 'Ad-Din Hospital', area: 'Maghbazar', type: 'Private' },
+  { name: 'Islami Bank Hospital', area: 'Kakrail', type: 'Private' },
+  { name: 'BRB Hospital', area: 'Panthapath', type: 'Private' },
+];
+
+// Medical Colleges for degrees
+const MEDICAL_COLLEGES = [
+  'Dhaka Medical College',
+  'Sir Salimullah Medical College',
+  'Bangabandhu Sheikh Mujib Medical University',
+  'Shaheed Suhrawardy Medical College',
+  'Chittagong Medical College',
+  'Rajshahi Medical College',
+  'Mymensingh Medical College',
+  'Sylhet MAG Osmani Medical College',
+  'Armed Forces Medical College',
+  'Ibrahim Medical College',
+  'Bangladesh Medical College',
+  'Holy Family Red Crescent Medical College',
+  'Popular Medical College',
+  'Delta Medical College',
+];
+
+const POSTGRAD_INSTITUTES = [
+  'BSMMU',
+  'BCPS',
+  'NICVD',
+  'National Institute of Neurosciences',
+  'National Institute of Cancer Research',
+  'BIRDEM Academy',
+  'National Heart Foundation',
+];
+
+const FOREIGN_INSTITUTES = [
+  'Royal College of Physicians, UK',
+  'Royal College of Surgeons, UK',
+  'American College of Cardiology, USA',
+  'Johns Hopkins University, USA',
+  'Harvard Medical School, USA',
+  'Stanford University, USA',
+  'Mayo Clinic, USA',
+  'Cleveland Clinic, USA',
+  'AIIMS, India',
+  'CMC Vellore, India',
+  'Singapore General Hospital',
+  'Mount Sinai Hospital, USA',
+];
+
+// Degrees
+const BASIC_DEGREES = ['MBBS', 'BDS'];
+const POSTGRAD_DEGREES = ['FCPS', 'MD', 'MS', 'MRCP', 'MRCS', 'FRCP', 'FRCS', 'PhD', 'DM', 'MCh'];
+const DIPLOMA_DEGREES = ['DCH', 'DGO', 'DTCD', 'DDV', 'DLO', 'DO', 'DA', 'DMRD'];
+
+// Achievements
+const ACHIEVEMENT_TYPES = [
+  { title: 'Best Doctor Award', org: 'Bangladesh Medical Association' },
+  { title: 'Excellence in Healthcare', org: 'Ministry of Health' },
+  { title: 'Gold Medal in Research', org: 'BSMMU' },
+  { title: 'Distinguished Service Award', org: 'Bangladesh Medical Association' },
+  { title: 'Young Researcher Award', org: 'Bangladesh Academy of Sciences' },
+  { title: 'Lifetime Achievement Award', org: 'Bangladesh Medical Association' },
+  { title: 'Best Paper Award', org: 'National Medical Conference' },
+  { title: 'Healthcare Excellence Award', org: 'Daily Star Health Awards' },
+];
+
+// Memberships
+const MEMBERSHIPS = [
+  { org: 'Bangladesh Medical Association (BMA)', type: 'Life Member' },
+  { org: 'Bangladesh Medical & Dental Council (BMDC)', type: 'Registered' },
+  { org: 'Bangladesh College of Physicians and Surgeons', type: 'Fellow' },
+  { org: 'Cardiological Society of Bangladesh', type: 'Member' },
+  { org: 'Association of Surgeons of Bangladesh', type: 'Member' },
+  { org: 'Bangladesh Paediatric Association', type: 'Member' },
+  { org: 'Obstetrical & Gynaecological Society of Bangladesh', type: 'Member' },
+  { org: 'Bangladesh Orthopaedic Society', type: 'Member' },
+  { org: 'Bangladesh Society of Medicine', type: 'Member' },
+  { org: 'Bangladesh Gastroenterology Society', type: 'Member' },
+];
+
+// Profile photo URLs (using UI Avatars and randomuser.me for variety)
+const getProfilePhoto = (gender: string, index: number): string => {
+  // Mix of sources for variety
+  if (index % 3 === 0) {
+    return `https://randomuser.me/api/portraits/${gender === 'Male' ? 'men' : 'women'}/${index % 100}.jpg`;
+  } else if (index % 3 === 1) {
+    return `https://i.pravatar.cc/300?img=${(index % 70) + 1}`;
+  } else {
+    const name = gender === 'Male' ? MALE_FIRST_NAMES[index % MALE_FIRST_NAMES.length] : FEMALE_FIRST_NAMES[index % FEMALE_FIRST_NAMES.length];
+    return `https://ui-avatars.com/api/?name=${name}&background=0D9488&color=fff&size=300&bold=true`;
+  }
+};
+
+// Bio templates
+const BIO_TEMPLATES = [
+  (name: string, specialty: string, exp: number) => `${name} is a highly skilled ${specialty} specialist with over ${exp} years of experience. Known for patient-centered care and clinical excellence.`,
+  (name: string, specialty: string, exp: number) => `With ${exp}+ years in ${specialty}, ${name} has treated thousands of patients and is recognized for diagnostic accuracy and compassionate care.`,
+  (name: string, specialty: string, exp: number) => `${name} specializes in ${specialty} with ${exp} years of dedicated practice. Committed to staying updated with the latest medical advancements.`,
+  (name: string, specialty: string, exp: number) => `A leading ${specialty} expert, ${name} brings ${exp} years of experience and a patient-first approach to healthcare.`,
+  (name: string, specialty: string, exp: number) => `${name} is renowned in ${specialty} for ${exp} years of exceptional service, combining expertise with empathy.`,
+];
+
+// Taglines
+const TAGLINES = [
+  'Committed to Your Health',
+  'Excellence in Patient Care',
+  'Your Health, Our Priority',
+  'Healing with Compassion',
+  'Advanced Care, Personal Touch',
+  'Dedicated to Better Health',
+  'Where Expertise Meets Care',
+  'Healthcare You Can Trust',
+  'Precision Medicine, Personal Care',
+  'Your Partner in Health',
+];
+
+// Helper functions
+const randomElement = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
+const randomBoolean = (probability = 0.5): boolean => Math.random() < probability;
+
+const generateBMDC = (index: number): string => {
+  const prefix = randomElement(['A', 'B', 'C', 'D']);
+  return `${prefix}-${(10000 + index).toString()}`;
+};
+
+const generatePhone = (index: number): string => {
+  const prefixes = ['1711', '1712', '1713', '1811', '1812', '1911', '1912', '1611', '1612', '1511'];
+  return `0${randomElement(prefixes)}${(100000 + index).toString().slice(-6)}`;
+};
+
+// Generate schedule
+const generateSchedule = (): { days: string; start: string; end: string; slot: number } => {
+  const schedules = [
+    { days: 'Sat,Mon,Wed', start: '09:00', end: '13:00', slot: 10 },
+    { days: 'Sat,Mon,Wed', start: '10:00', end: '14:00', slot: 15 },
+    { days: 'Sun,Tue,Thu', start: '16:00', end: '20:00', slot: 15 },
+    { days: 'Sun,Tue,Thu', start: '17:00', end: '21:00', slot: 10 },
+    { days: 'Sat,Mon,Wed,Thu', start: '09:00', end: '12:00', slot: 10 },
+    { days: 'Fri,Sat', start: '10:00', end: '14:00', slot: 15 },
+    { days: 'Sun,Tue,Thu', start: '18:00', end: '21:00', slot: 12 },
+    { days: 'Sat,Mon,Wed', start: '15:00', end: '19:00', slot: 15 },
+  ];
+  return randomElement(schedules);
+};
+
+// ==================== MAIN SEED FUNCTION ====================
+
 async function main() {
-  console.log('🌱 Seeding database with comprehensive data...');
+  console.log('🌱 Seeding database with 200 doctors in Dhaka...\n');
 
   // Clear existing data
+  console.log('🗑️  Clearing existing data...');
   await prisma.doctorVerification.deleteMany();
   await prisma.doctorReview.deleteMany();
   await prisma.doctorFAQ.deleteMany();
@@ -25,27 +259,26 @@ async function main() {
   await prisma.clinic.deleteMany();
   await prisma.specialty.deleteMany();
   await prisma.user.deleteMany();
+  console.log('✅ Cleared existing data\n');
 
-  console.log('✅ Cleared existing data');
+  // Create Specialties
+  console.log('📋 Creating specialties...');
+  const specialties: Specialty[] = [];
+  for (let i = 0; i < SPECIALTIES_DATA.length; i++) {
+    const spec = await prisma.specialty.create({
+      data: {
+        name: SPECIALTIES_DATA[i].name,
+        nameBn: SPECIALTIES_DATA[i].name, // Would need proper Bangla translation
+        displayOrder: i + 1,
+        isActive: true,
+      },
+    });
+    specialties.push(spec);
+  }
+  console.log(`✅ Created ${specialties.length} specialties\n`);
 
-  // Create Specialties Master List
-  const specialties = await Promise.all([
-    prisma.specialty.create({ data: { name: 'Cardiology', nameBn: 'হৃদরোগ', icon: 'fa-heart', displayOrder: 1 } }),
-    prisma.specialty.create({ data: { name: 'Medicine', nameBn: 'মেডিসিন', icon: 'fa-stethoscope', displayOrder: 2 } }),
-    prisma.specialty.create({ data: { name: 'Gynecology', nameBn: 'স্ত্রীরোগ', icon: 'fa-venus', displayOrder: 3 } }),
-    prisma.specialty.create({ data: { name: 'Pediatrics', nameBn: 'শিশুরোগ', icon: 'fa-baby', displayOrder: 4 } }),
-    prisma.specialty.create({ data: { name: 'Orthopedics', nameBn: 'হাড় ও জয়েন্ট', icon: 'fa-bone', displayOrder: 5 } }),
-    prisma.specialty.create({ data: { name: 'Neurology', nameBn: 'স্নায়ুরোগ', icon: 'fa-brain', displayOrder: 6 } }),
-    prisma.specialty.create({ data: { name: 'Dermatology', nameBn: 'চর্মরোগ', icon: 'fa-allergies', displayOrder: 7 } }),
-    prisma.specialty.create({ data: { name: 'ENT', nameBn: 'নাক-কান-গলা', icon: 'fa-ear-listen', displayOrder: 8 } }),
-    prisma.specialty.create({ data: { name: 'Ophthalmology', nameBn: 'চক্ষুরোগ', icon: 'fa-eye', displayOrder: 9 } }),
-    prisma.specialty.create({ data: { name: 'Psychiatry', nameBn: 'মানসিক রোগ', icon: 'fa-brain', displayOrder: 10 } }),
-    prisma.specialty.create({ data: { name: 'Gastroenterology', nameBn: 'পরিপাকতন্ত্র', icon: 'fa-stomach', displayOrder: 11 } }),
-    prisma.specialty.create({ data: { name: 'Urology', nameBn: 'মূত্ররোগ', icon: 'fa-kidneys', displayOrder: 12 } }),
-  ]);
-  console.log(`✅ Created ${specialties.length} specialties`);
-
-  // Create Admin User
+  // Create Admin
+  console.log('👤 Creating admin user...');
   const adminUser = await prisma.user.create({
     data: {
       phone: '01700000000',
@@ -59,374 +292,371 @@ async function main() {
       },
     },
   });
-  console.log('✅ Created admin user');
+  console.log('✅ Created admin user\n');
 
-  // Create Clinics
-  const clinics = await Promise.all([
-    prisma.clinic.create({
+  // Create Clinics/Hospitals
+  console.log('🏥 Creating hospitals/clinics...');
+  const clinics: Clinic[] = [];
+  for (const hospital of DHAKA_HOSPITALS) {
+    const clinic = await prisma.clinic.create({
       data: {
-        name: 'Bangabandhu Sheikh Mujib Medical University (BSMMU)',
-        type: 'HOSPITAL',
-        address: 'Shahbag, Dhaka-1000',
-        area: 'Shahbag',
+        name: hospital.name,
+        type: hospital.type === 'Government' ? 'HOSPITAL' : 'HOSPITAL',
+        address: `${hospital.area}, Dhaka`,
+        area: hospital.area,
         city: 'Dhaka',
         district: 'Dhaka',
-        hasEmergency: true,
-        hasPharmacy: true,
-        hasLab: true,
+        hasEmergency: randomBoolean(0.7),
+        hasPharmacy: randomBoolean(0.8),
+        hasLab: randomBoolean(0.9),
         isVerified: true,
+        isActive: true,
       },
-    }),
-    prisma.clinic.create({
-      data: {
-        name: 'Square Hospital',
-        type: 'HOSPITAL',
-        address: '18/F, Bir Uttam Qazi Nuruzzaman Sarak, West Panthapath',
-        area: 'Panthapath',
-        city: 'Dhaka',
-        district: 'Dhaka',
-        hasEmergency: true,
-        hasPharmacy: true,
-        hasLab: true,
-        isVerified: true,
-      },
-    }),
-    prisma.clinic.create({
-      data: {
-        name: 'United Hospital',
-        type: 'HOSPITAL',
-        address: 'Plot 15, Road 71, Gulshan-2',
-        area: 'Gulshan',
-        city: 'Dhaka',
-        district: 'Dhaka',
-        hasEmergency: true,
-        hasPharmacy: true,
-        hasLab: true,
-        isVerified: true,
-      },
-    }),
-    prisma.clinic.create({
-      data: {
-        name: 'Ibn Sina Hospital',
-        type: 'HOSPITAL',
-        address: 'House 48, Road 9/A, Dhanmondi',
-        area: 'Dhanmondi',
-        city: 'Dhaka',
-        district: 'Dhaka',
-        hasEmergency: true,
-        hasPharmacy: true,
-        hasLab: true,
-        isVerified: true,
-      },
-    }),
-    prisma.clinic.create({
-      data: {
-        name: 'Labaid Hospital',
-        type: 'HOSPITAL',
-        address: 'House 1, Road 4, Dhanmondi R/A',
-        area: 'Dhanmondi',
-        city: 'Dhaka',
-        district: 'Dhaka',
-        hasEmergency: true,
-        hasPharmacy: true,
-        hasLab: true,
-        isVerified: true,
-      },
-    }),
-  ]);
-  console.log(`✅ Created ${clinics.length} clinics`);
+    });
+    clinics.push(clinic);
+  }
+  console.log(`✅ Created ${clinics.length} hospitals/clinics\n`);
 
-  // Create World-Class Doctor Profiles
-  const doctorProfiles = [
-    {
-      phone: '01712345001',
-      nameEn: 'Prof. Dr. Abul Kashem Khandaker',
-      nameBn: 'অধ্যাপক ডা. আবুল কাশেম খন্দকার',
-      title: 'Prof.',
-      gender: 'Male',
-      dateOfBirth: new Date('1965-03-15'),
-      primarySpecialty: 'Cardiology',
-      bmdcNumber: 'A-12345',
-      bioEn: 'Professor Dr. Abul Kashem Khandaker is one of Bangladesh\'s most distinguished cardiologists with over 30 years of experience in interventional cardiology. He has performed over 10,000 angioplasties and is a pioneer in complex coronary interventions in South Asia.',
-      bioBn: 'অধ্যাপক ডা. আবুল কাশেম খন্দকার বাংলাদেশের সবচেয়ে বিশিষ্ট হৃদরোগ বিশেষজ্ঞদের একজন। ইন্টারভেনশনাল কার্ডিওলজিতে তাঁর ৩০ বছরেরও বেশি অভিজ্ঞতা রয়েছে।',
-      tagline: 'Committed to Heart Health',
-      consultationFeeNew: 2000,
-      consultationFeeFollowUp: 1000,
-      consultationFeeReport: 500,
-      onlineConsultationFee: 1500,
-      experienceYears: 30,
-      isAvailableForOnline: true,
-      languages: 'Bangla,English,Hindi',
-      qualifications: [
-        { degree: 'MBBS', institution: 'Dhaka Medical College', yearOfCompletion: 1988, displayOrder: 0 },
-        { degree: 'MD (Cardiology)', institution: 'BSMMU', yearOfCompletion: 1995, displayOrder: 1 },
-        { degree: 'FCPS (Medicine)', institution: 'BCPS', yearOfCompletion: 1993, displayOrder: 2 },
-        { degree: 'FRCP', institution: 'Royal College of Physicians, UK', yearOfCompletion: 2005, displayOrder: 3 },
-        { degree: 'Fellowship in Interventional Cardiology', institution: 'Mount Sinai Hospital, New York', yearOfCompletion: 2000, displayOrder: 4 },
-      ],
-      experiences: [
-        { position: 'Professor & Head', department: 'Cardiology', institution: 'BSMMU', institutionType: 'Government', startDate: new Date('2015-01-01'), isCurrent: true },
-        { position: 'Associate Professor', department: 'Cardiology', institution: 'National Heart Foundation', institutionType: 'Private', startDate: new Date('2008-01-01'), endDate: new Date('2014-12-31') },
-        { position: 'Consultant Cardiologist', department: 'Cardiology', institution: 'Square Hospital', institutionType: 'Private', startDate: new Date('2010-01-01'), isCurrent: true },
-      ],
-      chambers: [
-        { name: 'BSMMU Cardiology OPD', type: 'HOSPITAL', address: 'Shahbag, Dhaka', area: 'Shahbag', city: 'Dhaka', daysOfWeek: 'Sat,Mon,Wed', startTime: '09:00', endTime: '13:00', slotDuration: 15, isPrimary: true, clinicId: 0 },
-        { name: 'Square Hospital', type: 'HOSPITAL', address: 'Panthapath', area: 'Panthapath', city: 'Dhaka', daysOfWeek: 'Sun,Tue,Thu', startTime: '17:00', endTime: '20:00', slotDuration: 20, clinicId: 1 },
-      ],
-      achievements: [
-        { title: 'Best Cardiologist Award', type: 'AWARD', organization: 'Bangladesh Medical Association', year: 2020 },
-        { title: 'Gold Medal for Cardiac Research', type: 'AWARD', organization: 'SAARC Cardiology Society', year: 2018 },
-        { title: 'Fellow of American College of Cardiology', type: 'FELLOWSHIP', organization: 'ACC', year: 2010 },
-      ],
-      memberships: [
-        { organization: 'Bangladesh Medical Association (BMA)', membershipType: 'Life Member', joinedYear: 1990 },
-        { organization: 'Cardiological Society of Bangladesh', membershipType: 'President', joinedYear: 1995 },
-        { organization: 'American College of Cardiology', membershipType: 'Fellow (FACC)', joinedYear: 2010 },
-      ],
-      publications: [
-        { title: 'Outcomes of Primary PCI in STEMI Patients in Bangladesh', type: 'JOURNAL', journal: 'Bangladesh Heart Journal', year: 2021 },
-        { title: 'Coronary Artery Disease Patterns in South Asian Population', type: 'JOURNAL', journal: 'International Journal of Cardiology', year: 2019 },
-      ],
-      services: [
-        { name: 'Coronary Angiography', fee: 15000, duration: 60 },
-        { name: 'Angioplasty / Stenting', fee: 150000, duration: 120 },
-        { name: 'Echocardiography', fee: 3000, duration: 30 },
-        { name: 'ECG', fee: 500, duration: 15 },
-      ],
-    },
-    {
-      phone: '01712345002',
-      nameEn: 'Prof. Dr. Fatima Akter',
-      nameBn: 'অধ্যাপক ডা. ফাতেমা আক্তার',
-      title: 'Prof.',
-      gender: 'Female',
-      dateOfBirth: new Date('1970-07-20'),
-      primarySpecialty: 'Gynecology',
-      bmdcNumber: 'A-23456',
-      bioEn: 'Professor Dr. Fatima Akter is a leading gynecologist and obstetrician with expertise in high-risk pregnancy management and laparoscopic surgery. She has delivered over 15,000 babies and trained numerous doctors across Bangladesh.',
-      bioBn: 'অধ্যাপক ডা. ফাতেমা আক্তার একজন শীর্ষস্থানীয় স্ত্রীরোগ ও প্রসূতি বিশেষজ্ঞ। হাই-রিস্ক প্রেগন্যান্সি ম্যানেজমেন্ট এবং ল্যাপারোস্কোপিক সার্জারিতে তাঁর বিশেষ দক্ষতা রয়েছে।',
-      tagline: 'Caring for Women\'s Health',
-      consultationFeeNew: 1500,
-      consultationFeeFollowUp: 800,
-      consultationFeeReport: 400,
-      onlineConsultationFee: 1200,
-      experienceYears: 25,
-      isAvailableForOnline: true,
-      languages: 'Bangla,English',
-      qualifications: [
-        { degree: 'MBBS', institution: 'Sir Salimullah Medical College', yearOfCompletion: 1993, displayOrder: 0 },
-        { degree: 'FCPS (Gynae & Obs)', institution: 'BCPS', yearOfCompletion: 2000, displayOrder: 1 },
-        { degree: 'MS (Gynae & Obs)', institution: 'BSMMU', yearOfCompletion: 2003, displayOrder: 2 },
-        { degree: 'Fellowship in Laparoscopic Surgery', institution: 'IRCAD, France', yearOfCompletion: 2008, displayOrder: 3 },
-      ],
-      experiences: [
-        { position: 'Professor', department: 'Obstetrics & Gynecology', institution: 'BSMMU', institutionType: 'Government', startDate: new Date('2018-01-01'), isCurrent: true },
-        { position: 'Consultant', department: 'Gynecology', institution: 'United Hospital', institutionType: 'Private', startDate: new Date('2012-01-01'), isCurrent: true },
-      ],
-      chambers: [
-        { name: 'United Hospital', type: 'HOSPITAL', address: 'Gulshan-2', area: 'Gulshan', city: 'Dhaka', daysOfWeek: 'Sat,Mon,Wed', startTime: '10:00', endTime: '14:00', slotDuration: 15, isPrimary: true, clinicId: 2 },
-        { name: 'Ibn Sina Hospital', type: 'HOSPITAL', address: 'Dhanmondi', area: 'Dhanmondi', city: 'Dhaka', daysOfWeek: 'Sun,Tue', startTime: '17:00', endTime: '20:00', slotDuration: 15, clinicId: 3 },
-      ],
-      achievements: [
-        { title: 'Best Gynecologist Award', type: 'AWARD', organization: 'Obstetrical & Gynaecological Society of Bangladesh', year: 2019 },
-      ],
-      memberships: [
-        { organization: 'Obstetrical & Gynaecological Society of Bangladesh (OGSB)', membershipType: 'Executive Member', joinedYear: 2005 },
-        { organization: 'FIGO (International Federation of Gynecology and Obstetrics)', membershipType: 'Member', joinedYear: 2010 },
-      ],
-      publications: [],
-      services: [
-        { name: 'Normal Delivery', fee: 30000, duration: 0 },
-        { name: 'C-Section', fee: 60000, duration: 0 },
-        { name: 'Laparoscopic Surgery', fee: 80000, duration: 0 },
-        { name: 'Ultrasound (Pregnancy)', fee: 2000, duration: 30 },
-      ],
-    },
-    {
-      phone: '01712345003',
-      nameEn: 'Dr. Mohammad Rahman',
-      nameBn: 'ডা. মোহাম্মদ রহমান',
-      title: 'Dr.',
-      gender: 'Male',
-      dateOfBirth: new Date('1975-11-10'),
-      primarySpecialty: 'Medicine',
-      bmdcNumber: 'A-34567',
-      bioEn: 'Dr. Mohammad Rahman is a highly experienced internal medicine specialist with expertise in diabetes management, hypertension, and infectious diseases. He believes in holistic patient care and preventive medicine.',
-      bioBn: 'ডা. মোহাম্মদ রহমান একজন অভিজ্ঞ মেডিসিন বিশেষজ্ঞ। ডায়াবেটিস, উচ্চ রক্তচাপ এবং সংক্রামক রোগে তাঁর বিশেষ দক্ষতা রয়েছে।',
-      tagline: 'Your Family Physician',
-      consultationFeeNew: 1000,
-      consultationFeeFollowUp: 500,
-      consultationFeeReport: 300,
-      onlineConsultationFee: 800,
-      experienceYears: 20,
-      isAvailableForOnline: true,
-      languages: 'Bangla,English',
-      qualifications: [
-        { degree: 'MBBS', institution: 'Dhaka Medical College', yearOfCompletion: 1998, displayOrder: 0 },
-        { degree: 'MRCP (UK)', institution: 'Royal College of Physicians', yearOfCompletion: 2005, displayOrder: 1 },
-        { degree: 'MD (Medicine)', institution: 'BSMMU', yearOfCompletion: 2008, displayOrder: 2 },
-      ],
-      experiences: [
-        { position: 'Senior Consultant', department: 'Medicine', institution: 'Labaid Hospital', institutionType: 'Private', startDate: new Date('2015-01-01'), isCurrent: true },
-        { position: 'Associate Professor', department: 'Medicine', institution: 'Dhaka Medical College', institutionType: 'Government', startDate: new Date('2012-01-01'), endDate: new Date('2014-12-31') },
-      ],
-      chambers: [
-        { name: 'Labaid Hospital', type: 'HOSPITAL', address: 'Dhanmondi', area: 'Dhanmondi', city: 'Dhaka', daysOfWeek: 'Sat,Mon,Wed,Thu', startTime: '10:00', endTime: '13:00', slotDuration: 10, isPrimary: true, clinicId: 4 },
-      ],
-      achievements: [],
-      memberships: [
-        { organization: 'Bangladesh Society of Medicine', membershipType: 'Member', joinedYear: 2000 },
-      ],
-      publications: [],
-      services: [
-        { name: 'General Consultation', fee: 1000, duration: 15 },
-        { name: 'Diabetes Management', fee: 1000, duration: 20 },
-        { name: 'Health Checkup', fee: 3000, duration: 45 },
-      ],
-    },
-  ];
-
-  for (const profile of doctorProfiles) {
+  // Create 200 Doctors
+  console.log('👨‍⚕️ Creating 200 doctors...');
+  const doctors: Doctor[] = [];
+  
+  for (let i = 0; i < 200; i++) {
+    const isMale = i % 3 !== 0; // 2/3 male, 1/3 female (realistic ratio)
+    const gender = isMale ? 'Male' : 'Female';
+    
+    const firstName = isMale 
+      ? randomElement(MALE_FIRST_NAMES) 
+      : randomElement(FEMALE_FIRST_NAMES);
+    const lastName = isMale 
+      ? randomElement(MALE_LAST_NAMES) 
+      : randomElement(FEMALE_LAST_NAMES);
+    
+    const experienceYears = randomInt(5, 35);
+    const specialtyData = SPECIALTIES_DATA[i % SPECIALTIES_DATA.length];
+    const primarySpecialty = specialtyData.name;
+    
+    // Determine title based on experience
+    let title = 'Dr.';
+    if (experienceYears >= 25) title = randomElement(['Prof.', 'Prof.']);
+    else if (experienceYears >= 20) title = randomElement(['Assoc. Prof.', 'Dr.']);
+    else if (experienceYears >= 15) title = randomElement(['Asst. Prof.', 'Dr.']);
+    
+    const fullName = `${title} ${firstName} ${lastName}`;
+    const nameEn = `${firstName} ${lastName}`;
+    
+    // Generate fees based on experience and specialty
+    const baseFee = primarySpecialty === 'Cardiology' || primarySpecialty === 'Neurology' || primarySpecialty === 'Oncology'
+      ? randomInt(1500, 2500)
+      : randomInt(800, 1500);
+    const consultationFee = baseFee + (experienceYears * 20);
+    
+    // Create user
+    const phone = generatePhone(i);
     const user = await prisma.user.create({
       data: {
-        phone: profile.phone,
+        phone,
+        email: `dr.${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@nirnoycare.com`,
         role: 'DOCTOR',
       },
     });
 
+    // Create doctor
     const doctor = await prisma.doctor.create({
       data: {
         userId: user.id,
-        nameEn: profile.nameEn,
-        nameBn: profile.nameBn,
-        title: profile.title,
-        gender: profile.gender,
-        dateOfBirth: profile.dateOfBirth,
-        primarySpecialty: profile.primarySpecialty,
-        slug: profile.nameEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
-        bmdcNumber: profile.bmdcNumber,
+        nameEn: fullName,
+        nameBn: fullName, // Would need proper Bangla names
+        title,
+        gender,
+        dateOfBirth: new Date(1950 + randomInt(20, 50), randomInt(0, 11), randomInt(1, 28)),
+        profilePhoto: getProfilePhoto(gender, i),
+        primarySpecialty,
+        slug: `${firstName.toLowerCase()}-${lastName.toLowerCase()}-${i}`,
+        bmdcNumber: generateBMDC(i),
         bmdcVerified: true,
         bmdcVerifiedAt: new Date(),
-        bioEn: profile.bioEn,
-        bioBn: profile.bioBn,
-        tagline: profile.tagline,
-        consultationFeeNew: profile.consultationFeeNew,
-        consultationFeeFollowUp: profile.consultationFeeFollowUp,
-        consultationFeeReport: profile.consultationFeeReport,
-        onlineConsultationFee: profile.onlineConsultationFee,
-        experienceYears: profile.experienceYears,
-        isAvailableForOnline: profile.isAvailableForOnline,
-        languages: profile.languages,
+        nidNumber: `${randomInt(1000000000, 9999999999)}`,
+        nidVerified: true,
+        bioEn: randomElement(BIO_TEMPLATES)(fullName, primarySpecialty, experienceYears),
+        bioBn: randomElement(BIO_TEMPLATES)(fullName, primarySpecialty, experienceYears),
+        tagline: randomElement(TAGLINES),
+        experienceYears,
+        consultationFeeNew: consultationFee,
+        consultationFeeFollowUp: Math.round(consultationFee * 0.5),
+        consultationFeeReport: Math.round(consultationFee * 0.3),
+        onlineConsultationFee: Math.round(consultationFee * 0.8),
+        avgConsultationTime: randomElement([10, 12, 15, 20]),
+        isAvailableForOnline: randomBoolean(0.6),
+        isAvailableForHomeVisit: randomBoolean(0.2),
+        homeVisitFee: randomBoolean(0.2) ? consultationFee * 3 : null,
+        languages: randomBoolean(0.3) ? 'Bangla,English,Hindi' : 'Bangla,English',
         registrationStatus: 'APPROVED',
         approvedAt: new Date(),
-        totalPatients: Math.floor(Math.random() * 5000) + 1000,
-        totalReviews: Math.floor(Math.random() * 200) + 50,
-        averageRating: 4.5 + Math.random() * 0.5,
-        profilePhoto: `https://randomuser.me/api/portraits/${profile.gender === 'Male' ? 'men' : 'women'}/${Math.floor(Math.random() * 99)}.jpg`,
+        totalPatients: randomInt(500, 15000),
+        totalAppointments: randomInt(1000, 30000),
+        totalReviews: randomInt(20, 500),
+        averageRating: 4 + Math.random(),
+        acceptNewPatients: randomBoolean(0.9),
+        showPhonePublicly: randomBoolean(0.3),
+        showEmailPublicly: randomBoolean(0.2),
+      },
+    });
+    doctors.push(doctor);
+
+    // Add Qualifications (2-5 degrees)
+    const numQualifications = randomInt(2, 5);
+    const mbbsYear = 2024 - experienceYears - 1;
+    
+    // Always add MBBS/BDS first
+    await prisma.doctorQualification.create({
+      data: {
+        doctorId: doctor.id,
+        degree: primarySpecialty === 'Dental' ? 'BDS' : 'MBBS',
+        institution: randomElement(MEDICAL_COLLEGES),
+        institutionCountry: 'Bangladesh',
+        yearOfCompletion: mbbsYear,
+        isVerified: true,
+        displayOrder: 0,
       },
     });
 
-    // Add qualifications
-    for (const qual of profile.qualifications) {
+    // Add postgrad degrees
+    for (let q = 1; q < numQualifications; q++) {
+      const isPostgrad = q <= 2;
+      const degree = isPostgrad ? randomElement(POSTGRAD_DEGREES) : randomElement(DIPLOMA_DEGREES);
+      const isForeign = randomBoolean(0.15) && experienceYears > 15;
+      
       await prisma.doctorQualification.create({
         data: {
           doctorId: doctor.id,
-          ...qual,
+          degree,
+          field: isPostgrad ? primarySpecialty : null,
+          institution: isForeign ? randomElement(FOREIGN_INSTITUTES) : randomElement(POSTGRAD_INSTITUTES),
+          institutionCountry: isForeign ? 'Foreign' : 'Bangladesh',
+          yearOfCompletion: mbbsYear + randomInt(3, 8) * q,
+          isVerified: true,
+          displayOrder: q,
         },
       });
     }
 
-    // Add experiences
-    for (const exp of profile.experiences) {
+    // Add Specializations (1-3)
+    const numSpecs = randomInt(1, 3);
+    await prisma.doctorSpecialization.create({
+      data: {
+        doctorId: doctor.id,
+        name: primarySpecialty,
+        isPrimary: true,
+        yearsOfPractice: experienceYears,
+      },
+    });
+    
+    for (let s = 1; s < numSpecs; s++) {
+      const subSpec = randomElement(specialtyData.subs);
+      await prisma.doctorSpecialization.create({
+        data: {
+          doctorId: doctor.id,
+          name: subSpec,
+          isPrimary: false,
+          yearsOfPractice: randomInt(3, experienceYears),
+        },
+      });
+    }
+
+    // Add Experiences (2-4)
+    const numExperiences = randomInt(2, 4);
+    let currentYear = new Date().getFullYear();
+    
+    for (let e = 0; e < numExperiences; e++) {
+      const isCurrent = e === 0;
+      const position = e === 0 
+        ? (title === 'Prof.' ? 'Professor & Head' : title === 'Assoc. Prof.' ? 'Associate Professor' : 'Senior Consultant')
+        : randomElement(['Consultant', 'Associate Consultant', 'Medical Officer', 'Registrar']);
+      
+      const hospital = randomElement(DHAKA_HOSPITALS);
+      const duration = randomInt(3, 8);
+      
       await prisma.doctorExperience.create({
         data: {
           doctorId: doctor.id,
-          ...exp,
+          position,
+          department: primarySpecialty,
+          institution: hospital.name,
+          institutionType: hospital.type,
+          city: 'Dhaka',
+          country: 'Bangladesh',
+          startDate: new Date(currentYear - duration, 0, 1),
+          endDate: isCurrent ? null : new Date(currentYear, 0, 1),
+          isCurrent,
         },
       });
+      
+      currentYear -= duration;
     }
 
-    // Add chambers
-    for (const chamber of profile.chambers) {
+    // Add Chambers (1-3)
+    const numChambers = randomInt(1, 3);
+    const usedHospitals = new Set<number>();
+    
+    for (let c = 0; c < numChambers; c++) {
+      let hospitalIndex: number;
+      do {
+        hospitalIndex = randomInt(0, clinics.length - 1);
+      } while (usedHospitals.has(hospitalIndex) && usedHospitals.size < clinics.length);
+      usedHospitals.add(hospitalIndex);
+      
+      const clinic = clinics[hospitalIndex];
+      const schedule = generateSchedule();
+      
       await prisma.doctorChamber.create({
         data: {
           doctorId: doctor.id,
-          clinicId: clinics[chamber.clinicId].id,
-          name: chamber.name,
-          type: chamber.type,
-          address: chamber.address,
-          area: chamber.area,
-          city: chamber.city,
+          clinicId: clinic.id,
+          name: clinic.name,
+          type: 'HOSPITAL',
+          address: clinic.address,
+          area: clinic.area,
+          city: 'Dhaka',
           district: 'Dhaka',
-          daysOfWeek: chamber.daysOfWeek,
-          startTime: chamber.startTime,
-          endTime: chamber.endTime,
-          slotDuration: chamber.slotDuration,
-          isPrimary: chamber.isPrimary || false,
-          consultationFee: profile.consultationFeeNew,
-          followUpFee: profile.consultationFeeFollowUp,
-          reportCheckFee: profile.consultationFeeReport,
+          daysOfWeek: schedule.days,
+          startTime: schedule.start,
+          endTime: schedule.end,
+          slotDuration: schedule.slot,
+          consultationFee: consultationFee + (c * randomInt(-100, 200)),
+          followUpFee: Math.round(consultationFee * 0.5),
+          reportCheckFee: Math.round(consultationFee * 0.3),
+          isPrimary: c === 0,
+          isActive: true,
+          hasParking: randomBoolean(0.7),
+          hasWheelchairAccess: randomBoolean(0.5),
+          hasAC: true,
         },
       });
     }
 
-    // Add achievements
-    for (const achievement of profile.achievements) {
-      await prisma.doctorAchievement.create({
-        data: {
-          doctorId: doctor.id,
-          ...achievement,
-        },
-      });
+    // Add Achievements (0-3)
+    if (experienceYears > 10 && randomBoolean(0.5)) {
+      const numAchievements = randomInt(1, 3);
+      for (let a = 0; a < numAchievements; a++) {
+        const achievement = randomElement(ACHIEVEMENT_TYPES);
+        await prisma.doctorAchievement.create({
+          data: {
+            doctorId: doctor.id,
+            title: achievement.title,
+            type: 'AWARD',
+            organization: achievement.org,
+            year: 2024 - randomInt(1, 10),
+          },
+        });
+      }
     }
 
-    // Add memberships
-    for (const membership of profile.memberships) {
+    // Add Memberships (2-4)
+    const numMemberships = randomInt(2, 4);
+    const usedMemberships = new Set<number>();
+    
+    for (let m = 0; m < numMemberships; m++) {
+      let membershipIndex: number;
+      do {
+        membershipIndex = randomInt(0, MEMBERSHIPS.length - 1);
+      } while (usedMemberships.has(membershipIndex) && usedMemberships.size < MEMBERSHIPS.length);
+      usedMemberships.add(membershipIndex);
+      
+      const membership = MEMBERSHIPS[membershipIndex];
       await prisma.doctorMembership.create({
         data: {
           doctorId: doctor.id,
-          ...membership,
+          organization: membership.org,
+          membershipType: membership.type,
+          joinedYear: mbbsYear + randomInt(1, 5),
+          isActive: true,
         },
       });
     }
 
-    // Add publications
-    for (const publication of profile.publications) {
-      await prisma.doctorPublication.create({
-        data: {
-          doctorId: doctor.id,
-          ...publication,
-        },
-      });
-    }
-
-    // Add services
-    for (const service of profile.services) {
+    // Add Services (3-6)
+    const services = [
+      { name: 'General Consultation', fee: consultationFee, duration: 15 },
+      { name: 'Follow-up Visit', fee: Math.round(consultationFee * 0.5), duration: 10 },
+      { name: 'Report Analysis', fee: Math.round(consultationFee * 0.3), duration: 10 },
+      { name: 'Online Consultation', fee: Math.round(consultationFee * 0.8), duration: 15 },
+      { name: 'Second Opinion', fee: Math.round(consultationFee * 1.5), duration: 30 },
+      { name: 'Health Checkup', fee: Math.round(consultationFee * 2), duration: 45 },
+    ];
+    
+    const numServices = randomInt(3, 6);
+    for (let s = 0; s < numServices; s++) {
+      const service = services[s];
       await prisma.doctorService.create({
         data: {
           doctorId: doctor.id,
-          ...service,
+          name: service.name,
+          fee: service.fee,
+          duration: service.duration,
+          isAvailable: true,
         },
       });
     }
 
-    // Add verification record
+    // Add Reviews (3-10)
+    const numReviews = randomInt(3, 10);
+    const reviewComments = [
+      'Excellent doctor! Very thorough and patient.',
+      'Highly recommended. Explains everything clearly.',
+      'Great experience. Very professional.',
+      'Best doctor I have visited. Very caring.',
+      'Good diagnosis. Treatment worked well.',
+      'Very knowledgeable and experienced.',
+      'Takes time to listen to patients.',
+      'Friendly staff and good environment.',
+      'Quick appointment and no long wait.',
+      'Satisfied with the treatment.',
+    ];
+    
+    for (let r = 0; r < numReviews; r++) {
+      await prisma.doctorReview.create({
+        data: {
+          doctorId: doctor.id,
+          rating: randomInt(4, 5),
+          title: randomBoolean(0.5) ? randomElement(['Great Doctor', 'Highly Recommend', 'Excellent Care', 'Very Satisfied']) : null,
+          comment: randomElement(reviewComments),
+          ratingPunctuality: randomInt(4, 5),
+          ratingBehavior: randomInt(4, 5),
+          ratingExplanation: randomInt(4, 5),
+          ratingEffectiveness: randomInt(4, 5),
+          isVerified: randomBoolean(0.7),
+          isPublished: true,
+          createdAt: new Date(2024, randomInt(0, 11), randomInt(1, 28)),
+        },
+      });
+    }
+
+    // Add Verification record
     await prisma.doctorVerification.create({
       data: {
         doctorId: doctor.id,
         action: 'APPROVED',
-        notes: 'Initial seed - Auto approved',
+        notes: 'Auto-approved during seed',
       },
     });
 
-    console.log(`✅ Created doctor: ${profile.nameEn}`);
+    // Progress indicator
+    if ((i + 1) % 20 === 0) {
+      console.log(`   Created ${i + 1}/200 doctors...`);
+    }
   }
+  
+  console.log(`✅ Created ${doctors.length} doctors\n`);
 
   // Create sample patients
+  console.log('👥 Creating sample patients...');
   const patients = [
     { phone: '01811111111', name: 'Rahim Uddin', gender: 'Male', bloodGroup: 'A+' },
     { phone: '01822222222', name: 'Fatima Begum', gender: 'Female', bloodGroup: 'B+' },
     { phone: '01833333333', name: 'Karim Ahmed', gender: 'Male', bloodGroup: 'O+' },
+    { phone: '01844444444', name: 'Salma Khatun', gender: 'Female', bloodGroup: 'AB+' },
+    { phone: '01855555555', name: 'Jamal Hossain', gender: 'Male', bloodGroup: 'A-' },
   ];
 
   for (const pt of patients) {
@@ -444,14 +674,23 @@ async function main() {
       },
     });
   }
-  console.log(`✅ Created ${patients.length} sample patients`);
+  console.log(`✅ Created ${patients.length} sample patients\n`);
 
-  console.log('🎉 Database seeded successfully!');
+  // Summary
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log('🎉 DATABASE SEEDED SUCCESSFULLY!');
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log(`   👨‍⚕️ Doctors: ${doctors.length}`);
+  console.log(`   🏥 Hospitals/Clinics: ${clinics.length}`);
+  console.log(`   📋 Specialties: ${specialties.length}`);
+  console.log(`   👥 Sample Patients: ${patients.length}`);
+  console.log(`   👤 Admin Users: 1`);
+  console.log('═══════════════════════════════════════════════════════════\n');
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {
