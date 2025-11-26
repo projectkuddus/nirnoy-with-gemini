@@ -2,37 +2,85 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 
-// ============ ANIMATED HEALTH GRAPHIC ============
-const HealthGraphic: React.FC = () => (
-  <div className="relative w-full max-w-md mx-auto">
-    {/* Central Circle with Pulse */}
-    <div className="relative w-64 h-64 mx-auto">
-      {/* Outer rings */}
-      <div className="absolute inset-0 border-2 border-blue-100 rounded-full animate-ping opacity-20"></div>
-      <div className="absolute inset-4 border border-blue-200 rounded-full"></div>
-      <div className="absolute inset-8 border border-blue-100 rounded-full"></div>
+// ============ NIRNOY BRAIN GRAPHIC - Neural Network Style ============
+const NirnoyBrainGraphic: React.FC = () => (
+  <div className="relative w-80 h-80 mx-auto">
+    {/* SVG Neural Network */}
+    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 320 320">
+      {/* Connection lines from center to nodes */}
+      <g stroke="#93c5fd" strokeWidth="1.5" fill="none" opacity="0.6">
+        {/* Top connections */}
+        <path d="M160,160 Q140,100 160,40" />
+        <path d="M160,160 Q200,90 240,50" />
+        <path d="M160,160 Q120,90 80,50" />
+        {/* Side connections */}
+        <path d="M160,160 Q220,140 280,160" />
+        <path d="M160,160 Q100,140 40,160" />
+        <path d="M160,160 Q230,180 280,220" />
+        <path d="M160,160 Q90,180 40,220" />
+        {/* Bottom connections */}
+        <path d="M160,160 Q180,220 160,280" />
+        <path d="M160,160 Q120,230 80,270" />
+        <path d="M160,160 Q200,230 240,270" />
+        {/* Cross connections */}
+        <path d="M80,50 Q160,80 240,50" strokeWidth="0.8" opacity="0.4" />
+        <path d="M40,160 Q160,200 280,160" strokeWidth="0.8" opacity="0.4" />
+        <path d="M80,270 Q160,240 240,270" strokeWidth="0.8" opacity="0.4" />
+      </g>
       
-      {/* Center */}
-      <div className="absolute inset-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-xl shadow-blue-500/30">
-        <div className="text-center text-white">
-          <i className="fas fa-heartbeat text-4xl mb-2"></i>
-          <p className="text-xs font-bold uppercase tracking-wider">Nirnoy</p>
-        </div>
-      </div>
+      {/* Outer pulse ring */}
+      <circle cx="160" cy="160" r="120" fill="none" stroke="#dbeafe" strokeWidth="1" opacity="0.5" />
+      <circle cx="160" cy="160" r="100" fill="none" stroke="#bfdbfe" strokeWidth="0.5" strokeDasharray="4 4" opacity="0.4" />
+    </svg>
 
-      {/* Floating Icons */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
-        <i className="fas fa-user-md text-blue-500 text-lg"></i>
+    {/* Center Core - NIRNOY */}
+    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28">
+      <div className="absolute -inset-3 bg-blue-400/20 rounded-full blur-xl"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 rounded-full shadow-2xl flex items-center justify-center" style={{ boxShadow: '0 0 40px rgba(59, 130, 246, 0.4)' }}>
+        <div className="absolute inset-2 rounded-full bg-gradient-to-br from-white/25 via-transparent to-transparent"></div>
+        <span className="text-white text-lg font-black tracking-wide relative z-10">NIRNOY</span>
       </div>
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
-        <i className="fas fa-calendar-check text-blue-500 text-lg"></i>
-      </div>
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
-        <i className="fas fa-notes-medical text-blue-500 text-lg"></i>
-      </div>
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
-        <i className="fas fa-clock text-blue-500 text-lg"></i>
-      </div>
+    </div>
+
+    {/* Floating Nodes */}
+    {/* Top */}
+    <div className="absolute top-6 left-1/2 -translate-x-1/2 w-11 h-11 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center">
+      <i className="fas fa-user-md text-blue-500"></i>
+    </div>
+    {/* Top Left */}
+    <div className="absolute top-10 left-12 w-9 h-9 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center">
+      <i className="fas fa-hospital text-blue-400 text-sm"></i>
+    </div>
+    {/* Top Right */}
+    <div className="absolute top-10 right-12 w-9 h-9 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center">
+      <i className="fas fa-stethoscope text-blue-400 text-sm"></i>
+    </div>
+    {/* Left */}
+    <div className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center">
+      <i className="fas fa-notes-medical text-blue-500 text-sm"></i>
+    </div>
+    {/* Right */}
+    <div className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center">
+      <i className="fas fa-calendar-check text-blue-500 text-sm"></i>
+    </div>
+    {/* Bottom Left */}
+    <div className="absolute bottom-14 left-10 w-9 h-9 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center">
+      <i className="fas fa-pills text-blue-400 text-sm"></i>
+    </div>
+    {/* Bottom Right */}
+    <div className="absolute bottom-14 right-10 w-9 h-9 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center">
+      <i className="fas fa-clock text-blue-400 text-sm"></i>
+    </div>
+    {/* Bottom */}
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-11 h-11 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center">
+      <i className="fas fa-heartbeat text-blue-500"></i>
+    </div>
+    {/* Extra nodes for complexity */}
+    <div className="absolute bottom-20 right-2 w-8 h-8 bg-white rounded-full shadow-md border border-blue-50 flex items-center justify-center">
+      <i className="fas fa-bell text-blue-300 text-xs"></i>
+    </div>
+    <div className="absolute bottom-20 left-2 w-8 h-8 bg-white rounded-full shadow-md border border-blue-50 flex items-center justify-center">
+      <i className="fas fa-ambulance text-blue-300 text-xs"></i>
     </div>
   </div>
 );
@@ -178,7 +226,7 @@ export const Landing: React.FC = () => {
               <span className="text-white font-bold text-lg">ন</span>
             </div>
             <span className="font-bold text-xl text-slate-800">Nirnoy</span>
-          </div>
+        </div>
           
           <div className="flex items-center gap-3">
             <button onClick={() => navigate('/patient-auth')} className="text-sm font-medium text-slate-600 hover:text-slate-800 transition">
@@ -201,8 +249,8 @@ export const Landing: React.FC = () => {
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                 <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
                   {isBn ? 'বাংলাদেশের জন্য' : 'Built for Bangladesh'}
-                </span>
-              </div>
+            </span>
+          </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
                 {isBn ? (
@@ -210,8 +258,8 @@ export const Landing: React.FC = () => {
                 ) : (
                   <>Healthcare <br/><span className="text-blue-500">Made Simple</span></>
                 )}
-              </h1>
-
+          </h1>
+          
               <p className="text-lg text-slate-600 mb-8 max-w-lg">
                 {isBn 
                   ? 'ঢাকার সেরা ডাক্তারদের খুঁজুন, অ্যাপয়েন্টমেন্ট বুক করুন, লাইভ কিউ ট্র্যাক করুন - সব এক জায়গায়।' 
@@ -223,13 +271,13 @@ export const Landing: React.FC = () => {
                 <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-2 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100 transition">
                   <div className="flex items-center flex-1 px-3">
                     <i className="fas fa-search text-slate-400 mr-3"></i>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                     <input 
+                        type="text" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={isBn ? 'ডাক্তার বা বিশেষত্ব খুঁজুন...' : 'Search doctor or specialty...'}
                       className="flex-1 bg-transparent outline-none text-slate-800 placeholder:text-slate-400 py-2"
-                    />
+                     />
                   </div>
                   <button
                     type="submit"
@@ -237,9 +285,9 @@ export const Landing: React.FC = () => {
                   >
                     {isBn ? 'খুঁজুন' : 'Search'}
                   </button>
-                </div>
-              </form>
-
+               </div>
+            </form>
+            
               {/* Quick Specialty Tags */}
               <div className="flex flex-wrap gap-2">
                 {[
@@ -248,20 +296,20 @@ export const Landing: React.FC = () => {
                   { en: 'Gynecology', bn: 'স্ত্রীরোগ' },
                   { en: 'Pediatrics', bn: 'শিশুরোগ' },
                 ].map((spec, i) => (
-                  <button
+                  <button 
                     key={i}
                     onClick={() => navigate('/search')}
                     className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-sm text-slate-600 hover:border-blue-400 hover:text-blue-600 transition"
                   >
                     {isBn ? spec.bn : spec.en}
                   </button>
-                ))}
+               ))}
               </div>
             </div>
 
             {/* Right: Health Graphic */}
             <div className="hidden lg:block">
-              <HealthGraphic />
+              <NirnoyBrainGraphic />
             </div>
           </div>
         </div>
@@ -275,10 +323,10 @@ export const Landing: React.FC = () => {
               <div key={i}>
                 <p className="text-2xl md:text-3xl font-bold text-slate-800">{stat.value}</p>
                 <p className="text-sm text-slate-500">{stat.label}</p>
-              </div>
+                     </div>
             ))}
-          </div>
-        </div>
+                  </div>
+               </div>
       </section>
 
       {/* ============ VOICE BOOKING SECTION ============ */}
@@ -289,7 +337,7 @@ export const Landing: React.FC = () => {
               <i className="fas fa-phone-volume text-blue-500"></i>
               <span className="text-sm font-bold text-blue-600">24/7 • {isBn ? 'বিনামূল্যে' : 'No Charge'}</span>
             </div>
-            
+
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
               {isBn ? 'কথা বলে অ্যাপয়েন্টমেন্ট নিন' : 'Book by Talking to Our Agents'}
             </h2>
@@ -297,8 +345,8 @@ export const Landing: React.FC = () => {
               {isBn 
                 ? 'বাংলায় কথা বলুন আমাদের AI এজেন্টের সাথে। ডাক্তার খুঁজুন, প্রশ্ন করুন, অ্যাপয়েন্টমেন্ট বুক করুন - সব ভয়েসে।' 
                 : 'Speak in Bangla with our AI agents. Find doctors, ask questions, book appointments - all by voice.'}
-            </p>
-          </div>
+                     </p>
+                  </div>
 
           {/* Voice Agent Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
@@ -318,7 +366,7 @@ export const Landing: React.FC = () => {
               onDisconnect={() => setActiveAgent(null)}
               disabled={activeAgent === 1}
             />
-          </div>
+                     </div>
 
           {/* Info */}
           <div className="mt-8 text-center">
@@ -328,8 +376,8 @@ export const Landing: React.FC = () => {
                 ? 'দুটি এজেন্টের কাজ একই। যেকোনো একটি বেছে নিন।' 
                 : 'Both agents have same capabilities. Choose any one.'}
             </p>
-          </div>
-        </div>
+                  </div>
+               </div>
       </section>
 
       {/* ============ FEATURES SECTION ============ */}
@@ -341,21 +389,21 @@ export const Landing: React.FC = () => {
             </h2>
             <p className="text-slate-600">
               {isBn ? 'আধুনিক স্বাস্থ্যসেবার জন্য আধুনিক সমাধান' : 'Modern solutions for modern healthcare'}
-            </p>
-          </div>
-
+                  </p>
+               </div>
+               
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, i) => (
               <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 hover:shadow-lg transition">
                 <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mb-4">
                   <i className={`fas ${feature.icon} text-blue-500 text-xl`}></i>
-                </div>
+                        </div>
                 <h3 className="font-bold text-slate-800 mb-2">{feature.title}</h3>
                 <p className="text-sm text-slate-500">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+                           </div>
+                        ))}
+                     </div>
+                  </div>
       </section>
 
       {/* ============ QUICK ACTIONS ============ */}
@@ -381,12 +429,12 @@ export const Landing: React.FC = () => {
                   action.color === 'blue' ? 'bg-blue-500 text-white' : 'bg-slate-800 text-white'
                 }`}>
                   <i className={`fas ${action.icon} text-xl`}></i>
-                </div>
+               </div>
                 <p className="font-medium text-slate-800 text-sm">{action.label}</p>
               </button>
             ))}
-          </div>
-        </div>
+            </div>
+         </div>
       </section>
 
       {/* ============ CTA FOR DOCTORS ============ */}
@@ -399,7 +447,7 @@ export const Landing: React.FC = () => {
           
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
             {isBn ? 'আপনার প্র্যাকটিস ডিজিটাল করুন' : 'Digitize Your Practice'}
-          </h2>
+                  </h2>
           <p className="text-slate-400 max-w-lg mx-auto mb-8">
             {isBn 
               ? 'AI কপাইলট, স্মার্ট কিউ ম্যানেজমেন্ট, ডিজিটাল প্রেসক্রিপশন - সব এক প্ল্যাটফর্মে।' 
@@ -413,15 +461,15 @@ export const Landing: React.FC = () => {
             >
               <i className="fas fa-plus"></i>
               {isBn ? 'রেজিস্টার করুন' : 'Register Now'}
-            </button>
+                     </button>
             <button
               onClick={() => navigate('/login')}
               className="px-8 py-4 bg-white/10 border border-white/20 text-white font-medium rounded-xl hover:bg-white/20 transition"
             >
               {isBn ? 'লগইন করুন' : 'Login'}
-            </button>
-          </div>
-        </div>
+                     </button>
+            </div>
+         </div>
       </section>
 
       {/* ============ FOOTER ============ */}
@@ -431,33 +479,33 @@ export const Landing: React.FC = () => {
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 bg-blue-500 rounded-xl flex items-center justify-center">
                 <span className="text-white font-bold text-lg">ন</span>
-              </div>
-              <div>
+                  </div>
+                  <div>
                 <span className="font-bold text-slate-800 block">Nirnoy</span>
                 <span className="text-xs text-slate-500">{isBn ? 'স্বাস্থ্যসেবা সহজ করি' : 'Healthcare Made Simple'}</span>
-              </div>
-            </div>
+                  </div>
+               </div>
 
             <div className="flex gap-6 text-sm text-slate-500">
               <button onClick={() => navigate('/about')} className="hover:text-slate-800 transition">{isBn ? 'আমাদের সম্পর্কে' : 'About'}</button>
               <button onClick={() => navigate('/search')} className="hover:text-slate-800 transition">{isBn ? 'ডাক্তার' : 'Doctors'}</button>
               <button onClick={() => navigate('/privacy')} className="hover:text-slate-800 transition">{isBn ? 'গোপনীয়তা' : 'Privacy'}</button>
-            </div>
+               </div>
 
             <div className="flex gap-3">
               <a href="#" className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:bg-blue-50 hover:text-blue-500 transition" aria-label="Facebook">
-                <i className="fab fa-facebook-f"></i>
-              </a>
+                     <i className="fab fa-facebook-f"></i>
+                  </a>
               <a href="#" className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:bg-red-50 hover:text-red-500 transition" aria-label="YouTube">
                 <i className="fab fa-youtube"></i>
-              </a>
+                  </a>
+               </div>
             </div>
-          </div>
 
           <div className="mt-8 pt-8 border-t border-slate-100 text-center text-xs text-slate-400">
             &copy; {new Date().getFullYear()} Nirnoy Care. {isBn ? 'সর্বস্বত্ব সংরক্ষিত' : 'All rights reserved'}.
-          </div>
-        </div>
+            </div>
+         </div>
       </footer>
     </div>
   );

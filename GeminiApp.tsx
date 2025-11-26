@@ -111,8 +111,8 @@ const AppContent: React.FC = () => {
         <Route path="/doctors/:id" element={<DoctorProfile />} />
         <Route path="/doctor-registration" element={<DoctorRegistration />} />
         <Route path="/doctor-register" element={<DoctorRegistration />} />
-        <Route path="/patient-auth" element={<PatientAuth />} />
-        <Route path="/register" element={<PatientAuth />} />
+        <Route path="/patient-auth" element={<PatientAuth onLogin={() => handleLogin(UserRole.PATIENT)} />} />
+        <Route path="/register" element={<PatientAuth onLogin={() => handleLogin(UserRole.PATIENT)} />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/about" element={<About />} />
 

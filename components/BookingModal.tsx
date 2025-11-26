@@ -78,9 +78,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     const englishDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      return {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    return {
         value: d.toISOString().split('T')[0],
         day: isBn ? bengaliDays[d.getDay()] : englishDays[d.getDay()],
         date: d.getDate(),
@@ -166,7 +166,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     setIsSubmitting(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
+      setIsSubmitting(false);
     setBookingComplete(true);
   };
 
@@ -261,7 +261,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
         <div className="flex-shrink-0 bg-gradient-to-r from-teal-600 to-teal-500 p-4 text-white rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold">{t.title}</h2>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition">
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition" title="Close" aria-label="Close modal">
               <i className="fas fa-times"></i>
             </button>
           </div>
@@ -307,7 +307,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                 { type: 'FOLLOW_UP' as VisitType, icon: 'fa-redo', title: t.followUp, desc: t.followUpDesc, color: 'blue', badge: '50% ছাড়' },
                 { type: 'REPORT' as VisitType, icon: 'fa-file-medical', title: t.report, desc: t.reportDesc, color: 'purple', badge: '70% ছাড়' },
               ].map((item) => (
-                <button
+                      <button 
                   key={item.type}
                   onClick={() => setVisitType(item.type)}
                   className={`w-full p-4 rounded-xl border-2 text-left transition flex items-center gap-4 ${
@@ -337,7 +337,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                   }`}>
                     {visitType === item.type && <i className="fas fa-check text-white text-xs"></i>}
                   </div>
-                </button>
+                      </button>
               ))}
 
               {/* Fee Summary */}
@@ -356,12 +356,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           {/* Step 2: Date & Time */}
           {step === 2 && (
             <div className="space-y-4">
-              {/* Date Selection */}
-              <div>
+                {/* Date Selection */}
+                <div>
                 <p className="text-sm font-bold text-slate-500 uppercase mb-3">{t.selectDate}</p>
                 <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
                   {dates.map((d) => (
-                    <button
+                         <button
                       key={d.value}
                       onClick={() => setSelectedDate(d.value)}
                       className={`flex-shrink-0 w-16 py-3 rounded-xl text-center transition ${
@@ -374,12 +374,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                         {d.isToday ? t.today : d.isTomorrow ? t.tomorrow : d.day}
                       </p>
                       <p className="text-xl font-bold">{d.date}</p>
-                    </button>
-                  ))}
+                         </button>
+                      ))}
+                   </div>
                 </div>
-              </div>
 
-              {/* Time Selection */}
+                {/* Time Selection */}
               {selectedDate && (
                 <div>
                   <p className="text-sm font-bold text-slate-500 uppercase mb-3">{t.selectTime}</p>
@@ -391,7 +391,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                     </p>
                     <div className="grid grid-cols-4 gap-2">
                       {slots.filter(s => s.period === 'morning').slice(0, 8).map((slot) => (
-                        <button
+                         <button
                           key={slot.time}
                           onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: slot.serial, display: slot.display })}
                           disabled={!slot.available}
@@ -405,11 +405,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                         >
                           {slot.display.replace(' AM', '').replace(' PM', '')}
                           {slot.available && <span className="text-[10px] opacity-60 block">#{slot.serial}</span>}
-                        </button>
+                         </button>
                       ))}
-                    </div>
-                  </div>
-
+                   </div>
+                </div>
+                
                   {/* Afternoon */}
                   <div className="mb-4">
                     <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
@@ -417,7 +417,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                     </p>
                     <div className="grid grid-cols-4 gap-2">
                       {slots.filter(s => s.period === 'afternoon').slice(0, 8).map((slot) => (
-                        <button
+                   <button 
                           key={slot.time}
                           onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: slot.serial, display: slot.display })}
                           disabled={!slot.available}
@@ -431,7 +431,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                         >
                           {slot.display.replace(' AM', '').replace(' PM', '')}
                           {slot.available && <span className="text-[10px] opacity-60 block">#{slot.serial}</span>}
-                        </button>
+                   </button>
                       ))}
                     </div>
                   </div>
@@ -460,7 +460,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                         </button>
                       ))}
                     </div>
-                  </div>
+                 </div>
 
                   {/* Selected Summary */}
                   {selectedSlot && (
@@ -469,7 +469,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                         <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center text-white font-bold">
                           #{selectedSlot.serial}
                         </div>
-                        <div>
+                 <div>
                           <p className="text-sm font-bold text-teal-800">{t.serial} #{selectedSlot.serial}</p>
                           <p className="text-xs text-teal-600">{selectedSlot.display}</p>
                         </div>
@@ -482,51 +482,164 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
             </div>
           )}
 
-          {/* Step 3: Patient Details */}
+          {/* Step 3: Patient Details & Intake Form */}
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-sm font-bold text-slate-500 uppercase">{t.step3}</p>
               
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{t.patientName} *</label>
-                <input
-                  type="text"
-                  value={patientName}
-                  onChange={(e) => setPatientName(e.target.value)}
-                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition"
-                  placeholder={isBn ? 'রোগীর পুরো নাম' : 'Full name of patient'}
-                />
-              </div>
+              {/* Basic Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">{t.patientName} *</label>
+                    <input 
+                       type="text" 
+                    value={patientName}
+                    onChange={(e) => setPatientName(e.target.value)}
+                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition"
+                    placeholder={isBn ? 'রোগীর পুরো নাম' : 'Full name of patient'}
+                    />
+                 </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{t.phone} *</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">+880</span>
-                  <input
-                    type="tel"
-                    value={patientPhone}
-                    onChange={(e) => setPatientPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                    className={`w-full p-3 pl-14 border-2 rounded-xl outline-none transition ${
-                      patientPhone && !isValidPhone(patientPhone) ? 'border-red-300' : 'border-slate-200 focus:border-teal-500'
-                    }`}
-                    placeholder="1712345678"
-                  />
-                  {patientPhone && isValidPhone(patientPhone) && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500">
-                      <i className="fas fa-check-circle"></i>
-                    </span>
-                  )}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">{t.phone} *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">+880</span>
+                    <input 
+                       type="tel" 
+                      value={patientPhone}
+                      onChange={(e) => setPatientPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                      className={`w-full p-3 pl-14 border-2 rounded-xl outline-none transition ${
+                        patientPhone && !isValidPhone(patientPhone) ? 'border-red-300' : 'border-slate-200 focus:border-teal-500'
+                      }`}
+                      placeholder="01712345678"
+                    />
+                    {patientPhone && isValidPhone(patientPhone) && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500">
+                        <i className="fas fa-check-circle"></i>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">{isBn ? 'SMS এ কনফার্মেশন পাঠানো হবে' : 'Confirmation will be sent via SMS'}</p>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">{isBn ? 'SMS এ কনফার্মেশন পাঠানো হবে' : 'Confirmation will be sent via SMS'}</p>
+                 </div>
+
+              {/* Patient Intake Form */}
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <p className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
+                  <i className="fas fa-clipboard-list"></i>
+                  {isBn ? 'সমস্যার বিবরণ (ঐচ্ছিক)' : 'Health Information (Optional)'}
+                </p>
+                
+                {/* Chief Complaint */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    {isBn ? 'প্রধান সমস্যা' : 'Chief Complaint'} *
+                  </label>
+                    <textarea 
+                    value={symptoms}
+                    onChange={(e) => setSymptoms(e.target.value)}
+                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none transition resize-none text-sm bg-white"
+                    rows={2}
+                    placeholder={isBn ? 'আপনার প্রধান সমস্যা সংক্ষেপে লিখুন...' : 'Briefly describe your main problem...'}
+                  />
+                 </div>
+
+                {/* Quick Symptom Tags */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-slate-600 mb-2">
+                    {isBn ? 'সাধারণ লক্ষণ (প্রযোজ্য হলে ক্লিক করুন)' : 'Common Symptoms (click if applicable)'}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { en: 'Fever', bn: 'জ্বর' },
+                      { en: 'Headache', bn: 'মাথা ব্যথা' },
+                      { en: 'Cough', bn: 'কাশি' },
+                      { en: 'Chest Pain', bn: 'বুকে ব্যথা' },
+                      { en: 'Breathing Issue', bn: 'শ্বাসকষ্ট' },
+                      { en: 'Weakness', bn: 'দুর্বলতা' },
+                      { en: 'Stomach Pain', bn: 'পেটে ব্যথা' },
+                      { en: 'Nausea', bn: 'বমি ভাব' },
+                    ].map((symptom, i) => {
+                      const text = isBn ? symptom.bn : symptom.en;
+                      const isSelected = symptoms.toLowerCase().includes(text.toLowerCase());
+                      return (
+                    <button 
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setSymptoms(symptoms.replace(new RegExp(text + ',?\\s*', 'gi'), ''));
+                            } else {
+                              setSymptoms(symptoms ? `${symptoms}, ${text}` : text);
+                            }
+                          }}
+                          className={`px-3 py-1 text-xs rounded-full border transition ${
+                            isSelected 
+                              ? 'bg-blue-500 text-white border-blue-500' 
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+                          }`}
+                        >
+                          {text}
+                    </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Duration */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label htmlFor="duration" className="block text-xs font-medium text-slate-600 mb-1">
+                      {isBn ? 'কতদিন ধরে?' : 'Duration'}
+                    </label>
+                    <select id="duration" title="Duration" className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-400 outline-none">
+                      <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
+                      <option value="today">{isBn ? 'আজ থেকে' : 'Started today'}</option>
+                      <option value="2-3days">{isBn ? '২-৩ দিন' : '2-3 days'}</option>
+                      <option value="1week">{isBn ? '১ সপ্তাহ' : '1 week'}</option>
+                      <option value="2weeks">{isBn ? '২ সপ্তাহ' : '2 weeks'}</option>
+                      <option value="1month">{isBn ? '১ মাস+' : '1 month+'}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="severity" className="block text-xs font-medium text-slate-600 mb-1">
+                      {isBn ? 'তীব্রতা' : 'Severity'}
+                    </label>
+                    <select id="severity" title="Severity" className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-400 outline-none">
+                      <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
+                      <option value="mild">{isBn ? 'হালকা' : 'Mild'}</option>
+                      <option value="moderate">{isBn ? 'মাঝারি' : 'Moderate'}</option>
+                      <option value="severe">{isBn ? 'তীব্র' : 'Severe'}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Previous Reports */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    {isBn ? 'আগে কোনো রিপোর্ট/টেস্ট করেছেন?' : 'Any previous reports/tests?'}
+                  </label>
+                  <div className="flex gap-2">
+                    <label className="flex-1 flex items-center gap-2 p-2 border border-slate-200 rounded-lg bg-white cursor-pointer hover:border-blue-300 transition">
+                      <input type="radio" name="hasReports" value="yes" className="text-blue-500" />
+                      <span className="text-sm text-slate-600">{isBn ? 'হ্যাঁ' : 'Yes'}</span>
+                    </label>
+                    <label className="flex-1 flex items-center gap-2 p-2 border border-slate-200 rounded-lg bg-white cursor-pointer hover:border-blue-300 transition">
+                      <input type="radio" name="hasReports" value="no" className="text-blue-500" defaultChecked />
+                      <span className="text-sm text-slate-600">{isBn ? 'না' : 'No'}</span>
+                    </label>
+                  </div>
+                 </div>
               </div>
 
+              {/* Additional Notes */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{t.symptoms}</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  {isBn ? 'অতিরিক্ত মন্তব্য' : 'Additional Notes'}
+                </label>
                 <textarea
-                  value={symptoms}
-                  onChange={(e) => setSymptoms(e.target.value)}
                   className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition resize-none"
-                  rows={3}
+                  rows={2}
                   placeholder={t.symptomsPlaceholder}
                 />
               </div>
@@ -552,14 +665,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">{t.serial}</span>
                   <span className="font-bold text-teal-600">#{selectedSlot?.serial}</span>
-                </div>
+                 </div>
                 <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
                   <span className="font-bold text-slate-700">{t.total}</span>
                   <span className="font-bold text-teal-600 text-lg">৳{fee}</span>
-                </div>
+                 </div>
               </div>
-            </div>
-          )}
+              </div>
+           )}
         </div>
 
         {/* Footer - Fixed at bottom */}

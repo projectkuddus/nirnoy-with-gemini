@@ -4,7 +4,11 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 type AuthStep = 'phone' | 'otp' | 'register' | 'success';
 
-export const PatientAuth: React.FC = () => {
+interface PatientAuthProps {
+  onLogin?: (role: 'PATIENT') => void;
+}
+
+export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
@@ -263,6 +267,8 @@ export const PatientAuth: React.FC = () => {
                       onKeyDown={(e) => handleOtpKeyDown(i, e)}
                       className="w-12 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-100 outline-none transition"
                       autoFocus={i === 0}
+                      aria-label={`OTP digit ${i + 1}`}
+                      title={`OTP digit ${i + 1}`}
                     />
                   ))}
                 </div>
@@ -338,22 +344,26 @@ export const PatientAuth: React.FC = () => {
 
                   {/* DOB */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">{t.dobLabel}</label>
+                    <label htmlFor="dob" className="block text-sm font-medium text-slate-700 mb-1">{t.dobLabel}</label>
                     <input
+                      id="dob"
                       type="date"
                       value={dateOfBirth}
                       onChange={(e) => setDateOfBirth(e.target.value)}
                       className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition"
+                      title="Date of Birth"
                     />
                   </div>
 
                   {/* Blood Group */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">{t.bloodLabel}</label>
+                    <label htmlFor="bloodGroup" className="block text-sm font-medium text-slate-700 mb-1">{t.bloodLabel}</label>
                     <select
+                      id="bloodGroup"
                       value={bloodGroup}
                       onChange={(e) => setBloodGroup(e.target.value)}
                       className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition bg-white"
+                      title="Blood Group"
                     >
                       <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
                       {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map((bg) => (
@@ -405,13 +415,19 @@ export const PatientAuth: React.FC = () => {
 
                 <div className="space-y-3">
                   <button
-                    onClick={() => navigate('/my-health')}
+                    onClick={() => {
+                      if (onLogin) onLogin('PATIENT');
+                      navigate('/patient-dashboard');
+                    }}
                     className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2"
                   >
                     <i className="fas fa-heartbeat"></i> {t.goToDashboard}
                   </button>
                   <button
-                    onClick={() => navigate('/search')}
+                    onClick={() => {
+                      if (onLogin) onLogin('PATIENT');
+                      navigate('/search');
+                    }}
                     className="w-full py-4 border-2 border-teal-500 text-teal-600 rounded-xl font-bold text-lg hover:bg-teal-50 transition flex items-center justify-center gap-2"
                   >
                     <i className="fas fa-search"></i> {t.findDoctor}
