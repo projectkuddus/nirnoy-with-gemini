@@ -15,6 +15,8 @@ import { PatientDashboard } from "./pages/PatientDashboard";
 import { DoctorDashboard } from "./pages/DoctorDashboard";
 import { DoctorProfile } from "./pages/DoctorProfile";
 import { DoctorRegistration } from "./pages/DoctorRegistration";
+import { PatientAuth } from "./pages/PatientAuth";
+import { MyAppointments } from "./pages/MyAppointments";
 import { Privacy } from "./pages/Privacy";
 import { About } from "./pages/About";
 import { UserRole } from "./types";
@@ -31,12 +33,12 @@ const Layout: React.FC<LayoutProps> = ({ children, role, handleLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Hide Navbar on Doctor Dashboard to give it a "Cockpit" feel
-  const isDoctorDashboard = location.pathname === "/doctor-dashboard";
+  // Hide Navbar on certain pages for clean UX
+  const hideNavbar = ["/doctor-dashboard", "/my-health", "/my-appointments", "/patient-auth"].includes(location.pathname);
 
   return (
     <>
-      {!isDoctorDashboard && (
+      {!hideNavbar && (
         <Navbar role={role} onLogout={handleLogout} navigate={navigate} />
       )}
       {children}
@@ -108,6 +110,9 @@ const AppContent: React.FC = () => {
         <Route path="/search" element={<DoctorSearch />} />
         <Route path="/doctors/:id" element={<DoctorProfile />} />
         <Route path="/doctor-registration" element={<DoctorRegistration />} />
+        <Route path="/doctor-register" element={<DoctorRegistration />} />
+        <Route path="/patient-auth" element={<PatientAuth />} />
+        <Route path="/register" element={<PatientAuth />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/about" element={<About />} />
 
@@ -119,6 +124,26 @@ const AppContent: React.FC = () => {
               <PatientDashboard />
             ) : (
               <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/my-health"
+          element={
+            role === UserRole.PATIENT ? (
+              <PatientDashboard />
+            ) : (
+              <Navigate to="/patient-auth" replace />
+            )
+          }
+        />
+        <Route
+          path="/my-appointments"
+          element={
+            role === UserRole.PATIENT ? (
+              <MyAppointments />
+            ) : (
+              <Navigate to="/patient-auth" replace />
             )
           }
         />

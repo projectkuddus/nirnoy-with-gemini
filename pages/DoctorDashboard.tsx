@@ -206,7 +206,13 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [showDelayModal, setShowDelayModal] = useState(false);
+  const [delayMinutes, setDelayMinutes] = useState(15);
+  const [delayMessage, setDelayMessage] = useState('');
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [broadcastMessage, setBroadcastMessage] = useState('');
   const [todayAppointments, setTodayAppointments] = useState(TODAY_APPOINTMENTS);
+  const [currentSerial, setCurrentSerial] = useState(2); // Current patient being served
   const chatRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -451,9 +457,83 @@ How can I help you with this patient, Doctor?`,
     </div>
   );
 
+  // Announce delay handler
+  const handleAnnounceDelay = () => {
+    // In real app, this would send via WebSocket
+    console.log(`Delay announced: ${delayMinutes} minutes - ${delayMessage}`);
+    setShowDelayModal(false);
+    setDelayMinutes(15);
+    setDelayMessage('');
+    alert(`সব রোগীকে জানানো হয়েছে: ${delayMinutes} মিনিট দেরি হচ্ছে`);
+  };
+
+  // Send broadcast message
+  const handleBroadcastMessage = () => {
+    console.log(`Message broadcast: ${broadcastMessage}`);
+    setShowMessageModal(false);
+    setBroadcastMessage('');
+    alert('সব অপেক্ষমাণ রোগীকে বার্তা পাঠানো হয়েছে');
+  };
+
+  // Call next patient
+  const handleCallNextPatient = () => {
+    const nextWaiting = todayAppointments.find(a => a.status === 'Waiting');
+    if (nextWaiting) {
+      setCurrentSerial(nextWaiting.serial);
+      alert(`${nextWaiting.patientName} কে ডাকা হয়েছে (Serial #${nextWaiting.serial})`);
+    }
+  };
+
   // ============ RENDER TODAY'S QUEUE ============
   const renderTodayQueue = () => (
     <div className="space-y-4">
+      {/* Queue Control Bar */}
+      <div className="bg-gradient-to-r from-teal-500 to-emerald-600 rounded-2xl p-5 text-white">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <p className="text-teal-100 text-sm">Current Serial</p>
+            <p className="text-4xl font-bold">#{currentSerial}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button 
+              onClick={handleCallNextPatient}
+              className="px-4 py-2 bg-white text-teal-600 rounded-lg font-medium hover:bg-teal-50 transition flex items-center gap-2"
+            >
+              <i className="fas fa-bullhorn"></i>
+              Call Next
+            </button>
+            <button 
+              onClick={() => setShowDelayModal(true)}
+              className="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition flex items-center gap-2"
+            >
+              <i className="fas fa-clock"></i>
+              Announce Delay
+            </button>
+            <button 
+              onClick={() => setShowMessageModal(true)}
+              className="px-4 py-2 bg-white/20 text-white rounded-lg font-medium hover:bg-white/30 transition flex items-center gap-2"
+            >
+              <i className="fas fa-paper-plane"></i>
+              Send Message
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-4 text-center">
+          <div className="bg-white/10 rounded-lg p-3">
+            <p className="text-2xl font-bold">{todayAppointments.filter(a => a.status === 'Waiting').length}</p>
+            <p className="text-xs text-teal-100">Waiting</p>
+          </div>
+          <div className="bg-white/10 rounded-lg p-3">
+            <p className="text-2xl font-bold">{todayAppointments.filter(a => a.status === 'In-Progress').length}</p>
+            <p className="text-xs text-teal-100">In Progress</p>
+          </div>
+          <div className="bg-white/10 rounded-lg p-3">
+            <p className="text-2xl font-bold">{todayAppointments.filter(a => a.status === 'Completed').length}</p>
+            <p className="text-xs text-teal-100">Completed</p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-800">Today's Queue</h2>
         <div className="flex gap-2">
@@ -884,6 +964,120 @@ How can I help you with this patient, Doctor?`,
 
       {/* Prescription Modal */}
       {showPrescriptionModal && selectedPatient && renderPrescriptionModal()}
+
+      {/* Delay Announcement Modal */}
+      {showDelayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <i className="fas fa-clock text-amber-500"></i>
+                দেরির ঘোষণা / Announce Delay
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">কত মিনিট দেরি? / Delay Duration</label>
+                <div className="flex gap-2">
+                  {[10, 15, 20, 30, 45, 60].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setDelayMinutes(m)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                        delayMinutes === m ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {m} min
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">বার্তা (ঐচ্ছিক) / Message (Optional)</label>
+                <textarea
+                  value={delayMessage}
+                  onChange={(e) => setDelayMessage(e.target.value)}
+                  placeholder="উদাহরণ: জরুরি অপারেশনে আছি..."
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-500 outline-none resize-none"
+                  rows={3}
+                />
+              </div>
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-800">
+                <i className="fas fa-info-circle mr-2"></i>
+                সব অপেক্ষমাণ রোগী SMS ও নোটিফিকেশন পাবেন।
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex gap-3">
+              <button onClick={() => setShowDelayModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition">
+                বাতিল / Cancel
+              </button>
+              <button onClick={handleAnnounceDelay} className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition flex items-center justify-center gap-2">
+                <i className="fas fa-bullhorn"></i>
+                ঘোষণা করুন / Announce
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Broadcast Message Modal */}
+      {showMessageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <i className="fas fa-paper-plane text-teal-500"></i>
+                রোগীদের বার্তা পাঠান / Send Message
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">বার্তা / Message</label>
+                <textarea
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  placeholder="আপনার বার্তা লিখুন..."
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none resize-none"
+                  rows={4}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs text-slate-500">দ্রুত বার্তা:</span>
+                {[
+                  'চেম্বারে পৌঁছেছি, শীঘ্রই শুরু করছি',
+                  'লাঞ্চ বিরতি, ১ ঘন্টা পর ফিরছি',
+                  'আজকের সময়সূচী শেষ',
+                ].map((msg, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setBroadcastMessage(msg)}
+                    className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs hover:bg-slate-200 transition"
+                  >
+                    {msg.substring(0, 25)}...
+                  </button>
+                ))}
+              </div>
+              <div className="bg-teal-50 border border-teal-100 rounded-xl p-4 text-sm text-teal-800">
+                <i className="fas fa-users mr-2"></i>
+                {todayAppointments.filter(a => a.status === 'Waiting').length} জন অপেক্ষমাণ রোগীকে পাঠানো হবে।
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex gap-3">
+              <button onClick={() => setShowMessageModal(false)} className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition">
+                বাতিল / Cancel
+              </button>
+              <button 
+                onClick={handleBroadcastMessage} 
+                disabled={!broadcastMessage.trim()}
+                className="flex-1 px-4 py-2.5 bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-paper-plane"></i>
+                পাঠান / Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Bottom Nav */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 z-50">
