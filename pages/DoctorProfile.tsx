@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { MOCK_DOCTORS } from '../data/mockData';
 import { BookingModal } from '../components/BookingModal';
 import { Chamber } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
-// Types for comprehensive doctor profile
+// ==================== TYPES ====================
+
 interface DoctorQualification {
   id: number;
   degree: string;
@@ -28,6 +29,7 @@ interface DoctorExperience {
   startDate: string;
   endDate?: string;
   isCurrent?: boolean;
+  description?: string;
 }
 
 interface DoctorChamber {
@@ -49,37 +51,84 @@ interface DoctorChamber {
   hasParking?: boolean;
   hasWheelchairAccess?: boolean;
   hasAC?: boolean;
+  hasWifi?: boolean;
+  phone?: string;
+  mapUrl?: string;
 }
 
 interface DoctorAchievement {
   id: number;
   title: string;
   type: string;
-  organization: string;
+  organization?: string;
   year?: number;
+  description?: string;
 }
 
 interface DoctorMembership {
   id: number;
   organization: string;
   membershipType?: string;
+  position?: string;
   joinedYear?: number;
+  isActive?: boolean;
 }
 
 interface DoctorService {
   id: number;
   name: string;
   nameBn?: string;
+  description?: string;
   fee?: number;
   duration?: number;
+  isAvailable?: boolean;
 }
 
 interface DoctorReview {
   id: number;
   rating: number;
+  title?: string;
   comment?: string;
   patientName: string;
+  patientInitials?: string;
+  visitType?: string;
+  ratingPunctuality?: number;
+  ratingBehavior?: number;
+  ratingExplanation?: number;
+  ratingEffectiveness?: number;
+  isVerified?: boolean;
   createdAt: string;
+  reply?: string;
+  replyAt?: string;
+}
+
+interface DoctorPublication {
+  id: number;
+  title: string;
+  journal?: string;
+  year?: number;
+  url?: string;
+}
+
+interface DoctorTraining {
+  id: number;
+  title: string;
+  institution: string;
+  year?: number;
+  duration?: string;
+}
+
+interface DoctorFAQ {
+  id: number;
+  question: string;
+  answer: string;
+}
+
+interface DoctorSpecialization {
+  id: number;
+  name: string;
+  isPrimary?: boolean;
+  yearsOfPractice?: number;
 }
 
 interface DoctorFullProfile {
@@ -98,28 +147,216 @@ interface DoctorFullProfile {
   experienceYears: number;
   languages: string[];
   bmdcNumber?: string;
-  bmdcVerified: boolean;
+  bmdcVerified?: boolean;
+  nidVerified?: boolean;
   consultationFeeNew: number;
   consultationFeeFollowUp?: number;
   consultationFeeReport?: number;
   onlineConsultationFee?: number;
-  isAvailableForOnline: boolean;
-  acceptNewPatients: boolean;
-  averageRating: number;
-  totalReviews: number;
-  totalPatients: number;
-  websiteUrl?: string;
-  linkedinUrl?: string;
-  facebookUrl?: string;
+  avgConsultationTime?: number;
+  isAvailableForOnline?: boolean;
+  isAvailableForHomeVisit?: boolean;
+  homeVisitFee?: number;
+  acceptNewPatients?: boolean;
+  totalPatients?: number;
+  totalAppointments?: number;
+  totalReviews?: number;
+  averageRating?: number;
+  responseTime?: string;
   qualifications: DoctorQualification[];
-  specializations: { name: string; isPrimary: boolean }[];
+  specializations: DoctorSpecialization[];
   experiences: DoctorExperience[];
   chambers: DoctorChamber[];
   achievements: DoctorAchievement[];
   memberships: DoctorMembership[];
   services: DoctorService[];
   reviews: DoctorReview[];
+  publications?: DoctorPublication[];
+  trainings?: DoctorTraining[];
+  faqs?: DoctorFAQ[];
 }
+
+// ==================== MOCK DATA GENERATOR ====================
+
+const generateMockProfile = (mockDoctor: any): DoctorFullProfile => {
+  const experienceYears = mockDoctor.experience || Math.floor(Math.random() * 25) + 5;
+  const isSenior = experienceYears > 20;
+  const isMidLevel = experienceYears > 10;
+  
+  return {
+    id: parseInt(mockDoctor.id, 16) || Math.floor(Math.random() * 1000),
+    slug: mockDoctor.id,
+    title: isSenior ? 'Prof.' : isMidLevel ? 'Assoc. Prof.' : 'Dr.',
+    nameEn: mockDoctor.name,
+    nameBn: mockDoctor.name,
+    gender: mockDoctor.gender || 'Male',
+    profilePhoto: mockDoctor.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(mockDoctor.name)}&background=0D9488&color=fff&size=400&bold=true`,
+    coverPhoto: 'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?w=1200&h=400&fit=crop',
+    primarySpecialty: mockDoctor.specialties?.[0] || 'Medicine',
+    tagline: 'Committed to Excellence in Patient Care',
+    bioEn: `${mockDoctor.name} is a distinguished ${mockDoctor.specialties?.[0] || 'Medical'} specialist with ${experienceYears} years of clinical experience. Known for a patient-centered approach and commitment to evidence-based medicine, they have helped thousands of patients achieve better health outcomes. Their expertise spans diagnostic precision, treatment planning, and preventive care.`,
+    experienceYears,
+    languages: ['Bangla', 'English', ...(Math.random() > 0.7 ? ['Hindi'] : [])],
+    bmdcNumber: `A-${10000 + Math.floor(Math.random() * 50000)}`,
+    bmdcVerified: true,
+    nidVerified: true,
+    consultationFeeNew: mockDoctor.chambers?.[0]?.fee || 1500,
+    consultationFeeFollowUp: Math.round((mockDoctor.chambers?.[0]?.fee || 1500) * 0.5),
+    consultationFeeReport: Math.round((mockDoctor.chambers?.[0]?.fee || 1500) * 0.3),
+    onlineConsultationFee: Math.round((mockDoctor.chambers?.[0]?.fee || 1500) * 0.8),
+    avgConsultationTime: 15,
+    isAvailableForOnline: Math.random() > 0.3,
+    isAvailableForHomeVisit: Math.random() > 0.8,
+    homeVisitFee: 5000,
+    acceptNewPatients: true,
+    totalPatients: Math.floor(Math.random() * 15000) + 1000,
+    totalAppointments: Math.floor(Math.random() * 30000) + 5000,
+    totalReviews: Math.floor(Math.random() * 400) + 50,
+    averageRating: 4.2 + Math.random() * 0.7,
+    responseTime: '< 1 hour',
+    qualifications: [
+      { id: 1, degree: 'MBBS', institution: 'Dhaka Medical College', institutionCity: 'Dhaka', institutionCountry: 'Bangladesh', yearOfCompletion: 2024 - experienceYears - 1, isVerified: true },
+      { id: 2, degree: 'FCPS', field: mockDoctor.specialties?.[0], institution: 'BCPS', institutionCity: 'Dhaka', institutionCountry: 'Bangladesh', yearOfCompletion: 2024 - experienceYears + 5, isVerified: true },
+      ...(isSenior ? [{ id: 3, degree: 'FRCP', institution: 'Royal College of Physicians', institutionCity: 'London', institutionCountry: 'UK', yearOfCompletion: 2024 - experienceYears + 10, isVerified: true }] : []),
+    ],
+    specializations: [
+      { id: 1, name: mockDoctor.specialties?.[0] || 'Medicine', isPrimary: true, yearsOfPractice: experienceYears },
+      ...(mockDoctor.specialties?.slice(1).map((s: string, i: number) => ({ id: i + 2, name: s, isPrimary: false, yearsOfPractice: Math.floor(experienceYears * 0.7) })) || []),
+    ],
+    experiences: [
+      { id: 1, position: isSenior ? 'Professor & Head' : isMidLevel ? 'Associate Professor' : 'Senior Consultant', department: mockDoctor.specialties?.[0], institution: 'Bangabandhu Sheikh Mujib Medical University', institutionType: 'Government', city: 'Dhaka', country: 'Bangladesh', startDate: '2018-01-01', isCurrent: true },
+      { id: 2, position: 'Consultant', department: mockDoctor.specialties?.[0], institution: mockDoctor.chambers?.[0]?.name || 'Square Hospital', institutionType: 'Private', city: 'Dhaka', country: 'Bangladesh', startDate: '2012-01-01', endDate: '2017-12-31', isCurrent: false },
+    ],
+    chambers: mockDoctor.chambers?.map((c: any, i: number) => ({
+      id: i + 1,
+      name: c.name,
+      type: 'HOSPITAL',
+      address: c.address,
+      area: c.area || 'Dhaka',
+      city: 'Dhaka',
+      daysOfWeek: 'Sat,Mon,Wed',
+      startTime: '10:00',
+      endTime: '14:00',
+      slotDuration: 15,
+      consultationFee: c.fee,
+      followUpFee: Math.round(c.fee * 0.5),
+      reportCheckFee: Math.round(c.fee * 0.3),
+      isPrimary: i === 0,
+      hasParking: true,
+      hasWheelchairAccess: true,
+      hasAC: true,
+    })) || [],
+    achievements: [
+      { id: 1, title: 'Best Doctor Award', type: 'AWARD', organization: 'Bangladesh Medical Association', year: 2022 },
+      ...(isSenior ? [{ id: 2, title: 'Lifetime Achievement Award', type: 'AWARD', organization: 'Ministry of Health', year: 2020 }] : []),
+    ],
+    memberships: [
+      { id: 1, organization: 'Bangladesh Medical Association (BMA)', membershipType: 'Life Member', isActive: true },
+      { id: 2, organization: 'Bangladesh Medical & Dental Council (BMDC)', membershipType: 'Registered', isActive: true },
+      { id: 3, organization: 'Bangladesh College of Physicians and Surgeons', membershipType: 'Fellow', isActive: true },
+    ],
+    services: [
+      { id: 1, name: 'General Consultation', fee: mockDoctor.chambers?.[0]?.fee || 1500, duration: 15, isAvailable: true },
+      { id: 2, name: 'Follow-up Visit', fee: Math.round((mockDoctor.chambers?.[0]?.fee || 1500) * 0.5), duration: 10, isAvailable: true },
+      { id: 3, name: 'Online Consultation', fee: Math.round((mockDoctor.chambers?.[0]?.fee || 1500) * 0.8), duration: 15, isAvailable: true },
+      { id: 4, name: 'Report Analysis', fee: Math.round((mockDoctor.chambers?.[0]?.fee || 1500) * 0.3), duration: 10, isAvailable: true },
+      { id: 5, name: 'Second Opinion', fee: Math.round((mockDoctor.chambers?.[0]?.fee || 1500) * 1.5), duration: 30, isAvailable: true },
+    ],
+    reviews: Array.from({ length: 8 }, (_, i) => ({
+      id: i + 1,
+      rating: 4 + Math.floor(Math.random() * 2),
+      title: ['Excellent Doctor!', 'Highly Recommended', 'Very Professional', 'Great Experience'][i % 4],
+      comment: [
+        'Very thorough examination and clear explanation of my condition. Highly recommend!',
+        'The doctor took time to listen to all my concerns. Best experience ever.',
+        'Professional, knowledgeable, and caring. Will definitely visit again.',
+        'Quick diagnosis and effective treatment. Feeling much better now.',
+        'Great bedside manner. Made me feel comfortable throughout.',
+        'Explains everything in detail. Very patient with questions.',
+        'Top-notch medical care. Worth every penny.',
+        'The best specialist I have ever visited. Truly exceptional.',
+      ][i],
+      patientName: ['Rahim A.', 'Fatima B.', 'Karim H.', 'Salma K.', 'Jamal M.', 'Nusrat P.', 'Tariq S.', 'Ayesha R.'][i],
+      patientInitials: ['RA', 'FB', 'KH', 'SK', 'JM', 'NP', 'TS', 'AR'][i],
+      visitType: ['New Consultation', 'Follow-up', 'New Consultation', 'Report Check'][i % 4],
+      ratingPunctuality: 4 + Math.floor(Math.random() * 2),
+      ratingBehavior: 5,
+      ratingExplanation: 4 + Math.floor(Math.random() * 2),
+      ratingEffectiveness: 4 + Math.floor(Math.random() * 2),
+      isVerified: Math.random() > 0.3,
+      createdAt: new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1).toISOString(),
+    })),
+    faqs: [
+      { id: 1, question: 'What conditions do you treat?', answer: `I specialize in ${mockDoctor.specialties?.[0] || 'general medicine'} and treat a wide range of conditions including preventive care, chronic disease management, and acute conditions.` },
+      { id: 2, question: 'Do you offer online consultations?', answer: 'Yes, I offer video consultations for follow-up visits and initial assessments where physical examination is not critical.' },
+      { id: 3, question: 'What should I bring to my first appointment?', answer: 'Please bring all previous medical records, test reports, current medications list, and your health insurance card if applicable.' },
+    ],
+  };
+};
+
+// ==================== COMPONENTS ====================
+
+// Star Rating Component
+const StarRating: React.FC<{ rating: number; size?: 'sm' | 'md' | 'lg'; showNumber?: boolean }> = ({ 
+  rating, 
+  size = 'md',
+  showNumber = false 
+}) => {
+  const sizeClasses = { sm: 'text-xs', md: 'text-sm', lg: 'text-lg' };
+  const fullStars = Math.floor(rating);
+  const hasHalf = rating % 1 >= 0.5;
+  
+  return (
+    <div className="flex items-center gap-1">
+      <div className={`flex ${sizeClasses[size]}`}>
+        {[...Array(5)].map((_, i) => (
+          <i 
+            key={i} 
+            className={`fas ${i < fullStars ? 'fa-star text-amber-400' : i === fullStars && hasHalf ? 'fa-star-half-alt text-amber-400' : 'fa-star text-slate-200'}`}
+          />
+        ))}
+      </div>
+      {showNumber && <span className="font-bold text-slate-800">{rating.toFixed(1)}</span>}
+    </div>
+  );
+};
+
+// Verified Badge
+const VerifiedBadge: React.FC<{ text: string; icon?: string }> = ({ text, icon = 'fa-check-circle' }) => (
+  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">
+    <i className={`fas ${icon}`}></i>
+    {text}
+  </span>
+);
+
+// Stat Card
+const StatCard: React.FC<{ icon: string; value: string | number; label: string; color?: string }> = ({ 
+  icon, value, label, color = 'teal' 
+}) => (
+  <div className="text-center">
+    <div className={`w-12 h-12 mx-auto mb-2 rounded-xl bg-${color}-50 flex items-center justify-center`}>
+      <i className={`fas ${icon} text-${color}-600 text-lg`}></i>
+    </div>
+    <p className="text-2xl font-bold text-slate-800">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+    <p className="text-xs text-slate-500 uppercase tracking-wide">{label}</p>
+  </div>
+);
+
+// Rating Bar
+const RatingBar: React.FC<{ label: string; value: number; max?: number }> = ({ label, value, max = 5 }) => (
+  <div className="flex items-center gap-3">
+    <span className="text-sm text-slate-600 w-28">{label}</span>
+    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div 
+        className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500"
+        style={{ width: `${(value / max) * 100}%` }}
+      />
+    </div>
+    <span className="text-sm font-bold text-slate-700 w-8">{value.toFixed(1)}</span>
+  </div>
+);
+
+// ==================== MAIN COMPONENT ====================
 
 export const DoctorProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -127,717 +364,842 @@ export const DoctorProfile: React.FC = () => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
   
-  const [doctor, setDoctor] = useState<DoctorFullProfile | null>(null);
+  const [profile, setProfile] = useState<DoctorFullProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedChamber, setSelectedChamber] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'experience' | 'chambers' | 'reviews'>('overview');
-  
-  const role = localStorage.getItem('nirnoy_role');
-  const isDoctorView = role === 'DOCTOR';
+  const [showBooking, setShowBooking] = useState(false);
+  const [selectedChamber, setSelectedChamber] = useState<DoctorChamber | null>(null);
+  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Load profile
+  useEffect(() => {
+    const mockDoctor = MOCK_DOCTORS.find(d => d.id === id);
+    if (mockDoctor) {
+      const fullProfile = generateMockProfile(mockDoctor);
+      setProfile(fullProfile);
+    }
+    setLoading(false);
+  }, [id]);
+
+  // Calculate rating distribution
+  const ratingDistribution = useMemo(() => {
+    if (!profile?.reviews) return { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    const dist: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    profile.reviews.forEach(r => {
+      dist[Math.floor(r.rating)] = (dist[Math.floor(r.rating)] || 0) + 1;
+    });
+    return dist;
+  }, [profile?.reviews]);
 
   // Translations
   const t = {
     back: isBn ? 'পিছনে' : 'Back',
-    returnToDashboard: isBn ? 'ড্যাশবোর্ডে ফিরুন' : 'Return to Dashboard',
-    doctorNotFound: isBn ? 'ডাক্তার পাওয়া যায়নি' : 'Doctor Not Found',
-    notFoundDesc: isBn ? 'আপনি যে প্রোফাইলটি খুঁজছেন তা বিদ্যমান নেই।' : 'The profile you are looking for does not exist.',
-    goBack: isBn ? 'ফিরে যান' : 'Go Back',
+    verified: isBn ? 'যাচাইকৃত' : 'Verified',
+    bmdcVerified: isBn ? 'BMDC যাচাইকৃত' : 'BMDC Verified',
+    acceptingPatients: isBn ? 'নতুন রোগী গ্রহণ করছেন' : 'Accepting New Patients',
+    onlineAvailable: isBn ? 'অনলাইন পরামর্শ সক্রিয়' : 'Online Consultation',
+    yearsExp: isBn ? 'বছরের অভিজ্ঞতা' : 'Years Experience',
     patients: isBn ? 'রোগী' : 'Patients',
     reviews: isBn ? 'রিভিউ' : 'Reviews',
+    overview: isBn ? 'সংক্ষিপ্ত' : 'Overview',
     experience: isBn ? 'অভিজ্ঞতা' : 'Experience',
-    years: isBn ? 'বছর' : 'years',
-    bmdcVerified: isBn ? 'BMDC যাচাইকৃত' : 'BMDC Verified',
-    bmdcNumber: isBn ? 'BMDC নং' : 'BMDC No',
-    overview: isBn ? 'সংক্ষিপ্ত বিবরণ' : 'Overview',
-    chambers: isBn ? 'চেম্বার সমূহ' : 'Chambers',
+    chambers: isBn ? 'চেম্বার' : 'Chambers',
+    reviewsTab: isBn ? 'রিভিউ' : 'Reviews',
     about: isBn ? 'সম্পর্কে' : 'About',
     qualifications: isBn ? 'শিক্ষাগত যোগ্যতা' : 'Qualifications',
-    workExperience: isBn ? 'কর্ম অভিজ্ঞতা' : 'Work Experience',
-    achievements: isBn ? 'পুরস্কার ও অর্জন' : 'Awards & Achievements',
+    specializations: isBn ? 'বিশেষত্ব' : 'Specializations',
     memberships: isBn ? 'সদস্যপদ' : 'Professional Memberships',
-    services: isBn ? 'সেবাসমূহ' : 'Services Offered',
+    achievements: isBn ? 'পুরস্কার' : 'Awards & Achievements',
+    services: isBn ? 'সেবাসমূহ' : 'Services',
+    faq: isBn ? 'সাধারণ প্রশ্ন' : 'FAQ',
+    bookNow: isBn ? 'অ্যাপয়েন্টমেন্ট বুক করুন' : 'Book Appointment',
     consultationFee: isBn ? 'পরামর্শ ফি' : 'Consultation Fee',
     followUpFee: isBn ? 'ফলো-আপ ফি' : 'Follow-up Fee',
-    reportCheckFee: isBn ? 'রিপোর্ট দেখানো ফি' : 'Report Check Fee',
-    onlineFee: isBn ? 'অনলাইন ফি' : 'Online Consultation',
-    bookAppointment: isBn ? 'অ্যাপয়েন্টমেন্ট বুক করুন' : 'Book Appointment',
-    schedule: isBn ? 'সময়সূচী' : 'Schedule',
-    facilities: isBn ? 'সুবিধাসমূহ' : 'Facilities',
-    parking: isBn ? 'পার্কিং' : 'Parking',
-    wheelchair: isBn ? 'হুইলচেয়ার' : 'Wheelchair Access',
-    ac: isBn ? 'এসি' : 'Air Conditioned',
-    present: isBn ? 'বর্তমান' : 'Present',
-    acceptingPatients: isBn ? 'নতুন রোগী গ্রহণ করছেন' : 'Accepting New Patients',
-    onlineAvailable: isBn ? 'অনলাইন পরামর্শ সক্রিয়' : 'Online Consultation Available',
+    onlineFee: isBn ? 'অনলাইন ফি' : 'Online Fee',
     languages: isBn ? 'ভাষা' : 'Languages',
-    patientReviews: isBn ? 'রোগীদের মতামত' : 'Patient Reviews',
-    noReviews: isBn ? 'এখনো কোনো রিভিউ নেই' : 'No reviews yet',
-    verifiedPatient: isBn ? 'যাচাইকৃত রোগী' : 'Verified Patient',
+    avgTime: isBn ? 'গড় সময়' : 'Avg. Time',
+    minutes: isBn ? 'মিনিট' : 'min',
+    present: isBn ? 'বর্তমান' : 'Present',
+    viewAll: isBn ? 'সব দেখুন' : 'View All',
+    showLess: isBn ? 'কম দেখুন' : 'Show Less',
+    verifiedVisit: isBn ? 'যাচাইকৃত ভিজিট' : 'Verified Visit',
+    helpful: isBn ? 'সহায়ক' : 'Helpful',
+    schedule: isBn ? 'সময়সূচী' : 'Schedule',
+    facilities: isBn ? 'সুবিধা' : 'Facilities',
+    parking: isBn ? 'পার্কিং' : 'Parking',
+    wheelchair: isBn ? 'হুইলচেয়ার' : 'Wheelchair',
+    ac: isBn ? 'এসি' : 'A/C',
+    notFound: isBn ? 'ডাক্তার পাওয়া যায়নি' : 'Doctor Not Found',
+    notFoundDesc: isBn ? 'এই প্রোফাইলটি বিদ্যমান নেই।' : 'This profile does not exist.',
+    goBack: isBn ? 'ফিরে যান' : 'Go Back',
+    responseTime: isBn ? 'রেসপন্স টাইম' : 'Response Time',
+    patientSays: isBn ? 'রোগীরা যা বলেন' : 'What Patients Say',
+    ratingBreakdown: isBn ? 'রেটিং বিশ্লেষণ' : 'Rating Breakdown',
+    punctuality: isBn ? 'সময়ানুবর্তিতা' : 'Punctuality',
+    behavior: isBn ? 'আচরণ' : 'Behavior',
+    explanation: isBn ? 'ব্যাখ্যা' : 'Explanation',
+    effectiveness: isBn ? 'কার্যকারিতা' : 'Effectiveness',
   };
-
-  // Fetch doctor profile (mock for now, will connect to API)
-  useEffect(() => {
-    setLoading(true);
-    
-    // Simulate API call - in production, fetch from backend
-    const mockDoctor = MOCK_DOCTORS.find(d => d.id === id);
-    
-    if (mockDoctor) {
-      // Transform mock data to full profile format
-      const fullProfile: DoctorFullProfile = {
-        id: parseInt(mockDoctor.id),
-        slug: mockDoctor.id,
-        title: 'Dr.',
-        nameEn: mockDoctor.name,
-        nameBn: mockDoctor.name,
-        gender: mockDoctor.gender || 'Male',
-        profilePhoto: mockDoctor.image,
-        primarySpecialty: mockDoctor.specialties[0],
-        tagline: 'Committed to Your Health',
-        bioEn: mockDoctor.bio,
-        bioBn: mockDoctor.bio,
-        experienceYears: mockDoctor.experience,
-        languages: ['Bangla', 'English'],
-        bmdcNumber: 'A-' + Math.floor(10000 + Math.random() * 90000),
-        bmdcVerified: true,
-        consultationFeeNew: mockDoctor.chambers[0]?.fee || 1000,
-        consultationFeeFollowUp: Math.round((mockDoctor.chambers[0]?.fee || 1000) * 0.5),
-        consultationFeeReport: Math.round((mockDoctor.chambers[0]?.fee || 1000) * 0.3),
-        onlineConsultationFee: Math.round((mockDoctor.chambers[0]?.fee || 1000) * 0.8),
-        isAvailableForOnline: true,
-        acceptNewPatients: true,
-        averageRating: mockDoctor.rating,
-        totalReviews: Math.floor(50 + Math.random() * 200),
-        totalPatients: mockDoctor.patientCount,
-        qualifications: [
-          { id: 1, degree: 'MBBS', institution: 'Dhaka Medical College', yearOfCompletion: 2000, isVerified: true },
-          { id: 2, degree: 'FCPS', field: mockDoctor.specialties[0], institution: 'BCPS', yearOfCompletion: 2008, isVerified: true },
-          { id: 3, degree: 'MD', field: mockDoctor.specialties[0], institution: 'BSMMU', yearOfCompletion: 2012, isVerified: true },
-        ],
-        specializations: mockDoctor.specialties.map((s, i) => ({ name: s, isPrimary: i === 0 })),
-        experiences: [
-          { id: 1, position: 'Senior Consultant', department: mockDoctor.specialties[0], institution: mockDoctor.chambers[0]?.name || 'Hospital', institutionType: 'Private', startDate: '2015-01-01', isCurrent: true, city: 'Dhaka' },
-          { id: 2, position: 'Associate Consultant', department: mockDoctor.specialties[0], institution: 'Dhaka Medical College', institutionType: 'Government', startDate: '2010-01-01', endDate: '2014-12-31', city: 'Dhaka' },
-        ],
-        chambers: mockDoctor.chambers.map((c, i) => ({
-          id: i + 1,
-          name: c.name,
-          type: 'HOSPITAL',
-          address: c.address,
-          area: c.area || 'Dhaka',
-          city: 'Dhaka',
-          daysOfWeek: 'Sat,Mon,Wed',
-          startTime: c.startTime,
-          endTime: c.endTime,
-          slotDuration: c.slotDuration,
-          consultationFee: c.fee,
-          followUpFee: Math.round(c.fee * 0.5),
-          reportCheckFee: Math.round(c.fee * 0.3),
-          isPrimary: i === 0,
-          hasParking: true,
-          hasWheelchairAccess: i === 0,
-          hasAC: true,
-        })),
-        achievements: [
-          { id: 1, title: 'Best Doctor Award', type: 'AWARD', organization: 'Bangladesh Medical Association', year: 2022 },
-          { id: 2, title: 'Excellence in Patient Care', type: 'RECOGNITION', organization: 'Hospital Authority', year: 2020 },
-        ],
-        memberships: [
-          { id: 1, organization: 'Bangladesh Medical Association (BMA)', membershipType: 'Life Member', joinedYear: 2005 },
-          { id: 2, organization: `${mockDoctor.specialties[0]} Society of Bangladesh`, membershipType: 'Member', joinedYear: 2010 },
-        ],
-        services: [
-          { id: 1, name: 'General Consultation', fee: mockDoctor.chambers[0]?.fee, duration: 15 },
-          { id: 2, name: 'Follow-up Visit', fee: Math.round((mockDoctor.chambers[0]?.fee || 1000) * 0.5), duration: 10 },
-          { id: 3, name: 'Report Analysis', fee: Math.round((mockDoctor.chambers[0]?.fee || 1000) * 0.3), duration: 10 },
-        ],
-        reviews: [
-          { id: 1, rating: 5, comment: 'Excellent doctor. Very thorough and patient.', patientName: 'R***', createdAt: '2024-01-15' },
-          { id: 2, rating: 5, comment: 'Highly recommended. Explains everything clearly.', patientName: 'S***', createdAt: '2024-01-10' },
-          { id: 3, rating: 4, comment: 'Good experience overall.', patientName: 'M***', createdAt: '2024-01-05' },
-        ],
-      };
-      
-      setDoctor(fullProfile);
-    }
-    
-    setLoading(false);
-  }, [id]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <i className="fas fa-circle-notch fa-spin text-4xl text-teal-600 mb-4"></i>
-          <p className="text-slate-600">Loading profile...</p>
+          <div className="w-16 h-16 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500">{isBn ? 'লোড হচ্ছে...' : 'Loading...'}</p>
         </div>
       </div>
     );
   }
 
-  if (!doctor) {
+  if (!profile) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <i className="fas fa-user-slash text-6xl text-slate-300 mb-4"></i>
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">{t.doctorNotFound}</h2>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i className="fas fa-user-md text-4xl text-slate-300"></i>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">{t.notFound}</h1>
           <p className="text-slate-500 mb-6">{t.notFoundDesc}</p>
-          <button 
-            onClick={() => navigate(-1)}
-            className="bg-teal-600 text-white px-6 py-2 rounded-lg font-bold shadow-sm hover:bg-teal-700 transition"
+          <button
+            onClick={() => navigate('/search')}
+            className="bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition"
           >
-            {t.goBack}
+            <i className="fas fa-arrow-left mr-2"></i>{t.goBack}
           </button>
         </div>
       </div>
     );
   }
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      if (i <= rating) {
-        stars.push(<i key={i} className="fas fa-star text-yellow-400"></i>);
-      } else if (i - 0.5 <= rating) {
-        stars.push(<i key={i} className="fas fa-star-half-alt text-yellow-400"></i>);
-      } else {
-        stars.push(<i key={i} className="far fa-star text-yellow-400"></i>);
-      }
-    }
-    return stars;
-  };
+  const primaryChamber = profile.chambers.find(c => c.isPrimary) || profile.chambers[0];
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-16">
-      {/* Hero Section with Cover */}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      
+      {/* ==================== HERO SECTION ==================== */}
       <div className="relative">
-        {/* Cover Image */}
-        <div className="h-48 md:h-64 bg-gradient-to-r from-teal-600 via-teal-700 to-slate-800 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-            <div className="absolute bottom-0 right-0 w-64 h-64 bg-white rounded-full translate-x-1/2 translate-y-1/2"></div>
-          </div>
+        {/* Cover Photo */}
+        <div className="h-48 md:h-64 lg:h-80 bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-500 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnYtMmgtMnYtMmgydi0yaDJ2MmgydjJoLTJ2MmgydjRoLTJ2MmgtMnYtMnptMC0xMGgtMnYtMmgydjJ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
           
           {/* Back Button */}
-          <div className="absolute top-4 left-4 z-10">
-            <button 
-              onClick={() => navigate(-1)} 
-              className="text-white/80 hover:text-white flex items-center gap-2 font-bold bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm transition hover:bg-black/30"
-            >
-              <i className="fas fa-arrow-left"></i> {t.back}
+          <button
+            onClick={() => navigate(-1)}
+            className="absolute top-4 left-4 md:top-6 md:left-6 bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-xl font-medium hover:bg-white/30 transition flex items-center gap-2"
+          >
+            <i className="fas fa-arrow-left"></i>
+            <span className="hidden md:inline">{t.back}</span>
+          </button>
+
+          {/* Share & Save Buttons */}
+          <div className="absolute top-4 right-4 md:top-6 md:right-6 flex gap-2">
+            <button className="w-10 h-10 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition">
+              <i className="fas fa-share-alt"></i>
+            </button>
+            <button className="w-10 h-10 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition">
+              <i className="far fa-heart"></i>
             </button>
           </div>
-          
-          {isDoctorView && (
-            <div className="absolute top-4 right-4 z-10">
-              <button 
-                onClick={() => navigate('/doctor-dashboard')} 
-                className="bg-white text-teal-700 px-4 py-2 rounded-full font-bold shadow-lg text-sm flex items-center gap-2 hover:bg-teal-50 transition"
-              >
-                <i className="fas fa-tachometer-alt"></i> {t.returnToDashboard}
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Profile Card */}
-        <div className="container mx-auto px-4 max-w-6xl -mt-24 relative z-10">
-          <div className="bg-white rounded-3xl shadow-xl p-6 md:p-8 border border-slate-100">
-            <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-              {/* Profile Photo */}
-              <div className="flex flex-col items-center lg:items-start">
-                <div className="relative">
-                  <img 
-                    src={doctor.profilePhoto || 'https://via.placeholder.com/160'} 
-                    alt={doctor.nameEn} 
-                    className="w-36 h-36 md:w-44 md:h-44 rounded-2xl object-cover border-4 border-white shadow-xl bg-slate-100"
-                  />
-                  {doctor.bmdcVerified && (
-                    <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-2 rounded-full shadow-lg">
-                      <i className="fas fa-check text-sm"></i>
-                    </div>
-                  )}
-                </div>
+        <div className="max-w-6xl mx-auto px-4 -mt-24 md:-mt-32 relative z-10">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            <div className="p-6 md:p-8">
+              <div className="flex flex-col md:flex-row gap-6">
                 
-                {/* Quick Stats */}
-                <div className="flex gap-4 mt-4 text-center">
-                  <div className="bg-slate-50 px-4 py-2 rounded-xl">
-                    <p className="text-2xl font-bold text-slate-800">{doctor.experienceYears}</p>
-                    <p className="text-xs text-slate-500">{t.years}</p>
+                {/* Profile Photo */}
+                <div className="flex-shrink-0">
+                  <div className="relative">
+                    <div className={`w-32 h-32 md:w-40 md:h-40 rounded-2xl overflow-hidden border-4 border-white shadow-lg bg-slate-100 ${!imageLoaded ? 'animate-pulse' : ''}`}>
+                      <img 
+                        src={profile.profilePhoto} 
+                        alt={profile.nameEn}
+                        className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                        onLoad={() => setImageLoaded(true)}
+                      />
+                    </div>
+                    {profile.bmdcVerified && (
+                      <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center border-4 border-white shadow">
+                        <i className="fas fa-check text-white text-sm"></i>
+                      </div>
+                    )}
                   </div>
-                  <div className="bg-slate-50 px-4 py-2 rounded-xl">
-                    <p className="text-2xl font-bold text-slate-800">{doctor.totalPatients.toLocaleString()}+</p>
-                    <p className="text-xs text-slate-500">{t.patients}</p>
+                </div>
+
+                {/* Profile Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{profile.nameEn}</h1>
+                    {profile.bmdcVerified && (
+                      <span className="text-emerald-500" title={t.bmdcVerified}>
+                        <i className="fas fa-badge-check text-xl"></i>
+                      </span>
+                    )}
                   </div>
-                  <div className="bg-slate-50 px-4 py-2 rounded-xl">
-                    <p className="text-2xl font-bold text-slate-800">{doctor.totalReviews}</p>
-                    <p className="text-xs text-slate-500">{t.reviews}</p>
+
+                  <p className="text-lg text-teal-600 font-semibold mb-1">
+                    {profile.qualifications.map(q => q.degree).join(', ')}
+                  </p>
+                  
+                  <p className="text-slate-500 mb-4">
+                    {profile.specializations.map(s => s.name).join(' • ')}
+                  </p>
+
+                  {/* Badges */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <VerifiedBadge text={t.bmdcVerified} />
+                    {profile.acceptNewPatients && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full border border-blue-200">
+                        <i className="fas fa-user-plus"></i>
+                        {t.acceptingPatients}
+                      </span>
+                    )}
+                    {profile.isAvailableForOnline && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 text-xs font-semibold rounded-full border border-purple-200">
+                        <i className="fas fa-video"></i>
+                        {t.onlineAvailable}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quick Stats */}
+                  <div className="flex flex-wrap gap-6 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-teal-50 rounded-lg flex items-center justify-center">
+                        <i className="fas fa-briefcase-medical text-teal-600"></i>
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">{profile.experienceYears}+</p>
+                        <p className="text-xs text-slate-500">{t.yearsExp}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                        <i className="fas fa-users text-blue-600"></i>
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">{(profile.totalPatients || 0).toLocaleString()}</p>
+                        <p className="text-xs text-slate-500">{t.patients}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
+                        <i className="fas fa-star text-amber-500"></i>
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">{(profile.averageRating || 0).toFixed(1)}</p>
+                        <p className="text-xs text-slate-500">({profile.totalReviews} {t.reviews})</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Booking Card - Desktop */}
+                <div className="hidden lg:block w-72 flex-shrink-0">
+                  <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl p-5 border border-slate-200">
+                    <div className="text-center mb-4">
+                      <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">{t.consultationFee}</p>
+                      <p className="text-3xl font-bold text-slate-800">৳{profile.consultationFeeNew}</p>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        setSelectedChamber(primaryChamber as any);
+                        setShowBooking(true);
+                      }}
+                      className="w-full bg-gradient-to-r from-teal-600 to-teal-500 text-white py-4 rounded-xl font-bold hover:shadow-lg hover:shadow-teal-500/30 transition-all transform hover:-translate-y-0.5 mb-3"
+                    >
+                      <i className="fas fa-calendar-check mr-2"></i>
+                      {t.bookNow}
+                    </button>
+
+                    {profile.isAvailableForOnline && (
+                      <button className="w-full bg-white text-teal-600 py-3 rounded-xl font-bold border-2 border-teal-200 hover:bg-teal-50 transition">
+                        <i className="fas fa-video mr-2"></i>
+                        {isBn ? 'অনলাইন পরামর্শ' : 'Video Consult'}
+                      </button>
+                    )}
+
+                    <div className="mt-4 pt-4 border-t border-slate-200 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">{t.followUpFee}</span>
+                        <span className="font-bold text-slate-700">৳{profile.consultationFeeFollowUp}</span>
+                      </div>
+                      {profile.onlineConsultationFee && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">{t.onlineFee}</span>
+                          <span className="font-bold text-slate-700">৳{profile.onlineConsultationFee}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">{t.avgTime}</span>
+                        <span className="font-bold text-slate-700">{profile.avgConsultationTime} {t.minutes}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-              
-              {/* Profile Info */}
-              <div className="flex-1 text-center lg:text-left">
-                <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
-                  <div>
-                    {/* Name & Title */}
-                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800 mb-1">
-                      {doctor.title} {isBn && doctor.nameBn ? doctor.nameBn : doctor.nameEn}
-                    </h1>
+            </div>
+
+            {/* Tabs */}
+            <div className="border-t border-slate-100">
+              <div className="flex overflow-x-auto scrollbar-hide">
+                {(['overview', 'experience', 'chambers', 'reviews'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 min-w-[120px] px-6 py-4 text-sm font-bold transition-all relative ${
+                      activeTab === tab 
+                        ? 'text-teal-600' 
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {tab === 'overview' && <><i className="fas fa-user mr-2"></i>{t.overview}</>}
+                    {tab === 'experience' && <><i className="fas fa-briefcase mr-2"></i>{t.experience}</>}
+                    {tab === 'chambers' && <><i className="fas fa-hospital mr-2"></i>{t.chambers}</>}
+                    {tab === 'reviews' && <><i className="fas fa-star mr-2"></i>{t.reviewsTab}</>}
                     
-                    {/* Degrees */}
-                    <p className="text-slate-600 font-medium mb-3">
-                      {doctor.qualifications.map(q => q.degree).join(', ')}
-                    </p>
-                    
-                    {/* Specialties */}
-                    <div className="flex flex-wrap justify-center lg:justify-start gap-2 mb-4">
-                      {doctor.specializations.map((s, i) => (
-                        <span 
-                          key={i} 
-                          className={`px-3 py-1 rounded-full text-sm font-bold border ${
-                            s.isPrimary 
-                              ? 'bg-teal-50 text-teal-700 border-teal-200' 
-                              : 'bg-slate-50 text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          {s.name}
-                        </span>
-                      ))}
-                    </div>
-                    
-                    {/* Tagline */}
-                    {doctor.tagline && (
-                      <p className="text-slate-500 italic mb-4">"{doctor.tagline}"</p>
+                    {activeTab === tab && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-teal-500 to-emerald-500"></div>
                     )}
-                    
-                    {/* Badges */}
-                    <div className="flex flex-wrap justify-center lg:justify-start gap-2">
-                      {doctor.bmdcVerified && (
-                        <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-sm font-bold border border-green-200">
-                          <i className="fas fa-check-circle"></i> {t.bmdcVerified}
-                        </span>
-                      )}
-                      {doctor.acceptNewPatients && (
-                        <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-sm font-bold border border-blue-200">
-                          <i className="fas fa-user-plus"></i> {t.acceptingPatients}
-                        </span>
-                      )}
-                      {doctor.isAvailableForOnline && (
-                        <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-full text-sm font-bold border border-purple-200">
-                          <i className="fas fa-video"></i> {t.onlineAvailable}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Rating Card */}
-                  <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-4 rounded-2xl border border-yellow-200 text-center min-w-[140px]">
-                    <div className="text-3xl font-bold text-yellow-700 mb-1">{doctor.averageRating.toFixed(1)}</div>
-                    <div className="flex justify-center gap-0.5 mb-1">
-                      {renderStars(doctor.averageRating)}
-                    </div>
-                    <p className="text-xs text-yellow-600">{doctor.totalReviews} {t.reviews}</p>
-                  </div>
-                </div>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="container mx-auto px-4 max-w-6xl mt-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-1 flex gap-1 overflow-x-auto">
-          {(['overview', 'experience', 'chambers', 'reviews'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 min-w-[100px] py-3 px-4 rounded-xl font-bold text-sm transition-all ${
-                activeTab === tab 
-                  ? 'bg-teal-600 text-white shadow-lg' 
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {tab === 'overview' && <><i className="fas fa-user mr-2"></i>{t.overview}</>}
-              {tab === 'experience' && <><i className="fas fa-briefcase mr-2"></i>{t.experience}</>}
-              {tab === 'chambers' && <><i className="fas fa-hospital mr-2"></i>{t.chambers}</>}
-              {tab === 'reviews' && <><i className="fas fa-star mr-2"></i>{t.reviews}</>}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="container mx-auto px-4 max-w-6xl mt-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ==================== CONTENT SECTION ==================== */}
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
           
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="flex-1 min-w-0">
             
-            {/* Overview Tab */}
+            {/* ========== OVERVIEW TAB ========== */}
             {activeTab === 'overview' && (
-              <>
+              <div className="space-y-8">
+                
                 {/* About */}
-                {doctor.bioEn && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                      <i className="fas fa-info-circle text-teal-600"></i> {t.about}
-                    </h2>
-                    <p className="text-slate-600 leading-relaxed">
-                      {isBn && doctor.bioBn ? doctor.bioBn : doctor.bioEn}
-                    </p>
+                <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i className="fas fa-user-md text-teal-600"></i>
+                    {t.about}
+                  </h2>
+                  <p className="text-slate-600 leading-relaxed">{profile.bioEn}</p>
+                  
+                  {/* Languages */}
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <p className="text-sm text-slate-500 mb-2">{t.languages}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.languages.map((lang, i) => (
+                        <span key={i} className="px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full">
+                          {lang}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                )}
+                </section>
 
                 {/* Qualifications */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                   <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <i className="fas fa-graduation-cap text-teal-600"></i> {t.qualifications}
+                    <i className="fas fa-graduation-cap text-teal-600"></i>
+                    {t.qualifications}
                   </h2>
                   <div className="space-y-4">
-                    {doctor.qualifications.map((qual) => (
-                      <div key={qual.id} className="flex items-start gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center text-teal-600 flex-shrink-0">
-                          <i className="fas fa-award text-xl"></i>
+                    {profile.qualifications.map((qual, i) => (
+                      <div key={qual.id} className="flex items-start gap-4">
+                        <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0">
+                          {i + 1}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-slate-800">{qual.degree}</h3>
-                            {qual.field && <span className="text-slate-500">({qual.field})</span>}
+                            <p className="font-bold text-slate-800">
+                              {qual.degree}
+                              {qual.field && <span className="text-slate-500 font-normal"> ({qual.field})</span>}
+                            </p>
                             {qual.isVerified && (
-                              <i className="fas fa-check-circle text-green-500 text-sm"></i>
+                              <i className="fas fa-check-circle text-emerald-500 text-sm"></i>
                             )}
                           </div>
-                          <p className="text-slate-600 text-sm">{qual.institution}</p>
+                          <p className="text-sm text-slate-500">
+                            {qual.institution}
+                            {qual.institutionCity && `, ${qual.institutionCity}`}
+                            {qual.institutionCountry && qual.institutionCountry !== 'Bangladesh' && `, ${qual.institutionCountry}`}
+                          </p>
                           {qual.yearOfCompletion && (
-                            <p className="text-slate-400 text-sm">{qual.yearOfCompletion}</p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              <i className="far fa-calendar mr-1"></i>
+                              {qual.yearOfCompletion}
+                            </p>
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                </section>
 
-                {/* Achievements */}
-                {doctor.achievements.length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                      <i className="fas fa-trophy text-teal-600"></i> {t.achievements}
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {doctor.achievements.map((achievement) => (
-                        <div key={achievement.id} className="p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border border-yellow-100">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-600">
-                              <i className="fas fa-medal"></i>
-                            </div>
-                            <div>
-                              <h3 className="font-bold text-slate-800">{achievement.title}</h3>
-                              <p className="text-sm text-slate-600">{achievement.organization}</p>
-                              {achievement.year && <p className="text-xs text-slate-400">{achievement.year}</p>}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Memberships */}
-                {doctor.memberships.length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                      <i className="fas fa-id-card text-teal-600"></i> {t.memberships}
-                    </h2>
-                    <div className="flex flex-wrap gap-3">
-                      {doctor.memberships.map((membership) => (
-                        <div key={membership.id} className="inline-flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
-                          <i className="fas fa-certificate text-teal-600"></i>
-                          <span className="font-medium text-slate-700">{membership.organization}</span>
-                          {membership.membershipType && (
-                            <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">{membership.membershipType}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Experience Tab */}
-            {activeTab === 'experience' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                  <i className="fas fa-briefcase text-teal-600"></i> {t.workExperience}
-                </h2>
-                <div className="relative pl-8 border-l-2 border-teal-200 space-y-8">
-                  {doctor.experiences.map((exp, idx) => (
-                    <div key={exp.id} className="relative">
-                      <div className="absolute -left-[41px] top-0 h-4 w-4 rounded-full border-4 border-white bg-teal-500 shadow"></div>
-                      <div className="bg-slate-50 p-5 rounded-xl border border-slate-100">
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <h3 className="font-bold text-slate-800">{exp.position}</h3>
-                          {exp.isCurrent && (
-                            <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">{t.present}</span>
-                          )}
-                        </div>
-                        <p className="text-teal-700 font-medium">{exp.institution}</p>
-                        {exp.department && <p className="text-slate-500 text-sm">{exp.department}</p>}
-                        <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
-                          <span><i className="fas fa-calendar mr-1"></i> {new Date(exp.startDate).getFullYear()} - {exp.isCurrent ? t.present : exp.endDate ? new Date(exp.endDate).getFullYear() : ''}</span>
-                          {exp.city && <span><i className="fas fa-map-marker-alt mr-1"></i> {exp.city}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Chambers Tab */}
-            {activeTab === 'chambers' && (
-              <div className="space-y-4">
-                {doctor.chambers.map((chamber) => (
-                  <div key={chamber.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 hover:border-teal-300 transition group">
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-bold text-lg text-slate-800 group-hover:text-teal-600 transition">{chamber.name}</h3>
-                          {chamber.isPrimary && (
-                            <span className="bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full">Primary</span>
-                          )}
-                        </div>
-                        <p className="text-slate-500 text-sm mb-3">
-                          <i className="fas fa-map-marker-alt mr-2 text-teal-500"></i>
-                          {chamber.address}, {chamber.area}, {chamber.city}
-                        </p>
-                        
-                        {/* Schedule */}
-                        <div className="flex flex-wrap gap-4 text-sm text-slate-600 mb-4">
-                          <span className="flex items-center gap-1.5">
-                            <i className="far fa-calendar-alt text-slate-400"></i>
-                            {chamber.daysOfWeek.split(',').join(', ')}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <i className="far fa-clock text-slate-400"></i>
-                            {chamber.startTime} - {chamber.endTime}
-                          </span>
-                        </div>
-                        
-                        {/* Facilities */}
-                        <div className="flex flex-wrap gap-2">
-                          {chamber.hasParking && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
-                              <i className="fas fa-parking"></i> {t.parking}
-                            </span>
-                          )}
-                          {chamber.hasWheelchairAccess && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
-                              <i className="fas fa-wheelchair"></i> {t.wheelchair}
-                            </span>
-                          )}
-                          {chamber.hasAC && (
-                            <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">
-                              <i className="fas fa-snowflake"></i> {t.ac}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Fees & Book Button */}
-                      <div className="md:text-right space-y-3">
-                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                          <div className="text-2xl font-bold text-teal-600">৳{chamber.consultationFee}</div>
-                          <p className="text-xs text-slate-400">{t.consultationFee}</p>
-                          {chamber.followUpFee && (
-                            <p className="text-sm text-slate-500 mt-1">{t.followUpFee}: ৳{chamber.followUpFee}</p>
-                          )}
-                        </div>
-                        <button 
-                          onClick={() => setSelectedChamber({
-                            id: chamber.id.toString(),
-                            name: chamber.name,
-                            address: chamber.address,
-                            area: chamber.area,
-                            startTime: chamber.startTime,
-                            endTime: chamber.endTime,
-                            slotDuration: chamber.slotDuration,
-                            fee: chamber.consultationFee,
-                          })}
-                          className="w-full bg-teal-600 text-white py-3 px-6 rounded-xl font-bold hover:bg-teal-700 transition shadow-lg shadow-teal-500/20"
-                        >
-                          <i className="fas fa-calendar-plus mr-2"></i>
-                          {t.bookAppointment}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Reviews Tab */}
-            {activeTab === 'reviews' && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                  <i className="fas fa-comments text-teal-600"></i> {t.patientReviews}
-                </h2>
-                
-                {doctor.reviews.length > 0 ? (
-                  <div className="space-y-4">
-                    {doctor.reviews.map((review) => (
-                      <div key={review.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 font-bold">
-                              {review.patientName.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-800">{review.patientName}</p>
-                              <p className="text-xs text-slate-400">{new Date(review.createdAt).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          <div className="flex gap-0.5">
-                            {renderStars(review.rating)}
-                          </div>
-                        </div>
-                        {review.comment && (
-                          <p className="text-slate-600 text-sm mt-2">{review.comment}</p>
+                {/* Specializations */}
+                <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i className="fas fa-stethoscope text-teal-600"></i>
+                    {t.specializations}
+                  </h2>
+                  <div className="flex flex-wrap gap-3">
+                    {profile.specializations.map((spec) => (
+                      <div 
+                        key={spec.id} 
+                        className={`px-4 py-2 rounded-xl border-2 ${
+                          spec.isPrimary 
+                            ? 'bg-teal-50 border-teal-200 text-teal-700' 
+                            : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <p className="font-semibold">{spec.name}</p>
+                        {spec.yearsOfPractice && (
+                          <p className="text-xs opacity-70">{spec.yearsOfPractice} {isBn ? 'বছর' : 'years'}</p>
                         )}
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-slate-400">
-                    <i className="fas fa-comment-slash text-4xl mb-3"></i>
-                    <p>{t.noReviews}</p>
+                </section>
+
+                {/* Services */}
+                <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i className="fas fa-hand-holding-medical text-teal-600"></i>
+                    {t.services}
+                  </h2>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {profile.services.filter(s => s.isAvailable).map((service) => (
+                      <div key={service.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                        <div>
+                          <p className="font-semibold text-slate-800">{service.name}</p>
+                          {service.duration && (
+                            <p className="text-xs text-slate-500">{service.duration} {t.minutes}</p>
+                          )}
+                        </div>
+                        {service.fee && (
+                          <p className="font-bold text-teal-600">৳{service.fee}</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
+                </section>
+
+                {/* Achievements & Memberships */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Achievements */}
+                  {profile.achievements.length > 0 && (
+                    <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                      <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <i className="fas fa-trophy text-amber-500"></i>
+                        {t.achievements}
+                      </h2>
+                      <div className="space-y-3">
+                        {profile.achievements.map((ach) => (
+                          <div key={ach.id} className="flex items-start gap-3">
+                            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <i className="fas fa-award text-amber-600 text-sm"></i>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-800">{ach.title}</p>
+                              <p className="text-sm text-slate-500">
+                                {ach.organization}
+                                {ach.year && ` • ${ach.year}`}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Memberships */}
+                  <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <i className="fas fa-id-card text-blue-600"></i>
+                      {t.memberships}
+                    </h2>
+                    <div className="space-y-3">
+                      {profile.memberships.map((mem) => (
+                        <div key={mem.id} className="flex items-start gap-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <i className="fas fa-certificate text-blue-600 text-sm"></i>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-800">{mem.organization}</p>
+                            {mem.membershipType && (
+                              <p className="text-sm text-slate-500">{mem.membershipType}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+
+                {/* FAQ */}
+                {profile.faqs && profile.faqs.length > 0 && (
+                  <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <i className="fas fa-question-circle text-teal-600"></i>
+                      {t.faq}
+                    </h2>
+                    <div className="space-y-4">
+                      {profile.faqs.map((faq) => (
+                        <div key={faq.id} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
+                          <p className="font-semibold text-slate-800 mb-2">
+                            <i className="fas fa-q text-teal-600 mr-2"></i>
+                            {faq.question}
+                          </p>
+                          <p className="text-slate-600 pl-6">{faq.answer}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 )}
+              </div>
+            )}
+
+            {/* ========== EXPERIENCE TAB ========== */}
+            {activeTab === 'experience' && (
+              <div className="space-y-6">
+                <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <i className="fas fa-briefcase text-teal-600"></i>
+                    {isBn ? 'কর্ম অভিজ্ঞতা' : 'Work Experience'}
+                  </h2>
+                  
+                  <div className="relative">
+                    {/* Timeline line */}
+                    <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-teal-500 to-emerald-500"></div>
+                    
+                    <div className="space-y-8">
+                      {profile.experiences.map((exp, i) => (
+                        <div key={exp.id} className="relative pl-14">
+                          {/* Timeline dot */}
+                          <div className={`absolute left-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                            exp.isCurrent 
+                              ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white' 
+                              : 'bg-white border-2 border-slate-200 text-slate-400'
+                          }`}>
+                            <i className={`fas ${exp.isCurrent ? 'fa-check' : 'fa-briefcase'} text-sm`}></i>
+                          </div>
+                          
+                          <div className={`p-5 rounded-xl ${exp.isCurrent ? 'bg-teal-50 border-2 border-teal-200' : 'bg-slate-50'}`}>
+                            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                              <div>
+                                <h3 className="font-bold text-slate-800">{exp.position}</h3>
+                                {exp.department && (
+                                  <p className="text-sm text-slate-500">{exp.department}</p>
+                                )}
+                              </div>
+                              {exp.isCurrent && (
+                                <span className="px-3 py-1 bg-teal-600 text-white text-xs font-bold rounded-full">
+                                  {t.present}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <p className="text-slate-700 font-medium mb-1">
+                              <i className="fas fa-hospital text-slate-400 mr-2"></i>
+                              {exp.institution}
+                            </p>
+                            
+                            <div className="flex flex-wrap gap-4 text-sm text-slate-500">
+                              {exp.city && (
+                                <span>
+                                  <i className="fas fa-map-marker-alt mr-1"></i>
+                                  {exp.city}, {exp.country || 'Bangladesh'}
+                                </span>
+                              )}
+                              <span>
+                                <i className="far fa-calendar mr-1"></i>
+                                {new Date(exp.startDate).getFullYear()} - {exp.isCurrent ? t.present : new Date(exp.endDate!).getFullYear()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* ========== CHAMBERS TAB ========== */}
+            {activeTab === 'chambers' && (
+              <div className="space-y-6">
+                {profile.chambers.map((chamber, i) => (
+                  <section 
+                    key={chamber.id} 
+                    className={`bg-white rounded-2xl p-6 shadow-sm border-2 transition ${
+                      chamber.isPrimary ? 'border-teal-200' : 'border-slate-100'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-lg font-bold text-slate-800">{chamber.name}</h3>
+                          {chamber.isPrimary && (
+                            <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs font-bold rounded-full">
+                              {isBn ? 'প্রধান' : 'Primary'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-slate-500">
+                          <i className="fas fa-map-marker-alt mr-2 text-slate-400"></i>
+                          {chamber.address}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedChamber(chamber as any);
+                          setShowBooking(true);
+                        }}
+                        className="bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition"
+                      >
+                        <i className="fas fa-calendar-plus mr-2"></i>
+                        {t.bookNow}
+                      </button>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {/* Schedule */}
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-500 uppercase mb-3">
+                          <i className="far fa-clock mr-2"></i>{t.schedule}
+                        </h4>
+                        <div className="space-y-2">
+                          {chamber.daysOfWeek.split(',').map((day) => (
+                            <div key={day} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                              <span className="font-medium text-slate-700">{day}</span>
+                              <span className="text-slate-600">{chamber.startTime} - {chamber.endTime}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Fees & Facilities */}
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-500 uppercase mb-3">
+                          <i className="fas fa-tag mr-2"></i>{isBn ? 'ফি' : 'Fees'}
+                        </h4>
+                        <div className="space-y-2 mb-4">
+                          <div className="flex justify-between p-3 bg-slate-50 rounded-lg">
+                            <span className="text-slate-600">{isBn ? 'নতুন পরামর্শ' : 'New Consultation'}</span>
+                            <span className="font-bold text-slate-800">৳{chamber.consultationFee}</span>
+                          </div>
+                          {chamber.followUpFee && (
+                            <div className="flex justify-between p-3 bg-slate-50 rounded-lg">
+                              <span className="text-slate-600">{isBn ? 'ফলো-আপ' : 'Follow-up'}</span>
+                              <span className="font-bold text-slate-800">৳{chamber.followUpFee}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <h4 className="text-sm font-bold text-slate-500 uppercase mb-3">
+                          <i className="fas fa-concierge-bell mr-2"></i>{t.facilities}
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {chamber.hasParking && (
+                            <span className="px-3 py-1.5 bg-blue-50 text-blue-700 text-sm rounded-full">
+                              <i className="fas fa-parking mr-1"></i>{t.parking}
+                            </span>
+                          )}
+                          {chamber.hasWheelchairAccess && (
+                            <span className="px-3 py-1.5 bg-green-50 text-green-700 text-sm rounded-full">
+                              <i className="fas fa-wheelchair mr-1"></i>{t.wheelchair}
+                            </span>
+                          )}
+                          {chamber.hasAC && (
+                            <span className="px-3 py-1.5 bg-cyan-50 text-cyan-700 text-sm rounded-full">
+                              <i className="fas fa-snowflake mr-1"></i>{t.ac}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+
+            {/* ========== REVIEWS TAB ========== */}
+            {activeTab === 'reviews' && (
+              <div className="space-y-6">
+                
+                {/* Rating Summary */}
+                <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <div className="flex flex-col md:flex-row gap-8">
+                    {/* Overall Rating */}
+                    <div className="text-center md:border-r md:border-slate-100 md:pr-8">
+                      <p className="text-6xl font-bold text-slate-800 mb-2">
+                        {(profile.averageRating || 0).toFixed(1)}
+                      </p>
+                      <StarRating rating={profile.averageRating || 0} size="lg" />
+                      <p className="text-sm text-slate-500 mt-2">
+                        {profile.totalReviews} {t.reviews}
+                      </p>
+                    </div>
+
+                    {/* Rating Breakdown */}
+                    <div className="flex-1 space-y-3">
+                      <h3 className="font-bold text-slate-800 mb-4">{t.ratingBreakdown}</h3>
+                      {[5, 4, 3, 2, 1].map((star) => (
+                        <div key={star} className="flex items-center gap-3">
+                          <span className="text-sm text-slate-600 w-8">{star} <i className="fas fa-star text-amber-400 text-xs"></i></span>
+                          <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full"
+                              style={{ width: `${profile.totalReviews ? (ratingDistribution[star] / profile.totalReviews) * 100 : 0}%` }}
+                            />
+                          </div>
+                          <span className="text-sm text-slate-500 w-8">{ratingDistribution[star]}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Category Ratings */}
+                    <div className="flex-1 space-y-3">
+                      <h3 className="font-bold text-slate-800 mb-4">{isBn ? 'বিভাগ অনুযায়ী' : 'By Category'}</h3>
+                      <RatingBar label={t.punctuality} value={4.6} />
+                      <RatingBar label={t.behavior} value={4.9} />
+                      <RatingBar label={t.explanation} value={4.7} />
+                      <RatingBar label={t.effectiveness} value={4.5} />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Reviews List */}
+                <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                  <h2 className="text-lg font-bold text-slate-800 mb-6">{t.patientSays}</h2>
+                  
+                  <div className="space-y-6">
+                    {(showAllReviews ? profile.reviews : profile.reviews.slice(0, 4)).map((review) => (
+                      <div key={review.id} className="border-b border-slate-100 pb-6 last:border-0 last:pb-0">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-emerald-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+                            {review.patientInitials || review.patientName.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <p className="font-bold text-slate-800">{review.patientName}</p>
+                              {review.isVerified && (
+                                <span className="text-xs text-emerald-600 flex items-center gap-1">
+                                  <i className="fas fa-check-circle"></i>
+                                  {t.verifiedVisit}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center gap-3 mb-3">
+                              <StarRating rating={review.rating} size="sm" />
+                              <span className="text-xs text-slate-400">
+                                {new Date(review.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                              {review.visitType && (
+                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                  {review.visitType}
+                                </span>
+                              )}
+                            </div>
+
+                            {review.title && (
+                              <p className="font-semibold text-slate-800 mb-1">{review.title}</p>
+                            )}
+                            {review.comment && (
+                              <p className="text-slate-600">{review.comment}</p>
+                            )}
+
+                            <button className="mt-3 text-sm text-slate-400 hover:text-slate-600">
+                              <i className="far fa-thumbs-up mr-1"></i>{t.helpful}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {profile.reviews.length > 4 && (
+                    <button
+                      onClick={() => setShowAllReviews(!showAllReviews)}
+                      className="w-full mt-6 py-3 text-teal-600 font-bold hover:bg-teal-50 rounded-xl transition"
+                    >
+                      {showAllReviews ? t.showLess : `${t.viewAll} (${profile.reviews.length})`}
+                    </button>
+                  )}
+                </section>
               </div>
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Quick Book Card */}
-            <div className="bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl shadow-xl p-6 text-white sticky top-24">
-              <h3 className="font-bold text-lg mb-4">{t.bookAppointment}</h3>
-              
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between items-center p-3 bg-white/10 rounded-xl">
-                  <span className="text-teal-100">{t.consultationFee}</span>
-                  <span className="font-bold text-xl">৳{doctor.consultationFeeNew}</span>
-                </div>
-                {doctor.consultationFeeFollowUp && (
-                  <div className="flex justify-between items-center p-3 bg-white/10 rounded-xl">
-                    <span className="text-teal-100">{t.followUpFee}</span>
-                    <span className="font-bold">৳{doctor.consultationFeeFollowUp}</span>
-                  </div>
-                )}
-                {doctor.consultationFeeReport && (
-                  <div className="flex justify-between items-center p-3 bg-white/10 rounded-xl">
-                    <span className="text-teal-100">{t.reportCheckFee}</span>
-                    <span className="font-bold">৳{doctor.consultationFeeReport}</span>
-                  </div>
-                )}
-                {doctor.isAvailableForOnline && doctor.onlineConsultationFee && (
-                  <div className="flex justify-between items-center p-3 bg-purple-500/30 rounded-xl">
-                    <span className="text-purple-100"><i className="fas fa-video mr-2"></i>{t.onlineFee}</span>
-                    <span className="font-bold">৳{doctor.onlineConsultationFee}</span>
-                  </div>
-                )}
+          {/* ==================== SIDEBAR - Mobile Booking ==================== */}
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 z-40 shadow-lg">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs text-slate-500">{t.consultationFee}</p>
+                <p className="text-2xl font-bold text-slate-800">৳{profile.consultationFeeNew}</p>
               </div>
-
-              {doctor.chambers.length > 0 && (
-                <button 
-                  onClick={() => setSelectedChamber({
-                    id: doctor.chambers[0].id.toString(),
-                    name: doctor.chambers[0].name,
-                    address: doctor.chambers[0].address,
-                    area: doctor.chambers[0].area,
-                    startTime: doctor.chambers[0].startTime,
-                    endTime: doctor.chambers[0].endTime,
-                    slotDuration: doctor.chambers[0].slotDuration,
-                    fee: doctor.chambers[0].consultationFee,
-                  })}
-                  className="w-full bg-white text-teal-700 py-4 rounded-xl font-bold hover:bg-teal-50 transition shadow-lg"
-                >
-                  <i className="fas fa-calendar-check mr-2"></i>
-                  {t.bookAppointment}
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setSelectedChamber(primaryChamber as any);
+                  setShowBooking(true);
+                }}
+                className="flex-1 bg-gradient-to-r from-teal-600 to-teal-500 text-white py-4 rounded-xl font-bold"
+              >
+                <i className="fas fa-calendar-check mr-2"></i>
+                {t.bookNow}
+              </button>
             </div>
-
-            {/* BMDC Info */}
-            {doctor.bmdcVerified && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center gap-3 text-green-600 mb-3">
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                    <i className="fas fa-shield-alt text-xl"></i>
-                  </div>
-                  <div>
-                    <p className="font-bold">{t.bmdcVerified}</p>
-                    <p className="text-sm text-slate-500">{t.bmdcNumber}: {doctor.bmdcNumber}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Languages */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                <i className="fas fa-language text-teal-600"></i> {t.languages}
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {doctor.languages.map((lang, i) => (
-                  <span key={i} className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">
-                    {lang}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Services */}
-            {doctor.services.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <i className="fas fa-stethoscope text-teal-600"></i> {t.services}
-                </h3>
-                <div className="space-y-2">
-                  {doctor.services.map((service) => (
-                    <div key={service.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                      <span className="text-slate-700">{service.name}</span>
-                      {service.fee && <span className="font-bold text-teal-600">৳{service.fee}</span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Booking Modal */}
-      {selectedChamber && (
-        <BookingModal 
+      {/* ==================== BOOKING MODAL ==================== */}
+      {showBooking && selectedChamber && (
+        <BookingModal
           doctor={{
-            id: doctor.id.toString(),
-            name: doctor.nameEn,
-            specialties: doctor.specializations.map(s => s.name),
-            degrees: doctor.qualifications.map(q => q.degree).join(', '),
-            chambers: [selectedChamber],
-            image: doctor.profilePhoto || '',
-            experience: doctor.experienceYears,
-            rating: doctor.averageRating,
-            patientCount: doctor.totalPatients,
-            bio: doctor.bioEn || '',
-          }} 
-          chamber={selectedChamber} 
-          onClose={() => setSelectedChamber(null)} 
+            id: profile.id.toString(),
+            name: profile.nameEn,
+            degrees: profile.qualifications.map(q => q.degree).join(', '),
+            specialties: profile.specializations.map(s => s.name),
+            chambers: profile.chambers.map(c => ({
+              id: c.id.toString(),
+              name: c.name,
+              address: c.address,
+              area: c.area,
+              fee: c.consultationFee,
+            })) as Chamber[],
+            image: profile.profilePhoto || '',
+            rating: profile.averageRating || 4.5,
+            experience: profile.experienceYears,
+            patientCount: profile.totalPatients || 0,
+            nextAvailable: 'Today',
+            gender: profile.gender,
+          }}
+          chamber={{
+            id: selectedChamber.id.toString(),
+            name: selectedChamber.name,
+            address: selectedChamber.address,
+            area: selectedChamber.area,
+            fee: selectedChamber.consultationFee,
+          }}
+          onClose={() => {
+            setShowBooking(false);
+            setSelectedChamber(null);
+          }}
         />
       )}
     </div>
   );
 };
+
+export default DoctorProfile;
