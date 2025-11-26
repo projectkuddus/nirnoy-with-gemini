@@ -1,91 +1,41 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
+import { AudioStreamer, base64ToUint8Array } from '../lib/audio-streamer';
+import { AudioRecorder } from '../lib/audio-recorder';
 import { MOCK_DOCTORS } from '../data/mockData';
 
 // ============ CONFIGURATION ============
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
-
-// The correct model name for Gemini Live API (non-Vertex AI)
 const LIVE_MODEL = 'gemini-2.0-flash-live-001';
 
-// Debug mode
-const DEBUG = true;
-const log = (...args: any[]) => DEBUG && console.log('[VoiceAgent]', ...args);
-const logError = (...args: any[]) => console.error('[VoiceAgent ERROR]', ...args);
+const log = (...args: any[]) => console.log('[🎤 Nree]', ...args);
+const logError = (...args: any[]) => console.error('[❌ Nree]', ...args);
 
-// ============ AUDIO CONSTANTS ============
-const INPUT_SAMPLE_RATE = 16000;  // Gemini expects 16kHz input
-const OUTPUT_SAMPLE_RATE = 24000; // Gemini outputs 24kHz
+// ============ GET REAL STATS ============
+function getRealStats() {
+  const totalDoctors = MOCK_DOCTORS.length;
+  const specialties = [...new Set(MOCK_DOCTORS.flatMap(d => d.specialties))];
+  const hospitals = [...new Set(MOCK_DOCTORS.flatMap(d => d.chambers.map(c => c.name)))];
+  
+  // Get top specialties with counts
+  const specCounts: Record<string, number> = {};
+  MOCK_DOCTORS.forEach(d => {
+    d.specialties.forEach(s => {
+      specCounts[s] = (specCounts[s] || 0) + 1;
+    });
+  });
+  const topSpecs = Object.entries(specCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => `${name} (${count} জন)`);
 
-// ============ AUDIO HELPERS ============
-
-// Convert Float32 audio to PCM16 base64 string
-function audioPCM16FromFloat32(float32Data: Float32Array): string {
-  const pcm16 = new Int16Array(float32Data.length);
-  for (let i = 0; i < float32Data.length; i++) {
-    const sample = Math.max(-1, Math.min(1, float32Data[i]));
-    pcm16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-  }
-  
-  // Convert to base64
-  const uint8 = new Uint8Array(pcm16.buffer);
-  let binary = '';
-  for (let i = 0; i < uint8.length; i++) {
-    binary += String.fromCharCode(uint8[i]);
-  }
-  return btoa(binary);
-}
-
-// Decode base64 PCM16 audio to Float32Array for Web Audio API
-function audioFloat32FromPCM16Base64(base64Data: string): Float32Array {
-  // Decode base64 to binary
-  const binaryString = atob(base64Data);
-  const uint8Array = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    uint8Array[i] = binaryString.charCodeAt(i);
-  }
-  
-  // Convert to Int16 (PCM16 is 16-bit signed little-endian)
-  const dataView = new DataView(uint8Array.buffer);
-  const numSamples = uint8Array.length / 2;
-  const float32Array = new Float32Array(numSamples);
-  
-  for (let i = 0; i < numSamples; i++) {
-    // Read as little-endian signed 16-bit integer
-    const int16 = dataView.getInt16(i * 2, true);
-    // Normalize to [-1, 1]
-    float32Array[i] = int16 / 32768;
-  }
-  
-  return float32Array;
-}
-
-// Resample audio from source rate to target rate
-function resampleAudio(
-  inputData: Float32Array, 
-  inputRate: number, 
-  outputRate: number
-): Float32Array {
-  if (inputRate === outputRate) {
-    return inputData;
-  }
-  
-  const ratio = inputRate / outputRate;
-  const outputLength = Math.floor(inputData.length / ratio);
-  const output = new Float32Array(outputLength);
-  
-  for (let i = 0; i < outputLength; i++) {
-    const srcIndex = i * ratio;
-    const srcIndexFloor = Math.floor(srcIndex);
-    const srcIndexCeil = Math.min(srcIndexFloor + 1, inputData.length - 1);
-    const t = srcIndex - srcIndexFloor;
-    
-    // Linear interpolation
-    output[i] = inputData[srcIndexFloor] * (1 - t) + inputData[srcIndexCeil] * t;
-  }
-  
-  return output;
+  return {
+    totalDoctors,
+    totalSpecialties: specialties.length,
+    totalHospitals: hospitals.length,
+    topSpecialties: topSpecs,
+  };
 }
 
 // ============ GREETING ============
@@ -97,193 +47,66 @@ function getGreeting(): string {
   return 'শুভ রাত্রি';
 }
 
-// ============ SYSTEM PROMPT ============
-function getSystemPrompt(agentNumber: number): string {
+// ============ SYSTEM PROMPT - Natural Bangladeshi Bangla ============
+function getSystemPrompt(isMale: boolean): string {
   const greeting = getGreeting();
-  const doctors = MOCK_DOCTORS.slice(0, 5).map(d => 
-    `${d.name} (${d.specialties[0]}), ফি: ৳${d.chambers[0]?.fee}`
-  ).join('; ');
+  const stats = getRealStats();
+  
+  // Get sample doctors for reference
+  const sampleDoctors = MOCK_DOCTORS.slice(0, 15).map(d => 
+    `- ${d.name}, ${d.specialties[0]}, ${d.chambers[0]?.name || 'চেম্বার'}, ফি ৳${d.chambers[0]?.fee || 1000}`
+  ).join('\n');
 
-  return `আপনি Nirnoy ${agentNumber}, নির্ণয় কেয়ার এর AI ভয়েস এসিস্ট্যান্ট।
+  return `## তোমার পরিচয়
+তুমি "Nree" (নির্ণয়ের ২৪/৭ AI সহকারী)। তুমি ${isMale ? 'একজন ছেলে' : 'একজন মেয়ে'}। তোমার কাজ হলো নির্ণয় প্ল্যাটফর্মে মানুষদের সাহায্য করা।
 
-প্রথমেই বলুন: "আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। আমি Nirnoy ${agentNumber}। কীভাবে সাহায্য করতে পারি?"
+## কথা বলার ধরন (অত্যন্ত গুরুত্বপূর্ণ)
+- শুধুমাত্র বাংলাদেশী বাংলায় কথা বলো। ভারতীয় বাংলা একদম না।
+- "আপনি" না বলে "তুমি" বা "আপনি" পরিস্থিতি বুঝে বলো। সাধারণত "আপনি" ভালো।
+- স্বাভাবিক, বন্ধুসুলভ, আন্তরিক - যেমন একজন হেল্পফুল বন্ধু কথা বলে।
+- "জ্বী", "আচ্ছা", "ঠিক আছে", "অবশ্যই" এসব ব্যবহার করো।
+- ছোট ছোট বাক্যে কথা বলো। লম্বা বাক্য না।
+- "হ্যাঁ" না বলে "জ্বী" বলো। "না" বলতে পারো সরাসরি।
+- শেষে "আর কিছু?" বা "আর কোনো হেল্প লাগবে?" জিজ্ঞেস করো।
 
-বাংলাদেশী বাংলায় কথা বলুন। সংক্ষিপ্ত উত্তর দিন।
+## প্রথম কথা
+এভাবে শুরু করো: "আসসালামু আলাইকুম! ${greeting}! আমি Nree, নির্ণয়ের সহকারী। বলুন, কীভাবে হেল্প করতে পারি?"
 
-ডাক্তার: ${doctors}
+## নির্ণয় সম্পর্কে তথ্য (সঠিক তথ্য)
+- মোট ডাক্তার: ${stats.totalDoctors} জন
+- বিশেষত্ব: ${stats.totalSpecialties}+ ধরনের
+- হাসপাতাল/চেম্বার: ${stats.totalHospitals}+ টা
+- সার্ভিস: ২৪/৭ চালু
+- ফি: ডাক্তার ভেদে ৳৫০০ থেকে ৳২০০০+
 
-কাজ: ডাক্তার খোঁজা, অ্যাপয়েন্টমেন্ট বুকিং, ফি জানানো।
-জরুরি: বুকে ব্যথা/শ্বাসকষ্ট বললে 999 এ কল করতে বলুন।`;
+## জনপ্রিয় বিশেষত্ব
+${stats.topSpecialties.join(', ')}
+
+## কিছু ডাক্তারের তথ্য (রেফারেন্স)
+${sampleDoctors}
+
+## তোমার কাজ
+১. ডাক্তার খুঁজতে হেল্প করা - বিশেষত্ব, লোকেশন, ফি অনুযায়ী
+২. অ্যাপয়েন্টমেন্ট বুক করতে সাহায্য করা
+৩. ফি, সময়সূচী জানানো
+৪. নির্ণয় সম্পর্কে যেকোনো প্রশ্নের উত্তর দেওয়া
+
+## জরুরি অবস্থা
+বুকে ব্যথা, শ্বাসকষ্ট, অজ্ঞান - এসব শুনলে বলো: "এইটা ইমার্জেন্সি! এখনই ৯৯৯ এ কল করেন অথবা কাছের হাসপাতালে যান।"
+
+## বিদায়
+শেষে বলো: "আল্লাহ হাফেজ! ভালো থাকবেন।" অথবা "ধন্যবাদ! আবার কথা হবে।"`;
 }
 
 // ============ TYPES ============
 type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error';
 
 interface State {
-  activeAgent: 1 | 2 | null;
+  activeAgent: 'male' | 'female' | null;
   status: Status;
   statusText: string;
   volume: number;
   error: string | null;
-}
-
-// ============ AUDIO PLAYER CLASS ============
-class AudioPlayer {
-  private context: AudioContext;
-  private queue: AudioBufferSourceNode[] = [];
-  private nextStartTime: number = 0;
-  private onPlaybackStart?: () => void;
-  private onPlaybackEnd?: () => void;
-
-  constructor(onStart?: () => void, onEnd?: () => void) {
-    this.context = new (window.AudioContext || (window as any).webkitAudioContext)({
-      sampleRate: OUTPUT_SAMPLE_RATE
-    });
-    this.onPlaybackStart = onStart;
-    this.onPlaybackEnd = onEnd;
-  }
-
-  async resume() {
-    if (this.context.state === 'suspended') {
-      await this.context.resume();
-    }
-  }
-
-  play(float32Audio: Float32Array) {
-    if (float32Audio.length === 0) return;
-
-    const buffer = this.context.createBuffer(1, float32Audio.length, OUTPUT_SAMPLE_RATE);
-    buffer.getChannelData(0).set(float32Audio);
-
-    const source = this.context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(this.context.destination);
-
-    const now = this.context.currentTime;
-    const startTime = Math.max(now + 0.05, this.nextStartTime);
-    
-    if (this.queue.length === 0) {
-      this.onPlaybackStart?.();
-    }
-
-    source.start(startTime);
-    this.nextStartTime = startTime + buffer.duration;
-    this.queue.push(source);
-
-    log(`Playing audio: ${float32Audio.length} samples, duration: ${buffer.duration.toFixed(2)}s`);
-
-    source.onended = () => {
-      this.queue = this.queue.filter(s => s !== source);
-      if (this.queue.length === 0) {
-        this.onPlaybackEnd?.();
-      }
-    };
-  }
-
-  stop() {
-    this.queue.forEach(s => {
-      try { s.stop(); } catch (e) {}
-    });
-    this.queue = [];
-    this.nextStartTime = 0;
-  }
-
-  close() {
-    this.stop();
-    if (this.context.state !== 'closed') {
-      this.context.close();
-    }
-  }
-}
-
-// ============ AUDIO RECORDER CLASS ============
-class AudioRecorder {
-  private context: AudioContext | null = null;
-  private processor: ScriptProcessorNode | null = null;
-  private stream: MediaStream | null = null;
-  private onAudioData?: (data: string) => void;
-  private onVolume?: (volume: number) => void;
-  private buffer: Float32Array[] = [];
-  private lastSendTime: number = 0;
-  private sendInterval: number = 100; // ms
-
-  async start(onAudioData: (base64: string) => void, onVolume?: (v: number) => void) {
-    this.onAudioData = onAudioData;
-    this.onVolume = onVolume;
-
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      }
-    });
-
-    this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const source = this.context.createMediaStreamSource(this.stream);
-    
-    this.processor = this.context.createScriptProcessor(4096, 1, 1);
-    
-    this.processor.onaudioprocess = (e) => {
-      const inputData = e.inputBuffer.getChannelData(0);
-      
-      // Calculate volume
-      let sum = 0;
-      for (let i = 0; i < inputData.length; i++) {
-        sum += inputData[i] * inputData[i];
-      }
-      const rms = Math.sqrt(sum / inputData.length);
-      this.onVolume?.(Math.min(1, rms * 5));
-
-      // Resample to 16kHz
-      const resampled = resampleAudio(
-        new Float32Array(inputData), 
-        this.context!.sampleRate, 
-        INPUT_SAMPLE_RATE
-      );
-      this.buffer.push(resampled);
-
-      // Send every sendInterval ms
-      const now = Date.now();
-      if (now - this.lastSendTime >= this.sendInterval && this.buffer.length > 0) {
-        const totalLength = this.buffer.reduce((sum, arr) => sum + arr.length, 0);
-        const combined = new Float32Array(totalLength);
-        let offset = 0;
-        for (const arr of this.buffer) {
-          combined.set(arr, offset);
-          offset += arr.length;
-        }
-
-        const base64 = audioPCM16FromFloat32(combined);
-        this.onAudioData?.(base64);
-        
-        this.buffer = [];
-        this.lastSendTime = now;
-      }
-    };
-
-    source.connect(this.processor);
-    this.processor.connect(this.context.destination);
-    
-    log('Audio recording started');
-  }
-
-  stop() {
-    if (this.processor) {
-      this.processor.disconnect();
-      this.processor = null;
-    }
-    if (this.stream) {
-      this.stream.getTracks().forEach(t => t.stop());
-      this.stream = null;
-    }
-    if (this.context && this.context.state !== 'closed') {
-      this.context.close();
-      this.context = null;
-    }
-    this.buffer = [];
-    log('Audio recording stopped');
-  }
 }
 
 // ============ MAIN COMPONENT ============
@@ -298,32 +121,40 @@ export const HomeVoiceSection: React.FC = () => {
 
   const aiRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
-  const playerRef = useRef<AudioPlayer | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const streamerRef = useRef<AudioStreamer | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const isActiveRef = useRef(false);
 
-  // Initialize AI client
   useEffect(() => {
     if (hasValidApiKey) {
-      log('Initializing AI client with model:', LIVE_MODEL);
+      log('Initializing');
       aiRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
     }
   }, []);
 
-  // Cleanup
   const cleanup = useCallback(() => {
     log('Cleaning up...');
     isActiveRef.current = false;
 
-    recorderRef.current?.stop();
-    recorderRef.current = null;
+    if (recorderRef.current) {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+    }
 
-    playerRef.current?.close();
-    playerRef.current = null;
+    if (streamerRef.current) {
+      streamerRef.current.stop();
+      streamerRef.current = null;
+    }
 
     if (sessionRef.current) {
       try { sessionRef.current.close(); } catch (e) {}
       sessionRef.current = null;
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
     }
 
     setState({
@@ -337,18 +168,23 @@ export const HomeVoiceSection: React.FC = () => {
 
   useEffect(() => () => cleanup(), [cleanup]);
 
-  // Start session
-  const startSession = async (agentNumber: 1 | 2) => {
+  const handleEndCall = useCallback(() => {
+    log('End call');
+    cleanup();
+  }, [cleanup]);
+
+  const startSession = async (gender: 'male' | 'female') => {
     if (!aiRef.current) {
-      setState(s => ({ ...s, error: 'API Key কনফিগার করা হয়নি', status: 'error' }));
+      setState(s => ({ ...s, error: 'API Key নেই', status: 'error' }));
       return;
     }
 
     cleanup();
+    await new Promise(resolve => setTimeout(resolve, 100));
     isActiveRef.current = true;
 
     setState({
-      activeAgent: agentNumber,
+      activeAgent: gender,
       status: 'connecting',
       statusText: 'কানেক্ট হচ্ছে...',
       volume: 0,
@@ -356,24 +192,38 @@ export const HomeVoiceSection: React.FC = () => {
     });
 
     try {
-      // Create audio player
-      playerRef.current = new AudioPlayer(
-        () => setState(s => ({ ...s, status: 'speaking', statusText: 'বলছে...' })),
-        () => {
-          if (isActiveRef.current) {
-            setState(s => ({ ...s, status: 'listening', statusText: 'কথা বলুন...' }));
-          }
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
+      streamerRef.current = new AudioStreamer(audioContextRef.current);
+      streamerRef.current.onComplete = () => {
+        if (isActiveRef.current) {
+          setState(s => ({ ...s, status: 'listening', statusText: 'শুনছি...' }));
         }
-      );
-      await playerRef.current.resume();
+      };
+      await streamerRef.current.resume();
 
-      // Voice: Puck (male-ish), Kore (female)
-      const voiceName = agentNumber === 1 ? 'Puck' : 'Kore';
-      const systemPrompt = getSystemPrompt(agentNumber);
+      recorderRef.current = new AudioRecorder(16000);
+      recorderRef.current.on('data', (base64Audio: string) => {
+        if (sessionRef.current && isActiveRef.current) {
+          try {
+            sessionRef.current.sendRealtimeInput({
+              media: { mimeType: 'audio/pcm;rate=16000', data: base64Audio }
+            });
+          } catch (e) {}
+        }
+      });
+      recorderRef.current.on('volume', (volume: number) => {
+        setState(s => ({ ...s, volume }));
+      });
 
-      log('Connecting to Gemini Live API...');
-      log('Model:', LIVE_MODEL);
-      log('Voice:', voiceName);
+      // Puck = more neutral/male, Kore = more feminine
+      const voiceName = gender === 'male' ? 'Puck' : 'Kore';
+      const systemPrompt = getSystemPrompt(gender === 'male');
+
+      log('Connecting...', { voice: voiceName });
 
       const session = await aiRef.current.live.connect({
         model: LIVE_MODEL,
@@ -381,40 +231,23 @@ export const HomeVoiceSection: React.FC = () => {
           responseModalities: [Modality.AUDIO],
           systemInstruction: systemPrompt,
           speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName },
-            },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName } },
           },
         },
         callbacks: {
-          onopen: () => {
-            log('Session connected!');
-            setState(s => ({ ...s, status: 'listening', statusText: 'কথা বলুন...' }));
+          onopen: async () => {
+            log('Connected!');
+            setState(s => ({ ...s, status: 'listening', statusText: 'সংযুক্ত' }));
 
-            // Start recording and sending audio
-            recorderRef.current = new AudioRecorder();
-            recorderRef.current.start(
-              (base64Audio) => {
-                if (sessionRef.current && isActiveRef.current) {
-                  try {
-                    sessionRef.current.sendRealtimeInput({
-                      media: {
-                        mimeType: `audio/pcm;rate=${INPUT_SAMPLE_RATE}`,
-                        data: base64Audio,
-                      }
-                    });
-                  } catch (e) {
-                    logError('Send audio error:', e);
-                  }
-                }
-              },
-              (volume) => setState(s => ({ ...s, volume }))
-            );
+            try {
+              await recorderRef.current?.start();
+            } catch (e) {
+              setState(s => ({ ...s, error: 'মাইক পারমিশন দিন', status: 'error' }));
+              return;
+            }
 
-            // Trigger AI to speak first
             setTimeout(() => {
               if (sessionRef.current && isActiveRef.current) {
-                log('Triggering initial greeting...');
                 sessionRef.current.sendClientContent({
                   turns: [{ role: 'user', parts: [{ text: 'হ্যালো' }] }],
                   turnComplete: true,
@@ -424,218 +257,207 @@ export const HomeVoiceSection: React.FC = () => {
           },
 
           onmessage: (msg: LiveServerMessage) => {
-            // Handle audio data
+            if (!isActiveRef.current) return;
+
             const parts = msg.serverContent?.modelTurn?.parts;
             if (parts) {
               for (const part of parts) {
-                if (part.inlineData?.data && part.inlineData?.mimeType?.includes('audio')) {
-                  log('Received audio chunk:', part.inlineData.data.length, 'bytes base64');
-                  
-                  try {
-                    const float32Audio = audioFloat32FromPCM16Base64(part.inlineData.data);
-                    log('Decoded to:', float32Audio.length, 'samples');
-                    playerRef.current?.play(float32Audio);
-                  } catch (e) {
-                    logError('Audio decode error:', e);
-                  }
-                }
-
-                if (part.text) {
-                  log('Received text:', part.text);
+                if (part.inlineData?.data && part.inlineData.data.length > 0) {
+                  setState(s => ({ ...s, status: 'speaking', statusText: 'বলছে...' }));
+                  const audioData = base64ToUint8Array(part.inlineData.data);
+                  streamerRef.current?.addPCM16(audioData);
                 }
               }
             }
 
-            // Handle turn complete
-            if (msg.serverContent?.turnComplete) {
-              log('Turn complete');
-            }
-
-            // Handle interruption
             if (msg.serverContent?.interrupted) {
-              log('Interrupted');
-              playerRef.current?.stop();
+              streamerRef.current?.stop();
+              setState(s => ({ ...s, status: 'listening', statusText: 'শুনছি...' }));
             }
           },
 
           onclose: () => {
-            log('Session closed');
-            cleanup();
+            if (isActiveRef.current) cleanup();
           },
 
-          onerror: (e: ErrorEvent) => {
-            logError('Session error:', e);
-            setState(s => ({ 
-              ...s, 
-              error: 'সংযোগে সমস্যা হয়েছে', 
-              status: 'error',
-              statusText: 'ত্রুটি' 
-            }));
+          onerror: () => {
+            setState(s => ({ ...s, error: 'সংযোগ সমস্যা', status: 'error' }));
             cleanup();
           },
         },
       });
 
       sessionRef.current = session;
-      log('Session created successfully');
 
     } catch (err: any) {
-      logError('Failed to start session:', err);
-      setState(s => ({
-        ...s,
-        error: err.message?.includes('NotAllowed') 
-          ? 'মাইক্রোফোন পারমিশন দিন' 
-          : `ত্রুটি: ${err.message || 'Unknown error'}`,
-        status: 'error',
-        statusText: 'ত্রুটি',
-      }));
+      logError('Error:', err);
+      setState(s => ({ ...s, error: 'শুরু করা যাচ্ছে না', status: 'error' }));
       cleanup();
     }
   };
 
-  // Render volume bars
-  const VolumeBars: React.FC<{ active: boolean; speaking: boolean }> = ({ active, speaking }) => (
-    <div className="h-12 bg-slate-50 rounded-xl flex items-center justify-center gap-1 px-4">
-      {[...Array(6)].map((_, i) => {
-        const height = active 
-          ? speaking 
-            ? `${20 + Math.random() * 80}%`
-            : `${15 + state.volume * 85 * Math.random()}%`
-          : '15%';
-        return (
-          <div
-            key={i}
-            className={`w-1 rounded-full transition-all duration-75 ${
-              active ? (speaking ? 'bg-blue-500' : 'bg-green-500') : 'bg-slate-300'
-            }`}
-            style={{ height }}
-          />
-        );
-      })}
-    </div>
-  );
-
-  // Render agent card
-  const AgentCard: React.FC<{ num: 1 | 2 }> = ({ num }) => {
-    const isActive = state.activeAgent === num;
-    const isOther = state.activeAgent !== null && state.activeAgent !== num;
-    const isSpeaking = isActive && state.status === 'speaking';
-    const isMale = num === 1;
-    const color = isMale ? 'blue' : 'pink';
-
-    return (
-      <div className={`relative bg-white rounded-2xl p-6 border-2 transition-all ${
-        isActive 
-          ? `border-${color}-500 shadow-xl shadow-${color}-500/10`
-          : isOther 
-            ? 'border-slate-100 opacity-50'
-            : `border-slate-200 hover:border-${color}-300 hover:shadow-lg`
-      }`}>
-        {isActive && (
-          <div className="absolute top-3 right-3">
-            <span className="flex h-3 w-3">
-              <span className="animate-ping absolute h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative rounded-full h-3 w-3 bg-green-500" />
-            </span>
-          </div>
-        )}
-
-        <div className="w-20 h-20 mx-auto mb-4 relative">
-          <div className={`absolute inset-0 rounded-full ${isMale ? 'bg-blue-100' : 'bg-pink-100'}`} />
-          <div className="absolute inset-1 bg-white rounded-full flex items-center justify-center">
-            <i className={`fas ${isMale ? 'fa-user-tie' : 'fa-user'} text-3xl ${isMale ? 'text-blue-500' : 'text-pink-500'}`} />
-          </div>
-          {isSpeaking && (
-            <div className={`absolute inset-0 rounded-full border-2 ${isMale ? 'border-blue-400' : 'border-pink-400'} animate-ping opacity-30`} />
-          )}
-        </div>
-
-        <h3 className="text-lg font-bold text-slate-800 text-center mb-1">Nirnoy {num}</h3>
-        <p className={`text-sm text-center mb-1 ${isMale ? 'text-blue-500' : 'text-pink-500'}`}>
-          {isMale ? '🎙️ পুরুষ কণ্ঠ' : '🎙️ মহিলা কণ্ঠ'}
-        </p>
-        <p className="text-xs text-slate-500 text-center mb-6">AI স্বাস্থ্য সহায়ক</p>
-
-        {isActive ? (
-          <div className="space-y-4">
-            <VolumeBars active speaking={isSpeaking} />
-            <p className={`text-center text-sm font-medium animate-pulse ${isMale ? 'text-blue-600' : 'text-pink-600'}`}>
-              <i className={`${isSpeaking ? 'fas fa-volume-up' : 'fas fa-microphone'} mr-2`} />
-              {state.statusText}
-            </p>
-            <button
-              onClick={cleanup}
-              className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-medium hover:bg-red-100 transition flex items-center justify-center gap-2"
-            >
-              <i className="fas fa-phone-slash" /> শেষ করুন
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => startSession(num)}
-            disabled={isOther}
-            className={`w-full py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
-              isMale
-                ? 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300'
-                : 'bg-pink-500 text-white hover:bg-pink-600 disabled:bg-pink-300'
-            } disabled:cursor-not-allowed`}
-          >
-            <i className="fas fa-phone" /> কথা বলুন
-          </button>
-        )}
-      </div>
-    );
-  };
+  const stats = getRealStats();
 
   return (
-    <section className="py-20 px-4 bg-white">
-      <div className="max-w-4xl mx-auto">
+    <section className="py-20 px-6 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-5xl mx-auto relative z-10">
+        {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full mb-4">
-            <i className="fas fa-phone-volume text-blue-500" />
-            <span className="text-sm font-bold text-blue-600">24/7 • বিনামূল্যে</span>
+          <div className="inline-flex items-center gap-3 px-5 py-2 bg-white/10 backdrop-blur-sm border border-white/10 rounded-full mb-6">
+            <div className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse"></div>
+            <span className="text-sm font-semibold text-white">২৪/৭ চালু • বিনামূল্যে</span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-            কথা বলে অ্যাপয়েন্টমেন্ট নিন
+          
+          <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
+            Nree এর সাথে কথা বলুন
           </h2>
-          <p className="text-slate-600 max-w-xl mx-auto">
-            বাংলায় কথা বলুন AI এজেন্টের সাথে। ডাক্তার খুঁজুন, অ্যাপয়েন্টমেন্ট বুক করুন।
+          <p className="text-slate-400 max-w-lg mx-auto">
+            নির্ণয়ের AI সহকারী। ডাক্তার খুঁজুন, অ্যাপয়েন্টমেন্ট নিন, যেকোনো প্রশ্ন করুন — সব বাংলায়।
           </p>
         </div>
 
+        {/* Stats bar */}
+        <div className="flex items-center justify-center gap-8 mb-10 text-center">
+          <div>
+            <p className="text-2xl font-black text-white">{stats.totalDoctors}+</p>
+            <p className="text-xs text-slate-500">ডাক্তার</p>
+          </div>
+          <div className="w-px h-8 bg-slate-700"></div>
+          <div>
+            <p className="text-2xl font-black text-white">{stats.totalSpecialties}+</p>
+            <p className="text-xs text-slate-500">বিশেষত্ব</p>
+          </div>
+          <div className="w-px h-8 bg-slate-700"></div>
+          <div>
+            <p className="text-2xl font-black text-white">24/7</p>
+            <p className="text-xs text-slate-500">সার্ভিস</p>
+          </div>
+        </div>
+
+        {/* Error */}
         {state.error && (
-          <div className="max-w-md mx-auto mb-8 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm flex items-center justify-center gap-2">
-            <i className="fas fa-exclamation-circle" /> {state.error}
+          <div className="max-w-md mx-auto mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm text-center backdrop-blur-sm">
+            <i className="fas fa-exclamation-circle mr-2"></i>{state.error}
           </div>
         )}
 
         {!hasValidApiKey && (
-          <div className="max-w-md mx-auto mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
-            <p className="font-bold mb-1">
-              <i className="fas fa-exclamation-triangle mr-2" />API Key প্রয়োজন
-            </p>
-            <p className="text-xs">
-              <code className="bg-amber-100 px-1 rounded">.env</code> ফাইলে{' '}
-              <code className="bg-amber-100 px-1 rounded">VITE_GEMINI_API_KEY</code> সেট করুন।
-            </p>
+          <div className="max-w-md mx-auto mb-6 p-4 bg-amber-500/20 border border-amber-500/30 rounded-xl text-amber-300 text-sm text-center backdrop-blur-sm">
+            <i className="fas fa-exclamation-triangle mr-2"></i>API Key প্রয়োজন
           </div>
         )}
 
+        {/* Agent Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-          <AgentCard num={1} />
-          <AgentCard num={2} />
+          {(['male', 'female'] as const).map((gender) => {
+            const isActive = state.activeAgent === gender;
+            const isOther = state.activeAgent !== null && state.activeAgent !== gender;
+            const isSpeaking = isActive && state.status === 'speaking';
+            const isMale = gender === 'male';
+
+            return (
+              <div
+                key={gender}
+                className={`relative rounded-2xl p-6 transition-all duration-300 ${
+                  isActive 
+                    ? 'bg-white shadow-2xl shadow-blue-500/20' 
+                    : isOther 
+                      ? 'bg-white/5 opacity-40 pointer-events-none border border-white/5'
+                      : 'bg-white/10 backdrop-blur-sm border border-white/10 hover:bg-white/15 hover:border-white/20'
+                }`}
+              >
+                {isActive && (
+                  <div className="absolute top-4 right-4">
+                    <span className="flex h-3 w-3">
+                      <span className="animate-ping absolute h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 mb-5">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                    isActive 
+                      ? isMale ? 'bg-blue-500' : 'bg-pink-500'
+                      : isMale ? 'bg-blue-500/20' : 'bg-pink-500/20'
+                  }`}>
+                    <i className={`fas ${isMale ? 'fa-mars' : 'fa-venus'} text-xl ${
+                      isActive ? 'text-white' : isMale ? 'text-blue-400' : 'text-pink-400'
+                    }`}></i>
+                  </div>
+                  <div>
+                    <h3 className={`font-bold text-lg ${isActive ? 'text-slate-900' : 'text-white'}`}>
+                      Nree
+                    </h3>
+                    <p className={`text-sm ${isActive ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {isMale ? 'পুরুষ কণ্ঠ' : 'মহিলা কণ্ঠ'}
+                    </p>
+                  </div>
+                </div>
+
+                {isActive ? (
+                  <div className="space-y-4">
+                    {/* Visualizer */}
+                    <div className="h-14 bg-slate-100 rounded-xl flex items-center justify-center gap-1 px-4">
+                      {[...Array(10)].map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-1.5 rounded-full transition-all duration-75 ${
+                            isSpeaking ? 'bg-blue-500' : 'bg-green-500'
+                          }`}
+                          style={{ 
+                            height: isSpeaking 
+                              ? `${20 + Math.random() * 80}%` 
+                              : `${Math.max(15, state.volume * 100)}%` 
+                          }}
+                        />
+                      ))}
+                    </div>
+                    
+                    <p className="text-center text-sm font-medium text-slate-600">
+                      <i className={`${isSpeaking ? 'fas fa-volume-up' : 'fas fa-microphone'} mr-2`}></i>
+                      {state.statusText}
+                    </p>
+                    
+                    <button
+                      onClick={handleEndCall}
+                      className="w-full py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 active:bg-red-700 transition flex items-center justify-center gap-2"
+                    >
+                      <i className="fas fa-phone-slash"></i>
+                      কল শেষ করুন
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => startSession(gender)}
+                    disabled={isOther || !hasValidApiKey}
+                    className={`w-full py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-2 ${
+                      isMale
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-pink-500 text-white hover:bg-pink-600'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    <i className="fas fa-phone"></i>
+                    কথা বলুন
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-slate-500">
-            <i className="fas fa-info-circle mr-2" />
-            Nirnoy 1 পুরুষ কণ্ঠে, Nirnoy 2 মহিলা কণ্ঠে কথা বলে।
+        {/* Footer */}
+        <div className="mt-10 text-center">
+          <p className="text-slate-500 text-sm">
+            <i className="fas fa-shield-alt mr-2"></i>
+            নিরাপদ ও গোপনীয় • Powered by Gemini AI
           </p>
-        </div>
-
-        <div className="mt-6 flex items-center justify-center gap-2 text-slate-400 text-xs">
-          <i className="fas fa-lock" />
-          <span>Powered by Gemini AI</span>
         </div>
       </div>
     </section>
