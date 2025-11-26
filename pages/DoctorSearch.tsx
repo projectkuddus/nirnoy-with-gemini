@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MOCK_DOCTORS } from '../data/mockData';
 import { useLanguage } from '../contexts/LanguageContext';
+import LanguageToggle from '../components/LanguageToggle';
 
 // Extract unique values
 const ALL_SPECIALTIES = [...new Set(MOCK_DOCTORS.flatMap(d => d.specialties))].sort();
@@ -112,9 +113,33 @@ export const DoctorSearch: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Header with Language Toggle */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/')} className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <span className="text-white font-black text-lg">ন</span>
+              </div>
+              <div className="leading-tight">
+                <span className="font-black text-slate-900 text-lg tracking-tight">Nirnoy</span>
+                <span className="text-[10px] text-blue-600 font-semibold block -mt-0.5 tracking-widest uppercase">Health Synchronized</span>
+              </div>
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <LanguageToggle />
+            <button onClick={() => navigate('/patient-auth')} className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-bold rounded-xl hover:from-blue-600 hover:to-indigo-600 transition shadow-lg shadow-blue-500/25">
+              {isBn ? 'শুরু করুন' : 'Get Started'}
+            </button>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Search Section */}
-      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white pt-24 pb-12 px-6">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-black mb-3">
               {isBn ? 'আপনার ডাক্তার খুঁজুন' : 'Find Your Doctor'}
@@ -208,10 +233,10 @@ export const DoctorSearch: React.FC = () => {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           
-          {/* Sidebar Filters */}
+          {/* Sidebar Filters - FIXED SCROLLING */}
           <aside className="lg:w-72 flex-shrink-0">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm sticky top-40 overflow-hidden">
-              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                   <i className="fas fa-sliders-h text-blue-500"></i>
                   {isBn ? 'ফিল্টার' : 'Filters'}
@@ -223,7 +248,8 @@ export const DoctorSearch: React.FC = () => {
                 )}
               </div>
 
-              <div className="p-4 space-y-6">
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {/* Gender */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
@@ -279,12 +305,12 @@ export const DoctorSearch: React.FC = () => {
                   </div>
                 </div>
 
-                {/* All Specialties */}
+                {/* All Specialties - Now properly scrollable */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
                     {isBn ? 'সব বিশেষত্ব' : 'All Specialties'}
                   </label>
-                  <div className="max-h-64 overflow-y-auto space-y-1 pr-2">
+                  <div className="space-y-1">
                     {ALL_SPECIALTIES.map(spec => {
                       const meta = getSpecialtyMeta(spec);
                       const isActive = selectedSpecialty === spec;
@@ -418,7 +444,7 @@ export const DoctorSearch: React.FC = () => {
                             e.stopPropagation();
                             navigate(`/doctors/${doctor.id}`);
                           }}
-                          className="px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/20"
+                          className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-bold rounded-xl hover:from-blue-600 hover:to-indigo-600 transition shadow-lg shadow-blue-500/20"
                         >
                           {isBn ? 'বুক করুন' : 'Book'}
                         </button>
@@ -454,7 +480,7 @@ export const DoctorSearch: React.FC = () => {
                 </p>
                 <button
                   onClick={clearFilters}
-                  className="px-6 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
+                  className="px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-600 transition shadow-lg"
                 >
                   {isBn ? 'ফিল্টার রিসেট করুন' : 'Reset Filters'}
                 </button>

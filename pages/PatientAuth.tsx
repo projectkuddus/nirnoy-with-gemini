@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import LanguageToggle from '../components/LanguageToggle';
 
 type AuthStep = 'phone' | 'otp' | 'register' | 'success';
 
@@ -181,22 +182,36 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-emerald-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex flex-col">
       {/* Header */}
-      <div className="p-4">
-        <button onClick={() => navigate('/')} className="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition">
-          <i className="fas fa-arrow-left"></i>
-          <span className="text-sm font-medium">{t.back}</span>
-        </button>
-      </div>
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <button onClick={() => navigate('/')} className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <span className="text-white font-black text-lg">ন</span>
+            </div>
+            <div className="leading-tight">
+              <span className="font-black text-slate-900 text-lg tracking-tight">Nirnoy</span>
+              <span className="text-[10px] text-blue-600 font-semibold block -mt-0.5 tracking-widest uppercase">Health Synchronized</span>
+            </div>
+          </button>
+          
+          <div className="flex items-center gap-3">
+            <LanguageToggle />
+            <button onClick={() => navigate('/')} className="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition">
+              {isBn ? 'হোম' : 'Home'}
+            </button>
+          </div>
+        </div>
+      </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex items-center justify-center p-4 pt-24">
         <div className="w-full max-w-md">
           {/* Logo & Title */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <span className="text-white text-3xl font-bold">ন</span>
+            <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-teal-500/30">
+              <span className="text-white text-3xl font-black">ন</span>
             </div>
             <h1 className="text-2xl font-bold text-slate-800">{t.title}</h1>
             <p className="text-slate-500">{t.subtitle}</p>
