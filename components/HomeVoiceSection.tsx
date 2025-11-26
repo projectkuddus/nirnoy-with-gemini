@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality, Blob } from '@google/genai';
 import { useNavigate } from 'react-router-dom';
@@ -55,25 +54,38 @@ async function decodeAudioData(
   return buffer;
 }
 
+// --- Get Time-Based Greeting ---
+function getTimeBasedGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'সুপ্রভাত';
+  if (hour >= 12 && hour < 17) return 'শুভ দুপুর';
+  if (hour >= 17 && hour < 20) return 'শুভ সন্ধ্যা';
+  return 'শুভ রাত্রি';
+}
+
 // --- Build comprehensive Bangladeshi Bangla system prompt ---
 function buildSystemPrompt(
   agentNameBn: string,
   agentNameEn: string,
   isLoggedIn: boolean,
   today: string,
-  doctorList: string
+  doctorList: string,
+  greeting: string
 ): string {
   return `
 ## আপনার পরিচয় (Identity)
 আপনি "${agentNameBn}" (${agentNameEn}), "নির্ণয় কেয়ার" (Nirnoy Care) এর অফিসিয়াল AI ভয়েস এসিস্ট্যান্ট।
 
 ## ভাষা নির্দেশনা (CRITICAL - MUST FOLLOW)
-আপনাকে অবশ্যই **বাংলাদেশী বাংলা** তে কথা বলতে হবে। কলকাতার বাংলা বা পশ্চিমবঙ্গের স্টাইল একদম চলবে না।
+আপনাকে অবশ্যই **খাঁটি বাংলাদেশী বাংলা** তে কথা বলতে হবে। কলকাতার বাংলা বা পশ্চিমবঙ্গের স্টাইল একদম চলবে না।
+
+### সালাম ও অভিবাদন (GREETING - MUST START WITH):
+কল শুরু করতেই প্রথমে বলুন: "আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। আমি ${agentNameBn}। কীভাবে সাহায্য করতে পারি?"
 
 ### যা বলবেন (Bangladeshi Style):
 - "জি" (Ji) - হ্যাঁ বোঝাতে
 - "আপনি" - সম্মানসূচক
-- "ভাই/ভাইয়া" বা "আপা" - সম্বোধনে
+- "ভাই/ভাইয়া" বা "আপা" - সম্বোধনে (যথাযথ হলে)
 - "কেমন আছেন?" - হালচাল জিজ্ঞেস করতে
 - "আচ্ছা" - বোঝা গেছে বোঝাতে
 - "ঠিক আছে" - okay বোঝাতে
@@ -110,12 +122,13 @@ function buildSystemPrompt(
 ## ডাক্তার ডাটাবেজ (Available Doctors):
 ${doctorList}
 
-## আপনার ক্ষমতা (Capabilities):
-1. **তথ্য দেওয়া**: নির্ণয় কেয়ার সম্পর্কে - আমরা ডাক্তার অ্যাপয়েন্টমেন্ট সহজ করি, হেলথ রেকর্ড ম্যানেজ করি, waiting time কমাই।
+## আপনার ক্ষমতা (Capabilities - Both Yunus and Arisha have EQUAL capabilities):
+1. **নির্ণয় সম্পর্কে তথ্য**: আমরা ডাক্তার অ্যাপয়েন্টমেন্ট সহজ করি, হেলথ রেকর্ড ম্যানেজ করি, waiting time কমাই।
 2. **ডাক্তার খোঁজা**: স্পেশালিটি বা নাম দিয়ে ডাক্তার খুঁজে দেওয়া।
-3. **বুকিং করা**: ${isLoggedIn ? 'ইউজার লগইন আছে, বুকিং করতে পারবেন।' : 'গেস্ট ইউজার - শুধু তথ্য দিতে পারবেন, বুকিং করতে লগইন লাগবে।'}
-4. **সিরিয়াল/কিউ তথ্য**: লাইভ কিউ স্ট্যাটাস জানানো।
+3. **অ্যাপয়েন্টমেন্ট বুকিং**: ${isLoggedIn ? 'ইউজার লগইন আছে, সরাসরি বুকিং করতে পারবেন।' : 'গেস্ট ইউজার - OTP দিয়ে ভেরিফাই করে বুকিং করতে পারবেন।'}
+4. **লাইভ কিউ তথ্য**: সিরিয়াল ও ওয়েটিং টাইম জানানো।
 5. **ফি ও সময়সূচী**: ডাক্তারের ফি, চেম্বারের সময় জানানো।
+6. **প্রাথমিক স্বাস্থ্য তথ্য**: সাধারণ প্রশ্নের উত্তর দেওয়া (কিন্তু ডায়াগনোসিস না)।
 
 ## বুকিং প্রসেস (Booking Flow):
 ${isLoggedIn ? `
@@ -127,13 +140,16 @@ ${isLoggedIn ? `
 5. কনফার্ম করুন: "ঠিক আছে, [ডাক্তারের নাম] এর কাছে [তারিখ] এ অ্যাপয়েন্টমেন্ট বুক করে দিচ্ছি। ফি হবে [amount] টাকা।"
 6. শেষে: "আপনার সিরিয়াল নম্বর হইছে [number]। ধন্যবাদ!"
 ` : `
-### গেস্ট ইউজারের জন্য:
-- বুকিং করতে চাইলে বলুন: "ভাই/আপা, বুকিং করতে হলে আগে লগইন করতে হবে। ওয়েবসাইটে গিয়ে সাইন আপ করে নেন, তারপর আবার কল দেন।"
-- তথ্য দিতে পারবেন, কিন্তু বুকিং করতে পারবেন না।
+### গেস্ট ইউজারের জন্য (OTP দিয়ে বুকিং):
+1. প্রথমে বলুন: "বুকিং করতে আপনার মোবাইল নম্বর দরকার হবে।"
+2. মোবাইল নম্বর নিন: "আপনার মোবাইল নম্বরটা বলেন প্লিজ?"
+3. নম্বর পেলে বলুন: "ঠিক আছে, আপনার নম্বরে একটা OTP পাঠাচ্ছি। কয়েক সেকেন্ড অপেক্ষা করুন।"
+4. OTP ভেরিফাই করুন: "OTP টা বলেন প্লিজ?"
+5. ভেরিফাই হলে বুকিং করুন এবং বলুন: "অ্যাকাউন্ট তৈরি হয়ে গেছে! এখন বুকিং করে দিচ্ছি।"
 `}
 
 ## নিয়মাবলী (Rules):
-1. **সালাম দিয়ে শুরু**: "আসসালামু আলাইকুম! নির্ণয় কেয়ারে স্বাগতম। আমি ${agentNameBn}। কীভাবে সাহায্য করতে পারি?"
+1. **সালাম দিয়ে শুরু**: কল শুরু হলেই "আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। আমি ${agentNameBn}। কীভাবে সাহায্য করতে পারি?"
 2. **ছোট উত্তর**: ১-২ বাক্যে উত্তর দিন, যাতে স্বাভাবিক কথোপকথন হয়।
 3. **বুঝতে না পারলে**: "একটু আবার বলবেন প্লিজ?" বা "সরি, ঠিক বুঝতে পারলাম না।"
 4. **ইমার্জেন্সি**: বুকে ব্যথা, শ্বাসকষ্ট, বা জরুরি অবস্থা বললে - "এটা ইমার্জেন্সি মনে হচ্ছে! এখনই নিকটস্থ হাসপাতালে যান বা 999 এ কল করুন।"
@@ -148,6 +164,9 @@ You: "জি, আমাদের কাছে কয়েকজন ভালো
 
 User: "ফি কত?"
 You: "কোন ডাক্তারের ফি জানতে চাচ্ছেন? নাম বা স্পেশালিটি বলেন।"
+
+User: "নির্ণয় কী?"
+You: "নির্ণয় হলো বাংলাদেশের জন্য তৈরি একটা হেলথকেয়ার প্ল্যাটফর্ম। এখানে আপনি সেরা ডাক্তারদের খুঁজে পাবেন, অ্যাপয়েন্টমেন্ট বুক করতে পারবেন, আর আপনার সব হেলথ রেকর্ড এক জায়গায় রাখতে পারবেন।"
 `;
 }
 
@@ -226,7 +245,7 @@ export const HomeVoiceSection: React.FC = () => {
       cleanup();
       setError(null);
       setActiveAgent(agentType);
-      setStatus("Connecting...");
+      setStatus("কানেক্ট হচ্ছে...");
 
       // 2. Initialize Audio Contexts (Must be after user gesture)
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -249,20 +268,22 @@ export const HomeVoiceSection: React.FC = () => {
       // 4. Prepare Context Data
       const isLoggedIn = !!localStorage.getItem('nirnoy_role');
       const today = new Date().toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const greeting = getTimeBasedGreeting();
       
       // Simplified doctor list for prompt context
       const doctorList = MOCK_DOCTORS.slice(0, 15).map(d => 
         `${d.name} (${d.specialties[0]}) at ${d.chambers[0]?.name}, Fee: ৳${d.chambers[0]?.fee}`
       ).join('; ');
 
+      // BOTH agents have same voice quality, just different names
       const voiceName = agentType === 'male' ? 'Fenrir' : 'Kore'; // Fenrir = Deep/Male, Kore = Clear/Female
       const agentNameBn = agentType === 'male' ? 'ইউনুস' : 'আরিশা';
       const agentNameEn = agentType === 'male' ? 'Yunus' : 'Arisha';
 
-      setStatus("Connecting to AI...");
+      setStatus("AI সাথে কানেক্ট হচ্ছে...");
 
       // Build system prompt with proper Bangladeshi Bangla instructions
-      const systemPrompt = buildSystemPrompt(agentNameBn, agentNameEn, isLoggedIn, today, doctorList);
+      const systemPrompt = buildSystemPrompt(agentNameBn, agentNameEn, isLoggedIn, today, doctorList, greeting);
 
       // 5. Connect to Gemini Live
       const sessionPromise = aiRef.current.live.connect({
@@ -361,12 +382,12 @@ export const HomeVoiceSection: React.FC = () => {
              }
           },
           onclose: () => {
-            setStatus("Disconnected");
+            setStatus("সংযোগ বিচ্ছিন্ন");
             cleanup();
           },
           onerror: (e) => {
             console.error("Gemini Live Error:", e);
-            setError("Connection interrupted. Please try again.");
+            setError("সংযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
             setStatus("Error");
             cleanup();
           }
@@ -378,166 +399,197 @@ export const HomeVoiceSection: React.FC = () => {
       // Handle connection errors immediately
       sessionPromise.catch(err => {
           console.error("Connection Failed:", err);
-          setError("Failed to connect to Voice Service. Network or API error.");
+          setError("ভয়েস সার্ভিসে কানেক্ট করা যাচ্ছে না।");
           cleanup();
       });
 
     } catch (err) {
       console.error("Session Start Error:", err);
-      setError("Could not access microphone. Please check permissions.");
+      setError("মাইক্রোফোন এক্সেস করা যাচ্ছে না। পারমিশন চেক করুন।");
       cleanup();
     }
   };
 
   return (
-    <section className="py-20 bg-gradient-to-b from-white to-teal-50/30 border-t border-slate-100 relative overflow-hidden">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-         <div className="absolute top-10 left-10 w-64 h-64 bg-blue-400/5 rounded-full blur-3xl"></div>
-         <div className="absolute bottom-10 right-10 w-64 h-64 bg-teal-400/5 rounded-full blur-3xl"></div>
+    <section className="py-20 bg-[#0a0a0f] relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-teal-500/5 rounded-full blur-[100px]"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-[100px]"></div>
       </div>
 
-      <div className="container mx-auto px-4 text-center relative z-10">
-        <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 text-red-600 text-xs font-bold uppercase tracking-wider mb-4 animate-pulse">
-            <div className="w-2 h-2 bg-red-500 rounded-full"></div> Live Beta
+      <div className="container mx-auto px-4 relative z-10">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500/10 to-purple-500/10 border border-white/10 rounded-full mb-6">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-white/80">Live Voice AI</span>
           </div>
-          <h2 className="text-4xl font-bold text-slate-800 mb-4">বাংলায় কথা বলুন</h2>
-          <p className="text-slate-500 max-w-xl mx-auto text-lg">
-            আমাদের AI এসিস্ট্যান্টের সাথে <strong>বাংলায়</strong> কথা বলুন। ডাক্তার খুঁজুন, অ্যাপয়েন্টমেন্ট বুক করুন, প্রশ্ন করুন।
+          <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">বাংলায় কথা বলুন</h2>
+          <p className="text-slate-400 max-w-xl mx-auto text-lg">
+            ইউনুস বা আরিশার সাথে কথা বলুন। দুজনেই সমান - শুধু গলার স্বর আলাদা।
           </p>
         </div>
 
         {error && (
-          <div className="max-w-md mx-auto mb-8 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center justify-center gap-2 animate-fade-in">
+          <div className="max-w-md mx-auto mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center justify-center gap-2">
              <i className="fas fa-exclamation-circle"></i> {error}
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        {/* Voice Agents Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           
-          {/* --- Yunus (Male) Card --- */}
-          <div className={`relative bg-white rounded-3xl p-8 shadow-xl border-2 transition-all duration-500 ${activeAgent === 'male' ? 'border-teal-500 ring-4 ring-teal-500/10 scale-105 z-10' : 'border-slate-100 hover:border-teal-200'}`}>
-             <div className="absolute top-4 right-4">
-                {activeAgent === 'male' && (
-                    <span className="flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                )}
-             </div>
+          {/* Yunus (Male) Card */}
+          <div className={`relative bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 border-2 transition-all duration-500 ${
+            activeAgent === 'male' 
+              ? 'border-teal-500 shadow-2xl shadow-teal-500/20 scale-105' 
+              : activeAgent === 'female' 
+                ? 'border-slate-700/50 opacity-50' 
+                : 'border-slate-700/50 hover:border-teal-500/50'
+          }`}>
+            {/* Active Indicator */}
+            {activeAgent === 'male' && (
+              <div className="absolute top-4 right-4">
+                <span className="flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                </span>
+              </div>
+            )}
+            
+            {/* Avatar */}
+            <div className="w-28 h-28 mx-auto mb-6 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-teal-500/20 to-cyan-500/10 rounded-full"></div>
+              <div className="absolute inset-1 bg-slate-800 rounded-full flex items-center justify-center">
+                <i className="fas fa-user text-5xl text-teal-400/80"></i>
+              </div>
+              {activeAgent === 'male' && isAgentSpeaking && (
+                <div className="absolute inset-0 rounded-full border-2 border-teal-400 animate-ping opacity-30"></div>
+              )}
+            </div>
              
-             <div className="w-28 h-28 mx-auto bg-gradient-to-br from-blue-50 to-teal-50 rounded-full flex items-center justify-center mb-6 border-4 border-white shadow-lg relative">
-                <i className="fas fa-user-tie text-5xl text-teal-700"></i>
-                {activeAgent === 'male' && isAgentSpeaking && (
-                    <div className="absolute inset-0 rounded-full border-2 border-teal-500 animate-ping opacity-20"></div>
-                )}
-             </div>
-             
-             <h3 className="text-2xl font-bold text-slate-800">ইউনুস</h3>
-             <p className="text-slate-400 text-sm mb-8 font-medium">পুরুষ • বুকিং ও সাপোর্ট</p>
+            <h3 className="text-2xl font-bold text-white text-center">ইউনুস</h3>
+            <p className="text-slate-500 text-sm text-center mb-8">Yunus • AI Assistant</p>
 
-             {activeAgent === 'male' ? (
-                <div className="space-y-6">
-                   {/* Audio Visualizer */}
-                   <div className="h-16 bg-slate-50 rounded-2xl flex items-center justify-center gap-1.5 border border-slate-100 overflow-hidden px-4">
-                      {[...Array(8)].map((_, i) => (
-                        <div 
-                           key={i} 
-                           className={`w-1.5 rounded-full transition-all duration-75 ${isAgentSpeaking ? 'bg-teal-500' : 'bg-slate-300'}`} 
-                           style={{ 
-                               height: isAgentSpeaking 
-                                  ? `${Math.max(20, Math.random() * 50)}%` 
-                                  : `${Math.max(15, volume * Math.random() * 100)}%` 
-                           }}
-                        ></div>
-                      ))}
-                   </div>
-                   
-                   <div className="flex items-center justify-center gap-2 text-teal-600 font-bold animate-pulse">
-                      <i className={isAgentSpeaking ? "fas fa-volume-up" : "fas fa-microphone"}></i>
-                      {status}
-                   </div>
-                   
-                   <button onClick={cleanup} className="w-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 px-8 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2">
-                     <i className="fas fa-phone-slash"></i> কল শেষ করুন
-                   </button>
+            {activeAgent === 'male' ? (
+              <div className="space-y-6">
+                {/* Audio Visualizer */}
+                <div className="h-16 bg-slate-900/50 rounded-2xl flex items-center justify-center gap-1.5 border border-slate-700/50 px-4">
+                  {[...Array(8)].map((_, i) => (
+                    <div 
+                      key={i} 
+                      className={`w-1.5 rounded-full transition-all duration-75 ${isAgentSpeaking ? 'bg-teal-400' : 'bg-slate-600'}`} 
+                      style={{ 
+                        height: isAgentSpeaking 
+                          ? `${Math.max(20, Math.random() * 50)}%` 
+                          : `${Math.max(15, volume * Math.random() * 100)}%` 
+                      }}
+                    ></div>
+                  ))}
                 </div>
-             ) : (
-                <button 
-                  onClick={() => startSession('male')} 
-                  disabled={!!activeAgent}
-                  className="w-full bg-slate-900 text-white hover:bg-teal-600 px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed group"
-                >
-                  <span className="group-hover:hidden"><i className="fas fa-phone mr-2"></i> কানেক্ট করুন</span>
-                  <span className="hidden group-hover:inline"><i className="fas fa-microphone mr-2"></i> বাংলায় কথা বলুন</span>
+                 
+                <div className="flex items-center justify-center gap-2 text-teal-400 font-medium">
+                  <i className={isAgentSpeaking ? "fas fa-volume-up animate-pulse" : "fas fa-microphone animate-pulse"}></i>
+                  {status}
+                </div>
+                 
+                <button onClick={cleanup} className="w-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 px-8 py-3 rounded-xl font-medium transition flex items-center justify-center gap-2">
+                  <i className="fas fa-phone-slash"></i> কল শেষ করুন
                 </button>
-             )}
+              </div>
+            ) : (
+              <button 
+                onClick={() => startSession('male')} 
+                disabled={!!activeAgent}
+                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:shadow-teal-500/30 flex items-center justify-center gap-2"
+              >
+                <i className="fas fa-phone"></i> কথা বলুন
+              </button>
+            )}
           </div>
 
-          {/* --- Arisha (Female) Card --- */}
-          <div className={`relative bg-white rounded-3xl p-8 shadow-xl border-2 transition-all duration-500 ${activeAgent === 'female' ? 'border-purple-500 ring-4 ring-purple-500/10 scale-105 z-10' : 'border-slate-100 hover:border-purple-200'}`}>
-             <div className="absolute top-4 right-4">
-                {activeAgent === 'female' && (
-                    <span className="flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                )}
-             </div>
+          {/* Arisha (Female) Card */}
+          <div className={`relative bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 border-2 transition-all duration-500 ${
+            activeAgent === 'female' 
+              ? 'border-purple-500 shadow-2xl shadow-purple-500/20 scale-105' 
+              : activeAgent === 'male' 
+                ? 'border-slate-700/50 opacity-50' 
+                : 'border-slate-700/50 hover:border-purple-500/50'
+          }`}>
+            {/* Active Indicator */}
+            {activeAgent === 'female' && (
+              <div className="absolute top-4 right-4">
+                <span className="flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                </span>
+              </div>
+            )}
              
-             <div className="w-28 h-28 mx-auto bg-gradient-to-br from-purple-50 to-pink-50 rounded-full flex items-center justify-center mb-6 border-4 border-white shadow-lg relative">
-                <i className="fas fa-user-nurse text-5xl text-purple-700"></i>
-                {activeAgent === 'female' && isAgentSpeaking && (
-                    <div className="absolute inset-0 rounded-full border-2 border-purple-500 animate-ping opacity-20"></div>
-                )}
-             </div>
+            {/* Avatar */}
+            <div className="w-28 h-28 mx-auto mb-6 relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/10 rounded-full"></div>
+              <div className="absolute inset-1 bg-slate-800 rounded-full flex items-center justify-center">
+                <i className="fas fa-user text-5xl text-purple-400/80"></i>
+              </div>
+              {activeAgent === 'female' && isAgentSpeaking && (
+                <div className="absolute inset-0 rounded-full border-2 border-purple-400 animate-ping opacity-30"></div>
+              )}
+            </div>
              
-             <h3 className="text-2xl font-bold text-slate-800">আরিশা</h3>
-             <p className="text-slate-400 text-sm mb-8 font-medium">মহিলা • সাধারণ জিজ্ঞাসা</p>
+            <h3 className="text-2xl font-bold text-white text-center">আরিশা</h3>
+            <p className="text-slate-500 text-sm text-center mb-8">Arisha • AI Assistant</p>
 
-             {activeAgent === 'female' ? (
-                <div className="space-y-6">
-                   {/* Audio Visualizer */}
-                   <div className="h-16 bg-slate-50 rounded-2xl flex items-center justify-center gap-1.5 border border-slate-100 overflow-hidden px-4">
-                      {[...Array(8)].map((_, i) => (
-                        <div 
-                           key={i} 
-                           className={`w-1.5 rounded-full transition-all duration-75 ${isAgentSpeaking ? 'bg-purple-500' : 'bg-slate-300'}`} 
-                           style={{ 
-                               height: isAgentSpeaking 
-                                  ? `${Math.max(20, Math.random() * 50)}%` 
-                                  : `${Math.max(15, volume * Math.random() * 100)}%` 
-                           }}
-                        ></div>
-                      ))}
-                   </div>
-                   
-                   <div className="flex items-center justify-center gap-2 text-purple-600 font-bold animate-pulse">
-                      <i className={isAgentSpeaking ? "fas fa-volume-up" : "fas fa-microphone"}></i>
-                      {status}
-                   </div>
-                   
-                   <button onClick={cleanup} className="w-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 px-8 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2">
-                     <i className="fas fa-phone-slash"></i> কল শেষ করুন
-                   </button>
+            {activeAgent === 'female' ? (
+              <div className="space-y-6">
+                {/* Audio Visualizer */}
+                <div className="h-16 bg-slate-900/50 rounded-2xl flex items-center justify-center gap-1.5 border border-slate-700/50 px-4">
+                  {[...Array(8)].map((_, i) => (
+                    <div 
+                      key={i} 
+                      className={`w-1.5 rounded-full transition-all duration-75 ${isAgentSpeaking ? 'bg-purple-400' : 'bg-slate-600'}`} 
+                      style={{ 
+                        height: isAgentSpeaking 
+                          ? `${Math.max(20, Math.random() * 50)}%` 
+                          : `${Math.max(15, volume * Math.random() * 100)}%` 
+                      }}
+                    ></div>
+                  ))}
                 </div>
-             ) : (
-                <button 
-                  onClick={() => startSession('female')} 
-                  disabled={!!activeAgent}
-                  className="w-full bg-slate-900 text-white hover:bg-purple-600 px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed group"
-                >
-                  <span className="group-hover:hidden"><i className="fas fa-phone mr-2"></i> কানেক্ট করুন</span>
-                  <span className="hidden group-hover:inline"><i className="fas fa-microphone mr-2"></i> বাংলায় কথা বলুন</span>
+                 
+                <div className="flex items-center justify-center gap-2 text-purple-400 font-medium">
+                  <i className={isAgentSpeaking ? "fas fa-volume-up animate-pulse" : "fas fa-microphone animate-pulse"}></i>
+                  {status}
+                </div>
+                 
+                <button onClick={cleanup} className="w-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 px-8 py-3 rounded-xl font-medium transition flex items-center justify-center gap-2">
+                  <i className="fas fa-phone-slash"></i> কল শেষ করুন
                 </button>
-             )}
+              </div>
+            ) : (
+              <button 
+                onClick={() => startSession('female')} 
+                disabled={!!activeAgent}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:shadow-purple-500/30 flex items-center justify-center gap-2"
+              >
+                <i className="fas fa-phone"></i> কথা বলুন
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Equal Capabilities Notice */}
+        <div className="mt-12 text-center">
+          <p className="text-slate-500 text-sm flex items-center justify-center gap-2">
+            <i className="fas fa-info-circle"></i>
+            দুজনের কাজ একই - ডাক্তার খোঁজা, অ্যাপয়েন্টমেন্ট বুকিং, প্রশ্নের উত্তর। শুধু গলার স্বর আলাদা।
+          </p>
+        </div>
         
-        <div className="mt-12 flex items-center justify-center gap-2 text-slate-400 text-xs">
-           <i className="fas fa-lock"></i>
-           <span>নিরাপদ ও গোপনীয় • Powered by Gemini Live</span>
+        <div className="mt-8 flex items-center justify-center gap-2 text-slate-600 text-xs">
+          <i className="fas fa-lock"></i>
+          <span>নিরাপদ ও গোপনীয় • Powered by Gemini Live</span>
         </div>
       </div>
     </section>

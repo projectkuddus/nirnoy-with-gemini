@@ -1,366 +1,492 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HomeVoiceSection } from '../components/HomeVoiceSection';
 import { useLanguage } from '../contexts/LanguageContext';
 
+// ============ FUTURISTIC VOICE AI SECTION ============
+const VoiceAIHero: React.FC<{ onStartCall: (type: 'male' | 'female') => void; activeAgent: 'male' | 'female' | null }> = ({ onStartCall, activeAgent }) => {
+  const { language } = useLanguage();
+  const isBn = language === 'bn';
+  const [hoveredAgent, setHoveredAgent] = useState<'male' | 'female' | null>(null);
+
+  // Get time-based greeting in Bangla
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'সুপ্রভাত';
+    if (hour >= 12 && hour < 17) return 'শুভ দুপুর';
+    if (hour >= 17 && hour < 20) return 'শুভ সন্ধ্যা';
+    return 'শুভ রাত্রি';
+  };
+
+  return (
+    <div className="relative">
+      {/* Ambient Glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="w-[500px] h-[500px] bg-gradient-to-br from-teal-500/20 via-cyan-500/10 to-purple-500/20 rounded-full blur-[100px] animate-pulse"></div>
+      </div>
+
+      <div className="relative z-10 text-center">
+        {/* Greeting */}
+        <div className="mb-6">
+          <span className="text-lg text-slate-400 font-light">{getGreeting()}</span>
+        </div>
+
+        {/* Main Title */}
+        <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight">
+          {isBn ? 'আপনার স্বাস্থ্য সহায়ক' : 'Your Health Assistant'}
+        </h1>
+        <p className="text-slate-400 text-lg md:text-xl max-w-lg mx-auto mb-12">
+          {isBn 
+            ? 'বাংলায় কথা বলুন, ডাক্তার খুঁজুন, অ্যাপয়েন্টমেন্ট নিন' 
+            : 'Speak in Bangla, find doctors, book appointments'}
+        </p>
+
+        {/* Voice Agents */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10">
+          {/* Male Agent - Yunus */}
+          <button
+            onClick={() => onStartCall('male')}
+            onMouseEnter={() => setHoveredAgent('male')}
+            onMouseLeave={() => setHoveredAgent(null)}
+            disabled={activeAgent !== null}
+            className={`group relative w-40 h-40 sm:w-48 sm:h-48 rounded-full transition-all duration-500 ${
+              activeAgent === 'male' 
+                ? 'scale-110 ring-4 ring-teal-400/50' 
+                : activeAgent === 'female' 
+                  ? 'opacity-30 scale-90' 
+                  : 'hover:scale-105'
+            }`}
+          >
+            {/* Outer Ring Animation */}
+            <div className={`absolute inset-0 rounded-full border-2 border-teal-400/30 transition-all duration-500 ${hoveredAgent === 'male' || activeAgent === 'male' ? 'scale-110 opacity-100' : 'scale-100 opacity-0'}`}></div>
+            <div className={`absolute inset-0 rounded-full border border-teal-400/20 transition-all duration-700 ${hoveredAgent === 'male' || activeAgent === 'male' ? 'scale-125 opacity-100' : 'scale-100 opacity-0'}`}></div>
+            
+            {/* Main Circle */}
+            <div className="absolute inset-2 rounded-full bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 flex items-center justify-center overflow-hidden">
+              {/* Avatar */}
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-900/50 to-slate-900">
+                <i className="fas fa-user text-5xl sm:text-6xl text-teal-400/80"></i>
+              </div>
+              
+              {/* Active Indicator */}
+              {activeAgent === 'male' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <div className="flex gap-1">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="w-1 bg-teal-400 rounded-full animate-pulse" style={{ height: `${20 + Math.random() * 20}px`, animationDelay: `${i * 0.1}s` }}></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Label */}
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+              <p className="font-bold text-white">ইউনুস</p>
+              <p className="text-xs text-slate-500">Yunus</p>
+            </div>
+          </button>
+
+          {/* Center Divider */}
+          <div className="hidden sm:flex flex-col items-center gap-3 text-slate-600">
+            <div className="w-px h-8 bg-gradient-to-b from-transparent via-slate-700 to-transparent"></div>
+            <span className="text-xs font-bold uppercase tracking-wider">{isBn ? 'অথবা' : 'or'}</span>
+            <div className="w-px h-8 bg-gradient-to-b from-transparent via-slate-700 to-transparent"></div>
+          </div>
+
+          {/* Female Agent - Arisha */}
+          <button
+            onClick={() => onStartCall('female')}
+            onMouseEnter={() => setHoveredAgent('female')}
+            onMouseLeave={() => setHoveredAgent(null)}
+            disabled={activeAgent !== null}
+            className={`group relative w-40 h-40 sm:w-48 sm:h-48 rounded-full transition-all duration-500 ${
+              activeAgent === 'female' 
+                ? 'scale-110 ring-4 ring-purple-400/50' 
+                : activeAgent === 'male' 
+                  ? 'opacity-30 scale-90' 
+                  : 'hover:scale-105'
+            }`}
+          >
+            {/* Outer Ring Animation */}
+            <div className={`absolute inset-0 rounded-full border-2 border-purple-400/30 transition-all duration-500 ${hoveredAgent === 'female' || activeAgent === 'female' ? 'scale-110 opacity-100' : 'scale-100 opacity-0'}`}></div>
+            <div className={`absolute inset-0 rounded-full border border-purple-400/20 transition-all duration-700 ${hoveredAgent === 'female' || activeAgent === 'female' ? 'scale-125 opacity-100' : 'scale-100 opacity-0'}`}></div>
+            
+            {/* Main Circle */}
+            <div className="absolute inset-2 rounded-full bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 flex items-center justify-center overflow-hidden">
+              {/* Avatar */}
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-900/50 to-slate-900">
+                <i className="fas fa-user text-5xl sm:text-6xl text-purple-400/80"></i>
+              </div>
+              
+              {/* Active Indicator */}
+              {activeAgent === 'female' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <div className="flex gap-1">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="w-1 bg-purple-400 rounded-full animate-pulse" style={{ height: `${20 + Math.random() * 20}px`, animationDelay: `${i * 0.1}s` }}></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Label */}
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+              <p className="font-bold text-white">আরিশা</p>
+              <p className="text-xs text-slate-500">Arisha</p>
+            </div>
+          </button>
+        </div>
+
+        {/* Call to Action */}
+        <div className="mt-16">
+          {activeAgent ? (
+            <p className="text-teal-400 font-medium animate-pulse flex items-center justify-center gap-2">
+              <i className="fas fa-microphone"></i>
+              {isBn ? 'কথা বলুন...' : 'Listening...'}
+            </p>
+          ) : (
+            <p className="text-slate-500 text-sm">
+              {isBn ? 'ক্লিক করে কথা বলা শুরু করুন' : 'Click to start speaking'}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============ MAIN LANDING PAGE ============
 export const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
   const { t, language } = useLanguage();
+  const isBn = language === 'bn';
+  const [activeAgent, setActiveAgent] = useState<'male' | 'female' | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    navigate('/search');
+  // Scroll handler for search bar visibility
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowSearch(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleStartCall = (type: 'male' | 'female') => {
+    // This would trigger the actual voice session
+    // For now, we'll show a connected state
+    setActiveAgent(type);
+    // In real implementation, this would call the HomeVoiceSection's startSession
   };
 
-  // Smooth scroll to features
-  const scrollToFeatures = () => {
-    const element = document.getElementById('features');
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
+  const quickActions = [
+    { icon: 'fa-stethoscope', label: isBn ? 'ডাক্তার খুঁজুন' : 'Find Doctor', action: () => navigate('/search') },
+    { icon: 'fa-calendar-check', label: isBn ? 'অ্যাপয়েন্টমেন্ট' : 'Appointments', action: () => navigate('/my-appointments') },
+    { icon: 'fa-heartbeat', label: isBn ? 'আমার স্বাস্থ্য' : 'My Health', action: () => navigate('/my-health') },
+    { icon: 'fa-user-md', label: isBn ? 'ডাক্তার লগইন' : 'Doctor Login', action: () => navigate('/login') },
+  ];
 
-  // Specialty tags with translations
-  const specialtyTags = [
-    { key: 'spec.cardiology', en: 'Cardiology' },
-    { key: 'spec.neurology', en: 'Neurology' },
-    { key: 'spec.orthopedics', en: 'Orthopedics' },
-    { key: 'spec.medicine', en: 'Medicine' },
-    { key: 'spec.dermatology', en: 'Dermatology' },
+  const stats = [
+    { value: '২০০+', label: isBn ? 'বিশেষজ্ঞ ডাক্তার' : 'Expert Doctors' },
+    { value: '১০,০০০+', label: isBn ? 'সন্তুষ্ট রোগী' : 'Happy Patients' },
+    { value: '২৪/৭', label: isBn ? 'সেবা চালু' : 'Service Available' },
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] font-sans selection:bg-teal-500/20 selection:text-teal-900">
+    <div className="min-h-screen bg-[#0a0a0f] font-sans text-white overflow-x-hidden">
       
-      {/* --- Hero Section --- */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
-        {/* Abstract Background Blobs */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full overflow-hidden -z-10 pointer-events-none">
-           <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-teal-400/20 rounded-full mix-blend-multiply filter blur-[100px] animate-blob opacity-70"></div>
-           <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-blue-400/20 rounded-full mix-blend-multiply filter blur-[100px] animate-blob animation-delay-2000 opacity-70"></div>
-           <div className="absolute bottom-[-20%] left-[20%] w-[600px] h-[600px] bg-purple-400/20 rounded-full mix-blend-multiply filter blur-[100px] animate-blob animation-delay-4000 opacity-70"></div>
+      {/* ============ HERO SECTION ============ */}
+      <section className="relative min-h-screen flex items-center justify-center px-4 py-20">
+        {/* Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/50 via-[#0a0a0f] to-[#0a0a0f]"></div>
+        
+        {/* Grid Pattern */}
+        <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}></div>
+
+        {/* Top Bar */}
+        <div className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex items-center justify-between z-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/20">
+              <span className="text-white font-bold text-lg">ন</span>
+            </div>
+            <span className="font-bold text-xl text-white">Nirnoy</span>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/patient-auth')} className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition">
+              {isBn ? 'লগইন' : 'Login'}
+            </button>
+            <button onClick={() => navigate('/search')} className="px-4 py-2 bg-white/10 backdrop-blur border border-white/10 rounded-lg text-sm font-medium text-white hover:bg-white/20 transition">
+              {isBn ? 'ডাক্তার খুঁজুন' : 'Find Doctor'}
+            </button>
+          </div>
         </div>
 
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 border border-white/60 shadow-sm backdrop-blur-xl mb-8 hover:scale-105 transition-transform cursor-default group">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-[11px] font-bold text-slate-600 tracking-widest uppercase group-hover:text-teal-700 transition-colors">{t('hero.badge')}</span>
-          </div>
+        {/* Voice AI Hero */}
+        <VoiceAIHero onStartCall={handleStartCall} activeAgent={activeAgent} />
 
-          {/* Main Headline */}
-          <h1 className="text-5xl md:text-8xl font-bold text-slate-900 mb-8 tracking-tight leading-[1.1]">
-            {t('hero.title1')} <br className="md:hidden" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-blue-600 to-purple-600 animate-gradient-x">{t('hero.title2')}</span>
-          </h1>
-          
-          <p className="text-lg md:text-2xl text-slate-500 mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-            {t('hero.subtitle')}
+        {/* Bottom Scroll Indicator */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-slate-500 animate-bounce">
+          <span className="text-xs font-medium">{isBn ? 'স্ক্রল করুন' : 'Scroll'}</span>
+          <i className="fas fa-chevron-down"></i>
+        </div>
+      </section>
+
+      {/* ============ QUICK ACTIONS ============ */}
+      <section className="py-16 px-4 bg-gradient-to-b from-[#0a0a0f] to-slate-900/50">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {quickActions.map((action, i) => (
+              <button
+                key={i}
+                onClick={action.action}
+                className="group p-6 bg-white/5 backdrop-blur border border-white/10 rounded-2xl hover:bg-white/10 hover:border-teal-500/30 transition-all duration-300"
+              >
+                <div className="w-12 h-12 bg-gradient-to-br from-teal-500/20 to-cyan-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <i className={`fas ${action.icon} text-teal-400 text-xl`}></i>
+                </div>
+                <p className="font-medium text-white text-sm">{action.label}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ============ SEARCH SECTION ============ */}
+      <section className="py-20 px-4">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-4">
+            {isBn ? 'সেরা ডাক্তার খুঁজুন' : 'Find the Best Doctor'}
+          </h2>
+          <p className="text-slate-400 mb-8">
+            {isBn ? 'ঢাকার সেরা বিশেষজ্ঞ ডাক্তারদের সাথে অ্যাপয়েন্টমেন্ট নিন' : 'Book appointments with top specialists in Dhaka'}
           </p>
 
-          {/* Search Command Center */}
-          <div className="max-w-3xl mx-auto relative z-20">
-            <form onSubmit={handleSearch} className="relative group">
-               <div className="absolute -inset-0.5 bg-gradient-to-r from-teal-500 via-blue-500 to-purple-500 rounded-2xl blur opacity-20 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-               <div className="relative bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 flex flex-col md:flex-row p-2 items-center gap-2 transition-all">
-                  
-                  <div className="flex-1 w-full flex items-center px-4 h-16">
-                     <i className="fas fa-search text-slate-400 text-xl mr-4 group-focus-within:text-teal-500 transition-colors"></i>
-                     <input 
-                        type="text" 
-                        className="w-full h-full outline-none text-lg text-slate-800 placeholder:text-slate-400 bg-transparent font-medium"
-                        placeholder={t('hero.searchPlaceholder')}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                     />
-                  </div>
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition"></div>
+            <div className="relative bg-slate-900 border border-slate-700/50 rounded-2xl p-2 flex items-center gap-2">
+              <div className="flex-1 flex items-center px-4">
+                <i className="fas fa-search text-slate-500 mr-3"></i>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={isBn ? 'ডাক্তার বা বিশেষত্ব খুঁজুন...' : 'Search doctor or specialty...'}
+                  className="flex-1 bg-transparent outline-none text-white placeholder:text-slate-500 py-3"
+                />
+              </div>
+              <button
+                onClick={() => navigate('/search')}
+                className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-teal-500/30 transition"
+              >
+                {isBn ? 'খুঁজুন' : 'Search'}
+              </button>
+            </div>
+          </div>
 
-                  <div className="hidden md:block w-px h-10 bg-slate-200"></div>
+          {/* Specialty Tags */}
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            {[
+              { en: 'Cardiology', bn: 'হৃদরোগ' },
+              { en: 'Medicine', bn: 'মেডিসিন' },
+              { en: 'Gynecology', bn: 'স্ত্রীরোগ' },
+              { en: 'Pediatrics', bn: 'শিশুরোগ' },
+              { en: 'Orthopedics', bn: 'হাড়' },
+            ].map((spec, i) => (
+              <button
+                key={i}
+                onClick={() => navigate('/search')}
+                className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-slate-400 hover:text-white hover:border-teal-500/50 transition"
+              >
+                {isBn ? spec.bn : spec.en}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
-                  <div className="w-full md:w-auto flex items-center px-4 h-16 md:border-none border-t border-slate-100">
-                     <i className="fas fa-map-marker-alt text-slate-400 text-xl mr-3 group-focus-within:text-teal-500 transition-colors"></i>
-                     <select className="h-full outline-none bg-transparent text-slate-600 font-bold cursor-pointer hover:text-slate-800 transition">
-                        <option>{t('common.dhaka')}</option>
-                        <option>{t('common.chittagong')}</option>
-                     </select>
-                  </div>
+      {/* ============ STATS ============ */}
+      <section className="py-16 px-4 border-y border-white/5">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-3 gap-8">
+            {stats.map((stat, i) => (
+              <div key={i} className="text-center">
+                <p className="text-3xl md:text-4xl font-bold text-white mb-2">{stat.value}</p>
+                <p className="text-sm text-slate-500">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-                  <button type="submit" className="w-full md:w-auto bg-slate-900 hover:bg-black text-white h-14 px-8 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-teal-500/30 flex items-center justify-center gap-2 group/btn">
-                     <span>{t('hero.find')}</span>
-                     <i className="fas fa-arrow-right text-sm transform -rotate-45 group-hover/btn:rotate-0 transition-transform"></i>
-                  </button>
-               </div>
-            </form>
-            
-            {/* Quick Chips */}
-            <div className="mt-8 flex flex-wrap justify-center gap-3 opacity-80">
-               {specialtyTags.map((tag) => (
-                  <button 
-                    key={tag.key}
-                    onClick={() => navigate('/search')}
-                    className="px-4 py-1.5 rounded-full bg-white border border-slate-200 text-slate-500 text-xs font-bold hover:border-teal-400 hover:text-teal-600 hover:shadow-md transition-all transform hover:-translate-y-0.5"
-                  >
-                     {t(tag.key)}
-                  </button>
-               ))}
+      {/* ============ FEATURES ============ */}
+      <section className="py-20 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4">
+              {isBn ? 'কেন নির্ণয়?' : 'Why Nirnoy?'}
+            </h2>
+            <p className="text-slate-400 max-w-xl mx-auto">
+              {isBn 
+                ? 'বাংলাদেশের জন্য তৈরি আধুনিক হেলথকেয়ার প্ল্যাটফর্ম' 
+                : 'A modern healthcare platform built for Bangladesh'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Feature 1: Voice AI */}
+            <div className="p-8 bg-gradient-to-br from-teal-500/10 to-transparent border border-teal-500/20 rounded-3xl">
+              <div className="w-14 h-14 bg-teal-500/20 rounded-2xl flex items-center justify-center mb-6">
+                <i className="fas fa-microphone text-2xl text-teal-400"></i>
+              </div>
+              <h3 className="text-xl font-bold mb-3">{isBn ? 'ভয়েস AI' : 'Voice AI'}</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                {isBn 
+                  ? 'বাংলায় কথা বলুন, ডাক্তার খুঁজুন, অ্যাপয়েন্টমেন্ট বুক করুন - সব কিছু ভয়েসে' 
+                  : 'Speak in Bangla, find doctors, book appointments - all by voice'}
+              </p>
+            </div>
+
+            {/* Feature 2: Live Queue */}
+            <div className="p-8 bg-gradient-to-br from-purple-500/10 to-transparent border border-purple-500/20 rounded-3xl">
+              <div className="w-14 h-14 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6">
+                <i className="fas fa-clock text-2xl text-purple-400"></i>
+              </div>
+              <h3 className="text-xl font-bold mb-3">{isBn ? 'লাইভ কিউ' : 'Live Queue'}</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                {isBn 
+                  ? 'রিয়েল-টাইমে দেখুন আপনার সিরিয়াল কত দূরে, আর কতক্ষণ অপেক্ষা' 
+                  : 'See your queue position in real-time, no more waiting in the dark'}
+              </p>
+            </div>
+
+            {/* Feature 3: Health Record */}
+            <div className="p-8 bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 rounded-3xl">
+              <div className="w-14 h-14 bg-cyan-500/20 rounded-2xl flex items-center justify-center mb-6">
+                <i className="fas fa-notes-medical text-2xl text-cyan-400"></i>
+              </div>
+              <h3 className="text-xl font-bold mb-3">{isBn ? 'হেলথ রেকর্ড' : 'Health Record'}</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                {isBn 
+                  ? 'সব প্রেসক্রিপশন, রিপোর্ট এক জায়গায়। AI দিয়ে স্বাস্থ্য বুঝুন' 
+                  : 'All prescriptions, reports in one place. Understand health with AI'}
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* --- VOICE AGENT SECTION --- */}
-      <HomeVoiceSection />
+      {/* ============ CTA FOR DOCTORS ============ */}
+      <section className="py-20 px-4 bg-gradient-to-b from-slate-900/50 to-[#0a0a0f]">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500/10 border border-teal-500/20 rounded-full mb-6">
+            <i className="fas fa-user-md text-teal-400"></i>
+            <span className="text-sm font-medium text-teal-400">{isBn ? 'ডাক্তারদের জন্য' : 'For Doctors'}</span>
+          </div>
+          
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">
+            {isBn ? 'আপনার প্র্যাকটিস আধুনিক করুন' : 'Modernize Your Practice'}
+          </h2>
+          <p className="text-slate-400 max-w-xl mx-auto mb-10">
+            {isBn 
+              ? 'AI কপাইলট, স্মার্ট কিউ ম্যানেজমেন্ট, ডিজিটাল প্রেসক্রিপশন - সব এক প্ল্যাটফর্মে' 
+              : 'AI copilot, smart queue management, digital prescriptions - all in one platform'}
+          </p>
 
-      {/* --- Bento Grid Features --- */}
-      <section id="features" className="py-20 container mx-auto px-4">
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(220px,auto)]">
-            
-            {/* Box 1: Verified Doctors */}
-            <div className="md:col-span-2 bg-white rounded-[2rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-teal-100/50 transition-all duration-500 relative overflow-hidden group cursor-pointer" onClick={() => navigate('/search')}>
-               <div className="relative z-10 flex flex-col h-full justify-between">
-                  <div>
-                     <div className="inline-flex items-center justify-center h-14 w-14 bg-blue-50 rounded-2xl text-blue-600 text-2xl mb-6 group-hover:scale-110 transition-transform duration-500">
-                        <i className="fas fa-user-md"></i>
-                     </div>
-                     <h3 className="text-3xl font-bold text-slate-800 mb-3">{t('features.topSpecialists')}</h3>
-                     <p className="text-slate-500 text-lg max-w-md leading-relaxed">
-                        {t('features.topSpecialistsDesc')}
-                     </p>
-                  </div>
-                  <div className="mt-8 flex items-center gap-2 text-blue-600 font-bold group-hover:translate-x-2 transition-transform">
-                     {t('features.bookAppointment')} <i className="fas fa-arrow-right"></i>
-                  </div>
-               </div>
-               
-               {/* Abstract UI Illustration */}
-               <div className="absolute right-[-40px] top-[20%] w-64 opacity-80 group-hover:opacity-100 group-hover:translate-x-[-10px] transition-all duration-700">
-                  <div className="bg-white border border-slate-100 p-4 rounded-xl shadow-lg transform rotate-[-6deg]">
-                     <div className="flex items-center gap-3 mb-3">
-                        <div className="h-10 w-10 rounded-full bg-slate-200"></div>
-                        <div className="h-3 w-24 bg-slate-200 rounded"></div>
-                     </div>
-                     <div className="space-y-2">
-                        <div className="h-2 w-full bg-slate-100 rounded"></div>
-                        <div className="h-2 w-5/6 bg-slate-100 rounded"></div>
-                     </div>
-                  </div>
-                  <div className="bg-white border border-slate-100 p-4 rounded-xl shadow-lg transform rotate-[3deg] translate-y-[-20px] translate-x-[20px] z-10 relative">
-                     <div className="flex items-center justify-between mb-2">
-                        <div className="h-3 w-16 bg-teal-100 rounded"></div>
-                        <div className="h-4 w-4 bg-green-100 rounded-full"></div>
-                     </div>
-                     <div className="h-2 w-full bg-slate-100 rounded"></div>
-                  </div>
-               </div>
-            </div>
-
-            {/* Box 2: AI Notebook */}
-            <div className="bg-slate-900 rounded-[2rem] p-10 border border-slate-800 shadow-2xl relative overflow-hidden group text-white cursor-default">
-               <div className="relative z-10 flex flex-col h-full justify-between">
-                  <div>
-                     <div className="h-14 w-14 bg-teal-500/20 rounded-2xl flex items-center justify-center text-teal-400 text-2xl mb-6 border border-teal-500/30 group-hover:rotate-12 transition-transform duration-500">
-                        <i className="fas fa-brain"></i>
-                     </div>
-                     <h3 className="text-2xl font-bold mb-3">{t('features.healthIntelligence')}</h3>
-                     <p className="text-slate-400 text-sm leading-relaxed">
-                        {t('features.healthIntelligenceDesc')}
-                     </p>
-                  </div>
-                  <div className="mt-4 bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 backdrop-blur-sm">
-                     <div className="flex items-center gap-2 mb-2">
-                        <i className="fas fa-sparkles text-yellow-400 text-xs"></i>
-                        <span className="text-[10px] font-bold text-slate-300 uppercase">Insight</span>
-                     </div>
-                     <p className="text-xs text-slate-300 italic">{language === 'bn' ? '"আপনার BP ট্রেন্ড উন্নতি হচ্ছে..."' : '"Your BP trend is improving..."'}</p>
-                  </div>
-               </div>
-               <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-teal-500 rounded-full blur-[80px] opacity-20 group-hover:opacity-30 transition duration-500"></div>
-            </div>
-
-            {/* Box 3: Live Queue */}
-            <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-[2rem] p-10 shadow-xl shadow-teal-500/20 relative overflow-hidden group text-white flex flex-col justify-between cursor-default">
-               <div className="relative z-10">
-                  <div className="h-14 w-14 bg-white/20 rounded-2xl flex items-center justify-center text-white text-2xl mb-6 backdrop-blur-md border border-white/30">
-                     <i className="fas fa-clock"></i>
-                  </div>
-                  <h3 className="text-2xl font-bold mb-2">{t('features.liveQueue')}</h3>
-                  <p className="text-teal-50 text-sm opacity-90">
-                     {t('features.liveQueueDesc')}
-                  </p>
-               </div>
-               
-               <div className="mt-6 relative">
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-4">
-                     <div className="flex justify-between items-end">
-                        <div>
-                           <p className="text-[10px] uppercase font-bold text-teal-100 mb-1">{t('features.currentSerial')}</p>
-                           <p className="text-4xl font-bold">12</p>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-[10px] uppercase font-bold text-teal-100 mb-1">{t('features.yourSerial')}</p>
-                           <p className="text-xl font-bold opacity-70">18</p>
-                        </div>
-                     </div>
-                     <div className="w-full bg-black/20 h-1 mt-3 rounded-full overflow-hidden">
-                        <div className="bg-white h-full w-2/3 rounded-full animate-pulse"></div>
-                     </div>
-                  </div>
-               </div>
-            </div>
-
-            {/* Box 4: The Process (Full Width) */}
-            <div className="md:col-span-2 bg-[#F8FAFC] rounded-[2rem] p-10 border border-slate-200 shadow-sm hover:shadow-lg transition-shadow duration-300 flex items-center relative overflow-hidden">
-               <div className="relative z-10 max-w-lg">
-                  <h3 className="text-2xl font-bold text-slate-800 mb-3">{t('features.seamlessExperience')}</h3>
-                  <p className="text-slate-500 mb-6">
-                     {t('features.seamlessExperienceDesc')}
-                  </p>
-                  <div className="flex items-center gap-4">
-                     <div className="flex -space-x-3">
-                        {[1,2,3,4].map(i => (
-                           <div key={i} className="h-10 w-10 rounded-full bg-white border-2 border-slate-100 shadow-sm flex items-center justify-center text-xs font-bold text-slate-600">
-                              <i className="fas fa-check text-teal-500"></i>
-                           </div>
-                        ))}
-                     </div>
-                     <span className="text-sm font-bold text-slate-600">10k+ {t('features.appointmentsBooked')}</span>
-                  </div>
-               </div>
-               <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white via-transparent to-transparent pointer-events-none"></div>
-               <i className="fas fa-check-circle absolute right-[-20px] bottom-[-40px] text-[200px] text-slate-200/50 -z-0"></i>
-            </div>
-         </div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={() => navigate('/doctor-registration')}
+              className="px-8 py-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-teal-500/30 transition flex items-center gap-2"
+            >
+              <i className="fas fa-plus"></i>
+              {isBn ? 'রেজিস্টার করুন' : 'Register Now'}
+            </button>
+            <button
+              onClick={() => navigate('/login')}
+              className="px-8 py-4 bg-white/5 border border-white/10 text-white font-medium rounded-xl hover:bg-white/10 transition"
+            >
+              {isBn ? 'লগইন করুন' : 'Login'}
+            </button>
+          </div>
+        </div>
       </section>
 
-      {/* --- CTA for Doctors --- */}
-      <section className="py-24 bg-slate-900 text-white overflow-hidden relative">
-         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-slate-900 via-transparent to-slate-900 z-0"></div>
-         
-         <div className="container mx-auto px-4 relative z-10">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-16">
-               <div className="max-w-xl">
-                  <div className="inline-block bg-teal-900/50 border border-teal-700/50 rounded-lg px-3 py-1 mb-6">
-                     <span className="text-teal-400 font-bold tracking-widest uppercase text-[10px]">{t('cta.forProfessionals')}</span>
-                  </div>
-                  <h2 className="text-5xl font-bold mb-6 leading-tight">
-                     {t('cta.title1')} <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-400">{t('cta.title2')}</span>
-                  </h2>
-                  <p className="text-slate-400 text-lg mb-10 leading-relaxed">
-                     {t('cta.description')}
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4">
-                     <button onClick={() => navigate('/login')} className="bg-teal-500 hover:bg-teal-400 text-slate-900 px-8 py-4 rounded-xl font-bold transition shadow-[0_0_20px_rgba(20,184,166,0.3)] hover:shadow-[0_0_30px_rgba(20,184,166,0.5)]">
-                        {t('cta.joinAsDoctor')}
-                     </button>
-                     <button onClick={scrollToFeatures} className="px-8 py-4 rounded-xl font-bold border border-slate-700 hover:bg-slate-800 transition text-slate-300">
-                        {t('cta.viewFeatures')}
-                     </button>
-                  </div>
-               </div>
-               
-               {/* Visual Mockup Representation */}
-               <div className="relative w-full md:w-1/2 max-w-lg aspect-square hidden md:block">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-teal-500 to-purple-500 rounded-full opacity-20 blur-[100px] animate-pulse"></div>
-                  
-                  {/* Dashboard Card 1 */}
-                  <div className="absolute top-10 left-0 w-64 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-2xl p-5 shadow-2xl transform rotate-[-6deg] hover:rotate-0 transition duration-500 z-10">
-                     <div className="flex items-center justify-between mb-4">
-                        <div className="h-8 w-8 bg-teal-500 rounded-lg flex items-center justify-center"><i className="fas fa-users"></i></div>
-                        <span className="text-xs font-bold text-slate-400">{language === 'bn' ? 'দৈনিক ট্রাফিক' : 'Daily Traffic'}</span>
-                     </div>
-                     <div className="text-3xl font-bold mb-1">42 <span className="text-sm font-normal text-slate-500">{language === 'bn' ? 'রোগী' : 'Patients'}</span></div>
-                     <div className="h-1 w-full bg-slate-700 rounded-full overflow-hidden mt-2">
-                        <div className="h-full w-3/4 bg-teal-500 rounded-full"></div>
-                     </div>
-                  </div>
+      {/* ============ FOOTER ============ */}
+      <footer className="py-12 px-4 border-t border-white/5">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">ন</span>
+              </div>
+              <div>
+                <span className="font-bold text-white block">Nirnoy</span>
+                <span className="text-xs text-slate-500">{isBn ? 'স্বাস্থ্যসেবা সহজ করি' : 'Making Healthcare Simple'}</span>
+              </div>
+            </div>
 
-                  {/* Dashboard Card 2 */}
-                  <div className="absolute bottom-10 right-0 w-72 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-2xl p-5 shadow-2xl transform rotate-[3deg] hover:rotate-0 transition duration-500 z-20">
-                     <div className="flex items-center gap-3 mb-4">
-                        <div className="h-8 w-8 bg-purple-500 rounded-lg flex items-center justify-center"><i className="fas fa-robot"></i></div>
-                        <span className="text-xs font-bold text-slate-400">{language === 'bn' ? 'AI সহকারী' : 'AI Assistant'}</span>
-                     </div>
-                     <div className="space-y-2">
-                        <div className="bg-slate-700/50 p-2 rounded text-[10px] text-slate-300">
-                           {language === 'bn' ? '"ইতিহাসের উপর ভিত্তি করে, রোগীর লক্ষণ দেখা যাচ্ছে..."' : '"Based on history, patient shows signs of..."'}
-                        </div>
-                        <div className="bg-slate-700/50 p-2 rounded text-[10px] text-slate-300 opacity-60">
-                           {language === 'bn' ? '"ওষুধের মিথস্ক্রিয়া সতর্কতা সনাক্ত হয়েছে..."' : '"Drug interaction warning detected..."'}
-                        </div>
-                     </div>
-                  </div>
-               </div>
+            <div className="flex gap-6 text-sm text-slate-500">
+              <button onClick={() => navigate('/about')} className="hover:text-white transition">{isBn ? 'আমাদের সম্পর্কে' : 'About'}</button>
+              <button onClick={() => navigate('/search')} className="hover:text-white transition">{isBn ? 'ডাক্তার' : 'Doctors'}</button>
+              <button onClick={() => navigate('/privacy')} className="hover:text-white transition">{isBn ? 'গোপনীয়তা' : 'Privacy'}</button>
             </div>
-         </div>
-      </section>
 
-      {/* --- Footer --- */}
-      <footer className="bg-[#FAFAFA] border-t border-slate-200 py-16">
-         <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-               <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl flex items-center justify-center text-white shadow-lg">
-                     <i className="fas fa-heartbeat"></i>
-                  </div>
-                  <div>
-                     <span className="font-bold text-xl text-slate-900 block leading-none">{t('nav.brand')}</span>
-                     <span className="text-[10px] font-bold text-teal-600 tracking-widest uppercase">{t('footer.tagline')}</span>
-                  </div>
-               </div>
-               <div className="flex gap-8 text-sm font-bold text-slate-500">
-                  <button onClick={() => navigate('/about')} className="hover:text-slate-900 transition">{t('footer.about')}</button>
-                  <button onClick={() => navigate('/search')} className="hover:text-slate-900 transition">{t('footer.doctors')}</button>
-                  <button onClick={() => navigate('/privacy')} className="hover:text-slate-900 transition">{t('footer.privacy')}</button>
-                  <button onClick={() => navigate('/')} className="hover:text-slate-900 transition">{t('footer.contact')}</button>
-               </div>
-               <div className="flex gap-4">
-                  <a href="#" className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-100 hover:shadow-md transition-all">
-                     <i className="fab fa-facebook-f"></i>
-                  </a>
-                  <a href="#" className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-blue-400 hover:border-blue-100 hover:shadow-md transition-all">
-                     <i className="fab fa-twitter"></i>
-                  </a>
-               </div>
+            <div className="flex gap-4">
+              <a href="#" className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition">
+                <i className="fab fa-facebook-f"></i>
+              </a>
+              <a href="#" className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition">
+                <i className="fab fa-youtube"></i>
+              </a>
             </div>
-            <div className="text-center mt-12 text-slate-400 text-xs">
-               &copy; {new Date().getFullYear()} {t('footer.copyright')}
-            </div>
-         </div>
+          </div>
+
+          <div className="mt-8 pt-8 border-t border-white/5 text-center text-xs text-slate-600">
+            &copy; {new Date().getFullYear()} Nirnoy Care. {isBn ? 'সর্বস্বত্ব সংরক্ষিত' : 'All rights reserved'}.
+          </div>
+        </div>
       </footer>
 
+      {/* ============ FLOATING SEARCH (on scroll) ============ */}
+      {showSearch && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-white/5 p-4 animate-slide-down">
+          <div className="max-w-4xl mx-auto flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">ন</span>
+              </div>
+            </div>
+            
+            <div className="flex-1 flex items-center bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+              <i className="fas fa-search text-slate-500 mr-3"></i>
+              <input
+                type="text"
+                placeholder={isBn ? 'ডাক্তার খুঁজুন...' : 'Search doctors...'}
+                className="flex-1 bg-transparent outline-none text-white placeholder:text-slate-500 text-sm"
+              />
+            </div>
+            
+            <button onClick={() => navigate('/search')} className="px-4 py-2 bg-teal-500 text-white font-medium rounded-lg text-sm hover:bg-teal-600 transition">
+              {isBn ? 'খুঁজুন' : 'Search'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============ STYLES ============ */}
       <style>{`
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
+        @keyframes slide-down {
+          from { transform: translateY(-100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-        .animate-gradient-x {
-            background-size: 200% 200%;
-            animation: gradient-x 3s ease infinite;
-        }
-        @keyframes gradient-x {
-            0% { background-position: 0% 50% }
-            50% { background-position: 100% 50% }
-            100% { background-position: 0% 50% }
+        .animate-slide-down {
+          animation: slide-down 0.3s ease-out;
         }
       `}</style>
     </div>
   );
 };
+
+export default Landing;
