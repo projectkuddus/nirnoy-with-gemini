@@ -2,196 +2,346 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 
-// ============ NIRNOY NEURAL BRAIN - Organic 3D-like Network ============
+// ============ NIRNOY NEURAL BRAIN - Complex Organic Network ============
 const NirnoyCoreGraphic: React.FC = () => {
-  // Floating nodes at random-ish organic positions (like neurons)
-  const neuralNodes = [
-    { icon: 'fa-user-md', label: 'ডাক্তার', x: 45, y: 15, size: 'lg', delay: 0 },
-    { icon: 'fa-hospital', label: 'হাসপাতাল', x: 85, y: 25, size: 'md', delay: 0.5 },
-    { icon: 'fa-calendar-check', label: 'অ্যাপয়েন্টমেন্ট', x: 95, y: 55, size: 'lg', delay: 1 },
-    { icon: 'fa-pills', label: 'ওষুধ', x: 80, y: 85, size: 'sm', delay: 1.5 },
-    { icon: 'fa-heartbeat', label: 'স্বাস্থ্য', x: 55, y: 95, size: 'md', delay: 2 },
-    { icon: 'fa-file-medical', label: 'রিপোর্ট', x: 20, y: 80, size: 'lg', delay: 2.5 },
-    { icon: 'fa-clock', label: 'লাইভ কিউ', x: 5, y: 50, size: 'md', delay: 3 },
-    { icon: 'fa-bell', label: 'নোটিফিকেশন', x: 15, y: 20, size: 'sm', delay: 3.5 },
-    { icon: 'fa-stethoscope', label: 'পরীক্ষা', x: 70, y: 10, size: 'sm', delay: 4 },
-    { icon: 'fa-ambulance', label: 'ইমার্জেন্সি', x: 98, y: 40, size: 'sm', delay: 4.5 },
-    { icon: 'fa-brain', label: 'AI সহায়ক', x: 8, y: 35, size: 'sm', delay: 5 },
-    { icon: 'fa-phone', label: 'সাপোর্ট', x: 30, y: 5, size: 'sm', delay: 5.5 },
+  // Primary healthcare nodes - larger, more prominent
+  const primaryNodes = [
+    { icon: 'fa-user-md', label: 'ডাক্তার', x: 50, y: 5, size: 'xl' },
+    { icon: 'fa-hospital', label: 'হাসপাতাল', x: 92, y: 30, size: 'lg' },
+    { icon: 'fa-calendar-check', label: 'অ্যাপয়েন্টমেন্ট', x: 92, y: 70, size: 'xl' },
+    { icon: 'fa-heartbeat', label: 'স্বাস্থ্য', x: 50, y: 95, size: 'lg' },
+    { icon: 'fa-file-medical', label: 'রিপোর্ট', x: 8, y: 70, size: 'xl' },
+    { icon: 'fa-clock', label: 'লাইভ কিউ', x: 8, y: 30, size: 'lg' },
   ];
 
-  // Generate curved paths from center to each node
-  const generateCurvedPath = (x: number, y: number, index: number) => {
-    const centerX = 50;
-    const centerY = 50;
-    // Create bezier curve with random control points for organic feel
-    const ctrl1X = centerX + (x - centerX) * 0.3 + (index % 2 === 0 ? 10 : -10);
-    const ctrl1Y = centerY + (y - centerY) * 0.3 + (index % 3 === 0 ? 15 : -15);
-    const ctrl2X = centerX + (x - centerX) * 0.7 + (index % 2 === 0 ? -8 : 8);
-    const ctrl2Y = centerY + (y - centerY) * 0.7 + (index % 3 === 0 ? -10 : 10);
-    return `M${centerX},${centerY} C${ctrl1X},${ctrl1Y} ${ctrl2X},${ctrl2Y} ${x},${y}`;
+  // Secondary nodes - medium size, in between
+  const secondaryNodes = [
+    { icon: 'fa-pills', label: 'ওষুধ', x: 75, y: 12, size: 'md' },
+    { icon: 'fa-stethoscope', label: 'পরীক্ষা', x: 98, y: 50, size: 'md' },
+    { icon: 'fa-ambulance', label: 'ইমার্জেন্সি', x: 75, y: 88, size: 'md' },
+    { icon: 'fa-bell', label: 'নোটিফিকেশন', x: 25, y: 88, size: 'md' },
+    { icon: 'fa-brain', label: 'AI সহায়ক', x: 2, y: 50, size: 'md' },
+    { icon: 'fa-phone', label: 'সাপোর্ট', x: 25, y: 12, size: 'md' },
+  ];
+
+  // Tertiary micro-nodes - smallest, scattered around for complexity
+  const microNodes = [
+    { x: 35, y: 8 }, { x: 65, y: 8 }, { x: 85, y: 18 }, { x: 95, y: 42 },
+    { x: 95, y: 58 }, { x: 85, y: 82 }, { x: 65, y: 92 }, { x: 35, y: 92 },
+    { x: 15, y: 82 }, { x: 5, y: 58 }, { x: 5, y: 42 }, { x: 15, y: 18 },
+    { x: 40, y: 25 }, { x: 60, y: 25 }, { x: 72, y: 40 }, { x: 72, y: 60 },
+    { x: 60, y: 75 }, { x: 40, y: 75 }, { x: 28, y: 60 }, { x: 28, y: 40 },
+  ];
+
+  const allNodes = [...primaryNodes, ...secondaryNodes];
+
+  // Generate organic curved path with multiple control points
+  const generateBrainPath = (x: number, y: number, index: number) => {
+    const cx = 50, cy = 50;
+    const dx = x - cx, dy = y - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Create S-curve like brain connections
+    const angle = Math.atan2(dy, dx);
+    const perpAngle = angle + Math.PI / 2;
+    const curve = (index % 2 === 0 ? 1 : -1) * (8 + (index % 5) * 2);
+    
+    const mid1X = cx + dx * 0.35 + Math.cos(perpAngle) * curve;
+    const mid1Y = cy + dy * 0.35 + Math.sin(perpAngle) * curve;
+    const mid2X = cx + dx * 0.65 + Math.cos(perpAngle) * -curve * 0.7;
+    const mid2Y = cy + dy * 0.65 + Math.sin(perpAngle) * -curve * 0.7;
+    
+    return `M${cx},${cy} C${mid1X},${mid1Y} ${mid2X},${mid2Y} ${x},${y}`;
+  };
+
+  // Generate interconnection paths between nodes
+  const generateInterconnection = (n1: {x: number, y: number}, n2: {x: number, y: number}, i: number) => {
+    const midX = (n1.x + n2.x) / 2 + (i % 2 === 0 ? 8 : -8);
+    const midY = (n1.y + n2.y) / 2 + (i % 3 === 0 ? -6 : 6);
+    return `M${n1.x},${n2.y} Q${midX},${midY} ${n2.x},${n2.y}`;
   };
 
   return (
-    <div className="relative w-[340px] h-[340px] mx-auto">
-      {/* Background ambient glow */}
-      <div className="absolute inset-0 bg-gradient-radial from-blue-100/50 via-transparent to-transparent rounded-full"></div>
+    <div className="relative w-[420px] h-[420px] mx-auto">
+      {/* Deep background ambient glow */}
+      <div className="absolute inset-0 bg-gradient-radial from-blue-200/40 via-blue-100/20 to-transparent rounded-full blur-2xl"></div>
       
       {/* SVG for neural connections */}
       <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
         <defs>
-          {/* Gradient for neural paths */}
-          <linearGradient id="neuralGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.6" />
-            <stop offset="50%" stopColor="#60a5fa" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.1" />
+          {/* Strong neural gradient */}
+          <linearGradient id="neuralStrongGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#1d4ed8" stopOpacity="0.9" />
+            <stop offset="50%" stopColor="#3b82f6" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.3" />
           </linearGradient>
           
-          {/* Glow filter */}
-          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+          <linearGradient id="neuralMediumGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.6" />
+            <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.2" />
+          </linearGradient>
+          
+          <linearGradient id="neuralLightGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.1" />
+          </linearGradient>
+
+          {/* Center radial gradient */}
+          <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#1d4ed8" stopOpacity="1" />
+            <stop offset="40%" stopColor="#2563eb" stopOpacity="0.9" />
+            <stop offset="70%" stopColor="#3b82f6" stopOpacity="0.7" />
+            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0" />
+          </radialGradient>
+          
+          {/* Strong glow filter */}
+          <filter id="strongGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
             <feMerge>
-              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="blur"/>
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
-
-          {/* Animated dash pattern */}
-          <pattern id="flowPattern" patternUnits="userSpaceOnUse" width="8" height="1">
-            <circle cx="2" cy="0.5" r="1" fill="#3b82f6" opacity="0.8">
-              <animate attributeName="cx" from="-2" to="10" dur="1.5s" repeatCount="indefinite" />
-            </circle>
-          </pattern>
+          
+          <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
 
-        {/* Neural connection paths - curved organic lines */}
-        {neuralNodes.map((node, i) => (
-          <g key={`path-${i}`}>
-            {/* Main path */}
-            <path
-              d={generateCurvedPath(node.x, node.y, i)}
-              fill="none"
-              stroke="url(#neuralGradient)"
-              strokeWidth="0.5"
-              opacity="0.6"
-              className="animate-pulse"
-            />
-            {/* Animated flow dots */}
-            <circle r="1" fill="#3b82f6" opacity="0.8" filter="url(#glow)">
-              <animateMotion
-                dur={`${2 + (i * 0.3)}s`}
-                repeatCount="indefinite"
-                path={generateCurvedPath(node.x, node.y, i)}
-              />
-            </circle>
-            {/* Secondary slower dot */}
-            <circle r="0.6" fill="#60a5fa" opacity="0.5">
-              <animateMotion
-                dur={`${3 + (i * 0.4)}s`}
-                repeatCount="indefinite"
-                path={generateCurvedPath(node.x, node.y, i)}
-                begin={`${i * 0.2}s`}
-              />
-            </circle>
-          </g>
+        {/* Background neural mesh - many faint connections */}
+        {microNodes.map((node, i) => (
+          <path
+            key={`micro-${i}`}
+            d={generateBrainPath(node.x, node.y, i)}
+            fill="none"
+            stroke="#bfdbfe"
+            strokeWidth="0.3"
+            opacity="0.4"
+          />
         ))}
 
-        {/* Cross connections between nearby nodes */}
-        {neuralNodes.slice(0, 8).map((node, i) => {
-          const nextNode = neuralNodes[(i + 1) % 8];
-          const midX = (node.x + nextNode.x) / 2 + (i % 2 === 0 ? 5 : -5);
-          const midY = (node.y + nextNode.y) / 2 + (i % 2 === 0 ? -5 : 5);
+        {/* Interconnections between micro nodes */}
+        {microNodes.slice(0, 12).map((node, i) => {
+          const next = microNodes[(i + 1) % 12];
           return (
             <path
-              key={`cross-${i}`}
-              d={`M${node.x},${node.y} Q${midX},${midY} ${nextNode.x},${nextNode.y}`}
+              key={`micro-inter-${i}`}
+              d={generateInterconnection(node, next, i)}
               fill="none"
-              stroke="#93c5fd"
-              strokeWidth="0.3"
+              stroke="#dbeafe"
+              strokeWidth="0.2"
               opacity="0.3"
             />
           );
         })}
 
-        {/* Central pulsing rings */}
-        <circle cx="50" cy="50" r="12" fill="none" stroke="#3b82f6" strokeWidth="0.3" opacity="0.3">
-          <animate attributeName="r" from="12" to="20" dur="2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" />
-        </circle>
-        <circle cx="50" cy="50" r="12" fill="none" stroke="#3b82f6" strokeWidth="0.3" opacity="0.3">
-          <animate attributeName="r" from="12" to="20" dur="2s" repeatCount="indefinite" begin="0.5s" />
-          <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" begin="0.5s" />
-        </circle>
-        <circle cx="50" cy="50" r="12" fill="none" stroke="#3b82f6" strokeWidth="0.3" opacity="0.3">
-          <animate attributeName="r" from="12" to="20" dur="2s" repeatCount="indefinite" begin="1s" />
-          <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" begin="1s" />
-        </circle>
+        {/* Secondary connections - medium weight */}
+        {secondaryNodes.map((node, i) => (
+          <g key={`sec-${i}`}>
+            <path
+              d={generateBrainPath(node.x, node.y, i + 10)}
+              fill="none"
+              stroke="url(#neuralMediumGradient)"
+              strokeWidth="0.8"
+              opacity="0.7"
+            />
+            {/* Flowing particle */}
+            <circle r="1.2" fill="#3b82f6" opacity="0.7" filter="url(#softGlow)">
+              <animateMotion dur={`${2.5 + i * 0.2}s`} repeatCount="indefinite" path={generateBrainPath(node.x, node.y, i + 10)} />
+            </circle>
+          </g>
+        ))}
+
+        {/* Primary connections - bold weight with glow */}
+        {primaryNodes.map((node, i) => (
+          <g key={`pri-${i}`}>
+            {/* Glow layer */}
+            <path
+              d={generateBrainPath(node.x, node.y, i)}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth="2.5"
+              opacity="0.2"
+              filter="url(#strongGlow)"
+            />
+            {/* Main bold line */}
+            <path
+              d={generateBrainPath(node.x, node.y, i)}
+              fill="none"
+              stroke="url(#neuralStrongGradient)"
+              strokeWidth="1.2"
+              opacity="0.9"
+              strokeLinecap="round"
+            />
+            {/* Multiple flowing particles */}
+            <circle r="1.8" fill="#1d4ed8" opacity="0.9" filter="url(#strongGlow)">
+              <animateMotion dur={`${1.8 + i * 0.15}s`} repeatCount="indefinite" path={generateBrainPath(node.x, node.y, i)} />
+            </circle>
+            <circle r="1" fill="#60a5fa" opacity="0.6">
+              <animateMotion dur={`${2.2 + i * 0.2}s`} repeatCount="indefinite" path={generateBrainPath(node.x, node.y, i)} begin="0.5s" />
+            </circle>
+            <circle r="0.7" fill="#93c5fd" opacity="0.5">
+              <animateMotion dur={`${2.8 + i * 0.25}s`} repeatCount="indefinite" path={generateBrainPath(node.x, node.y, i)} begin="1s" />
+            </circle>
+          </g>
+        ))}
+
+        {/* Cross-connections between primary nodes */}
+        {primaryNodes.map((node, i) => {
+          const next = primaryNodes[(i + 1) % primaryNodes.length];
+          return (
+            <path
+              key={`cross-pri-${i}`}
+              d={generateInterconnection(node, next, i)}
+              fill="none"
+              stroke="#60a5fa"
+              strokeWidth="0.5"
+              opacity="0.4"
+            />
+          );
+        })}
+
+        {/* Central core base glow */}
+        <circle cx="50" cy="50" r="14" fill="url(#centerGlow)" filter="url(#strongGlow)" />
+        
+        {/* Expanding pulse rings from center */}
+        {[0, 0.4, 0.8, 1.2].map((delay, i) => (
+          <circle key={`pulse-${i}`} cx="50" cy="50" r="10" fill="none" stroke="#1d4ed8" strokeWidth="0.8" opacity="0">
+            <animate attributeName="r" from="10" to="28" dur="2.5s" repeatCount="indefinite" begin={`${delay}s`} />
+            <animate attributeName="opacity" from="0.6" to="0" dur="2.5s" repeatCount="indefinite" begin={`${delay}s`} />
+          </circle>
+        ))}
+
+        {/* Inner core rings */}
+        <circle cx="50" cy="50" r="11" fill="none" stroke="#1d4ed8" strokeWidth="0.8" opacity="0.5" />
+        <circle cx="50" cy="50" r="9" fill="none" stroke="#2563eb" strokeWidth="1" opacity="0.7" />
       </svg>
 
-      {/* Center Core - Nirnoy Brain */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 z-20">
-        {/* Outer glow */}
-        <div className="absolute -inset-4 bg-blue-400/20 rounded-full blur-xl animate-pulse"></div>
+      {/* Center Core - Nirnoy Brain - BOLD & CONNECTED */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 z-20">
+        {/* Deep outer glow */}
+        <div className="absolute -inset-8 bg-blue-500/30 rounded-full blur-2xl"></div>
+        <div className="absolute -inset-5 bg-blue-600/40 rounded-full blur-xl animate-pulse"></div>
         
-        {/* Core sphere */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700 rounded-full shadow-2xl shadow-blue-500/50">
-          {/* Inner highlight for 3D effect */}
-          <div className="absolute inset-2 bg-gradient-to-br from-white/30 via-transparent to-transparent rounded-full"></div>
+        {/* Connection ring */}
+        <div className="absolute -inset-2 rounded-full border-2 border-blue-400/50 animate-spin" style={{ animationDuration: '12s' }}></div>
+        <div className="absolute -inset-4 rounded-full border border-blue-300/30 animate-spin" style={{ animationDuration: '20s', animationDirection: 'reverse' }}></div>
+        
+        {/* Core sphere - 3D effect */}
+        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 shadow-2xl" style={{ boxShadow: '0 0 60px rgba(37, 99, 235, 0.6), inset 0 -8px 20px rgba(0,0,0,0.3), inset 0 8px 20px rgba(255,255,255,0.2)' }}>
+          {/* Inner sphere highlight */}
+          <div className="absolute inset-3 rounded-full bg-gradient-to-br from-white/40 via-white/10 to-transparent"></div>
+          <div className="absolute bottom-4 right-4 w-8 h-8 rounded-full bg-gradient-to-br from-transparent to-blue-900/30"></div>
           
-          {/* Content */}
+          {/* Logo content */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-white">
-              <span className="text-3xl font-bold block drop-shadow-lg">ন</span>
-              <span className="text-[9px] font-bold uppercase tracking-widest opacity-90">Nirnoy</span>
+              <span className="text-4xl font-black block drop-shadow-lg" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>ন</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.2em] opacity-95">Nirnoy</span>
             </div>
           </div>
         </div>
+        
+        {/* Orbiting mini-dots around center */}
+        <div className="absolute inset-0 animate-spin" style={{ animationDuration: '8s' }}>
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-blue-300 rounded-full shadow-lg"></div>
+        </div>
+        <div className="absolute inset-0 animate-spin" style={{ animationDuration: '6s', animationDirection: 'reverse' }}>
+          <div className="absolute top-1/2 -right-1 -translate-y-1/2 w-1.5 h-1.5 bg-blue-400 rounded-full shadow-lg"></div>
+        </div>
       </div>
 
-      {/* Floating Neural Nodes */}
-      {neuralNodes.map((node, i) => {
-        const sizeClasses = {
-          sm: 'w-8 h-8',
-          md: 'w-10 h-10',
-          lg: 'w-12 h-12',
-        };
-        const iconSizes = { sm: 'text-xs', md: 'text-sm', lg: 'text-base' };
-        
-        return (
-          <div
-            key={i}
-            className={`absolute ${sizeClasses[node.size as keyof typeof sizeClasses]} group`}
-            style={{
-              left: `${node.x}%`,
-              top: `${node.y}%`,
-              transform: 'translate(-50%, -50%)',
-              animation: `float ${3 + (i % 3)}s ease-in-out infinite`,
-              animationDelay: `${node.delay}s`,
-            }}
-          >
-            {/* Node glow */}
-            <div className="absolute inset-0 bg-blue-400/30 rounded-full blur-md group-hover:bg-blue-400/50 transition-all"></div>
-            
-            {/* Node body */}
-            <div className="absolute inset-0 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center group-hover:scale-110 group-hover:shadow-xl transition-all duration-300 cursor-default">
-              <i className={`fas ${node.icon} ${iconSizes[node.size as keyof typeof iconSizes]} text-blue-500`}></i>
-            </div>
-            
-            {/* Tooltip on hover */}
-            <div className="absolute left-1/2 -translate-x-1/2 -bottom-7 opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap z-30 pointer-events-none">
-              <span className="text-[10px] font-medium text-slate-600 bg-white/90 backdrop-blur px-2 py-1 rounded-full shadow-lg border border-slate-100">
-                {node.label}
-              </span>
-            </div>
+      {/* Primary Nodes - XL & LG */}
+      {primaryNodes.map((node, i) => (
+        <div
+          key={`pri-node-${i}`}
+          className={`absolute ${node.size === 'xl' ? 'w-14 h-14' : 'w-12 h-12'} group`}
+          style={{
+            left: `${node.x}%`,
+            top: `${node.y}%`,
+            transform: 'translate(-50%, -50%)',
+            animation: `float ${3.5 + (i % 2)}s ease-in-out infinite`,
+            animationDelay: `${i * 0.3}s`,
+          }}
+        >
+          {/* Glow */}
+          <div className="absolute -inset-2 bg-blue-500/40 rounded-full blur-lg group-hover:bg-blue-500/60 transition-all"></div>
+          
+          {/* Node body */}
+          <div className="absolute inset-0 bg-white rounded-full shadow-xl border-2 border-blue-200 flex items-center justify-center group-hover:scale-110 group-hover:border-blue-400 transition-all duration-300 cursor-default" style={{ boxShadow: '0 4px 25px rgba(59, 130, 246, 0.4)' }}>
+            <i className={`fas ${node.icon} ${node.size === 'xl' ? 'text-xl' : 'text-lg'} text-blue-600`}></i>
           </div>
-        );
-      })}
+          
+          {/* Tooltip */}
+          <div className="absolute left-1/2 -translate-x-1/2 -bottom-8 opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-30 pointer-events-none">
+            <span className="text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-full shadow-xl border border-blue-100">
+              {node.label}
+            </span>
+          </div>
+        </div>
+      ))}
 
-      {/* Floating animation keyframes */}
+      {/* Secondary Nodes - MD */}
+      {secondaryNodes.map((node, i) => (
+        <div
+          key={`sec-node-${i}`}
+          className="absolute w-10 h-10 group"
+          style={{
+            left: `${node.x}%`,
+            top: `${node.y}%`,
+            transform: 'translate(-50%, -50%)',
+            animation: `float ${4 + (i % 3)}s ease-in-out infinite`,
+            animationDelay: `${i * 0.4 + 0.5}s`,
+          }}
+        >
+          {/* Glow */}
+          <div className="absolute -inset-1 bg-blue-400/30 rounded-full blur-md group-hover:bg-blue-400/50 transition-all"></div>
+          
+          {/* Node body */}
+          <div className="absolute inset-0 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center group-hover:scale-110 transition-all duration-300 cursor-default">
+            <i className={`fas ${node.icon} text-sm text-blue-500`}></i>
+          </div>
+          
+          {/* Tooltip */}
+          <div className="absolute left-1/2 -translate-x-1/2 -bottom-7 opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-30 pointer-events-none">
+            <span className="text-[10px] font-medium text-slate-600 bg-white/95 backdrop-blur px-2 py-1 rounded-full shadow-lg border border-slate-100">
+              {node.label}
+            </span>
+          </div>
+        </div>
+      ))}
+
+      {/* Micro Nodes - tiny dots for complexity */}
+      {microNodes.map((node, i) => (
+        <div
+          key={`micro-node-${i}`}
+          className="absolute w-3 h-3"
+          style={{
+            left: `${node.x}%`,
+            top: `${node.y}%`,
+            transform: 'translate(-50%, -50%)',
+            animation: `microFloat ${2 + (i % 4) * 0.5}s ease-in-out infinite`,
+            animationDelay: `${i * 0.15}s`,
+          }}
+        >
+          <div className="w-full h-full bg-gradient-to-br from-blue-300 to-blue-400 rounded-full shadow-md opacity-70"></div>
+        </div>
+      ))}
+
+      {/* Animation keyframes */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
-          50% { transform: translate(-50%, -50%) translateY(-8px); }
+          50% { transform: translate(-50%, -50%) translateY(-10px); }
+        }
+        @keyframes microFloat {
+          0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+          50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.9; }
         }
       `}</style>
     </div>
