@@ -7,87 +7,542 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+// ==================== USER & AUTH ====================
+
 model User {
   id        Int      @id @default(autoincrement())
   phone     String   @unique
+  email     String?  @unique
   role      String   // "PATIENT" | "DOCTOR" | "ADMIN"
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   doctor    Doctor?
   patient   Patient?
+  admin     Admin?
 }
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  name      String
+  role      String   @default("MODERATOR") // "SUPER_ADMIN" | "MODERATOR"
+  
+  user      User     @relation(fields: [userId], references: [id])
+  
+  // Audit trail
+  approvedDoctors   DoctorVerification[] @relation("ApprovedBy")
+}
+
+// ==================== DOCTOR PROFILE (World-Class) ====================
 
 model Doctor {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @unique
+  
+  // === BASIC INFO ===
+  nameEn              String   // Full name in English
+  nameBn              String?  // Full name in Bangla
+  gender              String   // "Male" | "Female" | "Other"
+  dateOfBirth         DateTime?
+  profilePhoto        String?  // URL to profile photo
+  coverPhoto          String?  // URL to cover/banner photo
+  
+  // === PROFESSIONAL IDENTITY ===
+  title               String   @default("Dr.") // "Dr." | "Prof." | "Assoc. Prof." | "Asst. Prof."
+  primarySpecialty    String   // Main specialty
+  slug                String?  @unique // URL-friendly unique identifier
+  
+  // === BMDC REGISTRATION (Bangladesh Medical & Dental Council) ===
+  bmdcNumber          String?  @unique // BMDC Registration Number (Required)
+  bmdcVerified        Boolean  @default(false)
+  bmdcVerifiedAt      DateTime?
+  bmdcCertificateUrl  String?  // Uploaded BMDC certificate
+  
+  // === NID VERIFICATION ===
+  nidNumber           String?  // National ID Number
+  nidVerified         Boolean  @default(false)
+  nidFrontUrl         String?  // NID front image
+  nidBackUrl          String?  // NID back image
+  
+  // === ACCOUNT STATUS ===
+  registrationStatus  String   @default("PENDING") // "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "SUSPENDED"
+  rejectionReason     String?
+  approvedAt          DateTime?
+  suspendedAt         DateTime?
+  suspensionReason    String?
+  
+  // === PROFESSIONAL SUMMARY ===
+  bioEn               String?  // Professional bio in English
+  bioBn               String?  // Professional bio in Bangla
+  tagline             String?  // Short tagline (e.g., "Committed to Heart Health")
+  
+  // === EXPERIENCE ===
+  experienceYears     Int      @default(0)
+  careerStartDate     DateTime?
+  
+  // === CONSULTATION ===
+  consultationFeeNew      Int   @default(0) // Fee for new patients
+  consultationFeeFollowUp Int?  // Fee for follow-up (if different)
+  consultationFeeReport   Int?  // Fee for report check
+  onlineConsultationFee   Int?  // Fee for online consultation
+  avgConsultationTime     Int   @default(15) // Average time per patient in minutes
+  
+  // === AVAILABILITY ===
+  isAvailableForOnline    Boolean @default(false)
+  isAvailableForHomeVisit Boolean @default(false)
+  homeVisitFee            Int?
+  homeVisitAreas          String? // JSON array of areas
+  
+  // === LANGUAGES ===
+  languages           String   @default("Bangla,English") // Comma-separated
+  
+  // === CONTACT (Professional) ===
+  professionalEmail   String?
+  professionalPhone   String?
+  websiteUrl          String?
+  
+  // === SOCIAL MEDIA ===
+  linkedinUrl         String?
+  facebookUrl         String?
+  twitterUrl          String?
+  youtubeUrl          String?
+  researchGateUrl     String?
+  
+  // === STATISTICS ===
+  totalPatients       Int      @default(0)
+  totalAppointments   Int      @default(0)
+  totalReviews        Int      @default(0)
+  averageRating       Float    @default(0)
+  
+  // === PREFERENCES ===
+  showPhonePublicly   Boolean  @default(false)
+  showEmailPublicly   Boolean  @default(false)
+  acceptNewPatients   Boolean  @default(true)
+  
+  // === TIMESTAMPS ===
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  lastActiveAt        DateTime?
+  
+  // === RELATIONS ===
+  user                User     @relation(fields: [userId], references: [id])
+  
+  qualifications      DoctorQualification[]
+  specializations     DoctorSpecialization[]
+  experiences         DoctorExperience[]
+  chambers            DoctorChamber[]
+  achievements        DoctorAchievement[]
+  publications        DoctorPublication[]
+  memberships         DoctorMembership[]
+  trainings           DoctorTraining[]
+  services            DoctorService[]
+  faqs                DoctorFAQ[]
+  reviews             DoctorReview[]
+  appointments        Appointment[]
+  verifications       DoctorVerification[]
+}
+
+// === QUALIFICATIONS (Degrees) ===
+model DoctorQualification {
   id              Int      @id @default(autoincrement())
-  userId          Int      @unique
-  name            String
-  specialty       String
-  gender          String
-  degrees         String?
-  fee             Int
-  experienceYears Int?
-
-  user           User          @relation(fields: [userId], references: [id])
-  doctorClinics  DoctorClinic[]
-  appointments   Appointment[]
-}
-
-model Patient {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @unique
-  name        String
-  dateOfBirth DateTime?
-  gender      String?
-
-  user         User          @relation(fields: [userId], references: [id])
-  appointments Appointment[]
-}
-
-model Clinic {
-  id      Int    @id @default(autoincrement())
-  name    String
-  area    String
-  city    String
-  address String
-
-  doctorClinics DoctorClinic[]
-  appointments  Appointment[]
-}
-
-model DoctorClinic {
-  id          Int    @id @default(autoincrement())
-  doctorId    Int
-  clinicId    Int
-  daysOfWeek  String  // e.g. "Sat,Mon,Wed"
-  startTime   String  // "10:00"
-  endTime     String  // "13:00"
-  slotMinutes Int
-
-  doctor Doctor @relation(fields: [doctorId], references: [id])
-  clinic Clinic @relation(fields: [clinicId], references: [id])
-}
-
-model Appointment {
-  id              Int      @id @default(autoincrement())
-  patientId       Int
   doctorId        Int
-  clinicId        Int
-  date            DateTime
-  startTime       String
-  endTime         String?
-  status          String   // "REQUESTED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | "NO_SHOW"
-  visitType       String   // "NEW" | "FOLLOW_UP" | "REPORT_CHECK"
-  consultationType String  @default("CHAMBER") // "CHAMBER" | "ONLINE"
-  serialNumber    Int?     // Queue serial for the day
-  patientName     String?  // For guest bookings or name override
-  patientPhone    String?  // For guest bookings
-  symptoms        String?  // Chief complaint
-  fee             Int?     // Fee at time of booking
+  
+  degree          String   // "MBBS" | "MD" | "MS" | "FCPS" | "PhD" | etc.
+  field           String?  // Field of study (e.g., "Cardiology")
+  institution     String   // University/College name
+  institutionCity String?
+  institutionCountry String @default("Bangladesh")
+  yearOfCompletion Int?
+  certificateUrl  String?  // Uploaded certificate
+  isVerified      Boolean  @default(false)
+  displayOrder    Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === SPECIALIZATIONS ===
+model DoctorSpecialization {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  
+  name            String   // e.g., "Interventional Cardiology"
+  isPrimary       Boolean  @default(false)
+  yearsOfPractice Int?
+  description     String?
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === WORK EXPERIENCE ===
+model DoctorExperience {
+  id              Int       @id @default(autoincrement())
+  doctorId        Int
+  
+  position        String    // "Senior Consultant" | "Professor" | etc.
+  department      String?
+  institution     String    // Hospital/Clinic name
+  institutionType String?   // "Government" | "Private" | "NGO"
+  city            String?
+  country         String    @default("Bangladesh")
+  startDate       DateTime
+  endDate         DateTime?
+  isCurrent       Boolean   @default(false)
+  description     String?
+  
+  createdAt       DateTime  @default(now())
+  
+  doctor          Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === CHAMBERS (Practice Locations) ===
+model DoctorChamber {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  clinicId        Int?     // Link to Clinic if it's a registered clinic
+  
+  // Chamber Details
+  name            String   // "PG Hospital Chamber" | "Personal Clinic"
+  type            String   @default("HOSPITAL") // "HOSPITAL" | "CLINIC" | "DIAGNOSTIC" | "PERSONAL"
+  
+  // Address
+  address         String
+  area            String
+  city            String   @default("Dhaka")
+  district        String   @default("Dhaka")
+  postalCode      String?
+  landmark        String?
+  googleMapsUrl   String?
+  latitude        Float?
+  longitude       Float?
+  
+  // Contact
+  phone           String?
+  email           String?
+  
+  // Schedule
+  daysOfWeek      String   // "Sat,Mon,Wed"
+  startTime       String   // "10:00"
+  endTime         String   // "13:00"
+  slotDuration    Int      @default(15) // minutes per patient
+  maxPatients     Int?     // Max patients per session
+  
+  // Fees (can override doctor's default)
+  consultationFee Int?
+  followUpFee     Int?
+  reportCheckFee  Int?
+  
+  // Status
+  isActive        Boolean  @default(true)
+  isPrimary       Boolean  @default(false)
+  
+  // Facilities
+  hasParking      Boolean  @default(false)
+  hasWheelchairAccess Boolean @default(false)
+  hasAC           Boolean  @default(true)
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  clinic          Clinic?  @relation(fields: [clinicId], references: [id])
+  appointments    Appointment[]
+}
 
-  patient Patient @relation(fields: [patientId], references: [id])
-  doctor  Doctor  @relation(fields: [doctorId], references: [id])
-  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+// === ACHIEVEMENTS & AWARDS ===
+model DoctorAchievement {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  
+  title           String   // "Best Cardiologist Award"
+  type            String   // "AWARD" | "RECOGNITION" | "FELLOWSHIP" | "GRANT"
+  organization    String   // Awarding organization
+  year            Int?
+  description     String?
+  certificateUrl  String?
+  
+  createdAt       DateTime @default(now())
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === PUBLICATIONS & RESEARCH ===
+model DoctorPublication {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  
+  title           String
+  type            String   // "JOURNAL" | "BOOK" | "CHAPTER" | "CONFERENCE" | "THESIS"
+  journal         String?  // Journal/Publisher name
+  year            Int?
+  authors         String?  // Co-authors
+  doi             String?  // Digital Object Identifier
+  url             String?  // Link to publication
+  abstract        String?
+  citationCount   Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === PROFESSIONAL MEMBERSHIPS ===
+model DoctorMembership {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  
+  organization    String   // "Bangladesh Medical Association"
+  membershipType  String?  // "Fellow" | "Member" | "Associate"
+  membershipId    String?
+  joinedYear      Int?
+  expiryYear      Int?
+  isActive        Boolean  @default(true)
+  certificateUrl  String?
+  
+  createdAt       DateTime @default(now())
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === TRAININGS & CERTIFICATIONS ===
+model DoctorTraining {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  
+  title           String   // "Advanced Cardiac Life Support"
+  type            String   // "TRAINING" | "WORKSHOP" | "CERTIFICATION" | "CME"
+  institution     String
+  country         String   @default("Bangladesh")
+  year            Int?
+  duration        String?  // "2 weeks" | "6 months"
+  certificateUrl  String?
+  
+  createdAt       DateTime @default(now())
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === SERVICES OFFERED ===
+model DoctorService {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  
+  name            String   // "ECG" | "Echo" | "Angiography Consultation"
+  namebn          String?  // Bangla name
+  description     String?
+  fee             Int?
+  duration        Int?     // in minutes
+  isAvailable     Boolean  @default(true)
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === FAQs ===
+model DoctorFAQ {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  
+  question        String
+  questionBn      String?
+  answer          String
+  answerBn        String?
+  displayOrder    Int      @default(0)
+  isPublished     Boolean  @default(true)
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+// === REVIEWS & RATINGS ===
+model DoctorReview {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  patientId       Int?
+  appointmentId   Int?     @unique
+  
+  rating          Int      // 1-5
+  title           String?
+  comment         String?
+  
+  // Detailed ratings
+  ratingPunctuality    Int? // 1-5
+  ratingBehavior       Int? // 1-5
+  ratingExplanation    Int? // 1-5
+  ratingEffectiveness  Int? // 1-5
+  
+  isVerified      Boolean  @default(false) // Verified patient
+  isPublished     Boolean  @default(true)
+  doctorReply     String?
+  doctorRepliedAt DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient         Patient? @relation(fields: [patientId], references: [id])
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
+}
+
+// === VERIFICATION HISTORY ===
+model DoctorVerification {
+  id              Int      @id @default(autoincrement())
+  doctorId        Int
+  
+  action          String   // "SUBMITTED" | "APPROVED" | "REJECTED" | "SUSPENDED" | "REACTIVATED"
+  reason          String?
+  notes           String?
+  approvedById    Int?
+  
+  createdAt       DateTime @default(now())
+  
+  doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  approvedBy      Admin?   @relation("ApprovedBy", fields: [approvedById], references: [id])
+}
+
+// ==================== PATIENT ====================
+
+model Patient {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @unique
+  
+  name            String
+  nameEn          String?
+  dateOfBirth     DateTime?
+  gender          String?
+  bloodGroup      String?
+  profilePhoto    String?
+  
+  // Contact
+  email           String?
+  alternatePhone  String?
+  
+  // Address
+  address         String?
+  area            String?
+  city            String?
+  
+  // Emergency Contact
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  emergencyContactRelation String?
+  
+  // Medical Info
+  allergies       String?  // JSON array
+  chronicConditions String? // JSON array
+  currentMedications String? // JSON array
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation(fields: [userId], references: [id])
+  appointments    Appointment[]
+  reviews         DoctorReview[]
+}
+
+// ==================== CLINIC ====================
+
+model Clinic {
+  id              Int      @id @default(autoincrement())
+  
+  name            String
+  type            String   @default("HOSPITAL") // "HOSPITAL" | "CLINIC" | "DIAGNOSTIC"
+  
+  // Address
+  address         String
+  area            String
+  city            String
+  district        String?
+  
+  // Contact
+  phone           String?
+  email           String?
+  website         String?
+  
+  // Facilities
+  hasEmergency    Boolean  @default(false)
+  hasPharmacy     Boolean  @default(false)
+  hasLab          Boolean  @default(false)
+  
+  logoUrl         String?
+  isVerified      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  doctorChambers  DoctorChamber[]
+  appointments    Appointment[]
+}
+
+// ==================== APPOINTMENT ====================
+
+model Appointment {
+  id                  Int      @id @default(autoincrement())
+  patientId           Int
+  doctorId            Int
+  chamberId           Int
+  clinicId            Int?
+  
+  // Scheduling
+  date                DateTime
+  startTime           String
+  endTime             String?
+  serialNumber        Int?
+  
+  // Status
+  status              String   @default("REQUESTED") // "REQUESTED" | "CONFIRMED" | "CHECKED_IN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "NO_SHOW"
+  
+  // Visit Details
+  visitType           String   // "NEW" | "FOLLOW_UP" | "REPORT_CHECK"
+  consultationType    String   @default("CHAMBER") // "CHAMBER" | "ONLINE" | "HOME_VISIT"
+  
+  // Patient Info (snapshot at booking time)
+  patientName         String?
+  patientPhone        String?
+  patientAge          Int?
+  patientGender       String?
+  
+  // Clinical
+  symptoms            String?
+  diagnosis           String?
+  prescription        String?  // JSON
+  notes               String?
+  
+  // Financial
+  fee                 Int?
+  isPaid              Boolean  @default(false)
+  paymentMethod       String?
+  paymentReference    String?
+  
+  // Timestamps
+  bookedAt            DateTime @default(now())
+  confirmedAt         DateTime?
+  checkedInAt         DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Relations
+  patient             Patient  @relation(fields: [patientId], references: [id])
+  doctor              Doctor   @relation(fields: [doctorId], references: [id])
+  chamber             DoctorChamber @relation(fields: [chamberId], references: [id])
+  clinic              Clinic?  @relation(fields: [clinicId], references: [id])
+  review              DoctorReview?
+}
+
+// ==================== SPECIALTIES MASTER ====================
+
+model Specialty {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique
+  nameBn          String?
+  icon            String?
+  description     String?
+  isActive        Boolean  @default(true)
+  displayOrder    Int      @default(0)
 }

@@ -15,7 +15,7 @@ export class AppointmentsController {
     @Request() req,
     @Body() dto: {
       doctorId: number;
-      clinicId: number;
+      chamberId: number;
       date: string;
       startTime: string;
       visitType: VisitType;
@@ -28,7 +28,7 @@ export class AppointmentsController {
     return this.appointmentsService.create(req.user.patient.id, dto);
   }
 
-  // Patient: Check history with a doctor (for visit type suggestion)
+  // Patient: Check history with a doctor
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PATIENT')
   @Get('history/:doctorId')
@@ -65,12 +65,12 @@ export class AppointmentsController {
   // Doctor: Get today's queue
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DOCTOR')
-  @Get('doctor/queue/:clinicId')
+  @Get('doctor/queue/:chamberId')
   async getTodayQueue(
     @Request() req,
-    @Param('clinicId', ParseIntPipe) clinicId: number,
+    @Param('chamberId', ParseIntPipe) chamberId: number,
   ) {
-    return this.appointmentsService.getTodayQueue(req.user.doctor.id, clinicId);
+    return this.appointmentsService.getTodayQueue(req.user.doctor.id, chamberId);
   }
 
   // Doctor: Update appointment status
@@ -91,18 +91,18 @@ export class AppointmentsController {
   async cancel(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
+    @Body('reason') reason?: string,
   ) {
-    return this.appointmentsService.cancel(id, req.user.id, req.user.role);
+    return this.appointmentsService.cancel(id, req.user.id, req.user.role, reason);
   }
 
   // Public: Get available slots
-  @Get('slots/:doctorId/:clinicId')
+  @Get('slots/:doctorId/:chamberId')
   async getAvailableSlots(
     @Param('doctorId', ParseIntPipe) doctorId: number,
-    @Param('clinicId', ParseIntPipe) clinicId: number,
+    @Param('chamberId', ParseIntPipe) chamberId: number,
     @Query('date') date: string,
   ) {
-    return this.appointmentsService.getAvailableSlots(doctorId, clinicId, date);
+    return this.appointmentsService.getAvailableSlots(doctorId, chamberId, date);
   }
 }
-

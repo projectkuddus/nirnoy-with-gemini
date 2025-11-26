@@ -14,6 +14,7 @@ import { DoctorSearch } from "./pages/DoctorSearch";
 import { PatientDashboard } from "./pages/PatientDashboard";
 import { DoctorDashboard } from "./pages/DoctorDashboard";
 import { DoctorProfile } from "./pages/DoctorProfile";
+import { DoctorRegistration } from "./pages/DoctorRegistration";
 import { Privacy } from "./pages/Privacy";
 import { About } from "./pages/About";
 import { UserRole } from "./types";
@@ -106,6 +107,7 @@ const AppContent: React.FC = () => {
         />
         <Route path="/search" element={<DoctorSearch />} />
         <Route path="/doctors/:id" element={<DoctorProfile />} />
+        <Route path="/doctor-registration" element={<DoctorRegistration />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/about" element={<About />} />
 

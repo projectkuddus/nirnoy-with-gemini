@@ -1,12 +1,17 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserRole } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface LoginProps {
   onLogin: (role: UserRole) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const navigate = useNavigate();
+  const { language } = useLanguage();
+  const isBn = language === 'bn';
   const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>('patient');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -118,10 +123,27 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             )}
           </form>
 
+          {/* Doctor Registration Link */}
+          {activeTab === 'doctor' && (
+            <div className="mt-6 text-center">
+              <p className="text-slate-500 text-sm mb-2">
+                {isBn ? 'নতুন ডাক্তার?' : 'New Doctor?'}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/doctor-registration')}
+                className="text-teal-600 font-bold hover:text-teal-700 transition flex items-center justify-center gap-2 mx-auto"
+              >
+                <i className="fas fa-user-plus"></i>
+                {isBn ? 'নির্ণয় কেয়ারে যোগ দিন' : 'Join Nirnoy Care'}
+              </button>
+            </div>
+          )}
+
           {/* Demo Hints */}
           <div className="mt-8 p-3 bg-yellow-50 rounded-lg border border-yellow-100 text-xs text-yellow-800">
-            <p className="font-bold mb-1"><i className="fas fa-info-circle mr-1"></i> Demo Credentials:</p>
-            <p>Use any number. OTP is not checked.</p>
+            <p className="font-bold mb-1"><i className="fas fa-info-circle mr-1"></i> {isBn ? 'ডেমো তথ্য:' : 'Demo Credentials:'}</p>
+            <p>{isBn ? 'যেকোনো নম্বর ব্যবহার করুন। OTP চেক করা হয় না।' : 'Use any number. OTP is not checked.'}</p>
           </div>
         </div>
       </div>
