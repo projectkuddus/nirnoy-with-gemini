@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Doctor, Chamber } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -18,12 +18,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [visitType, setVisitType] = useState<VisitType>('NEW');
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedSlot, setSelectedSlot] = useState<{ time: string; serial: number } | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<{ time: string; serial: number; display: string } | null>(null);
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
+  
+  // Clear slot when date changes
+  useEffect(() => {
+    setSelectedSlot(null);
+  }, [selectedDate]);
 
   // Translations
   const t = {
@@ -85,18 +90,27 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     });
   }, [isBn]);
 
-  // Generate time slots
+  // Generate time slots - stable based on date
   const slots = useMemo(() => {
     const result: { time: string; display: string; serial: number; available: boolean; period: string }[] = [];
     let serial = 1;
     
+    // Use date as seed for consistent availability
+    const dateSeed = selectedDate ? parseInt(selectedDate.replace(/-/g, '')) : 20241126;
+    const pseudoRandom = (index: number) => {
+      const x = Math.sin(dateSeed + index) * 10000;
+      return x - Math.floor(x);
+    };
+    
+    let slotIndex = 0;
+    
     // Morning: 9 AM - 12 PM
     for (let h = 9; h < 12; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const available = Math.random() > 0.25;
+        const available = pseudoRandom(slotIndex++) > 0.2; // 80% available
         result.push({
           time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
-          display: `${h > 12 ? h - 12 : h}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`,
+          display: `${h}:${m.toString().padStart(2, '0')} AM`,
           serial: available ? serial++ : 0,
           available,
           period: 'morning',
@@ -107,10 +121,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     // Afternoon: 3 PM - 6 PM
     for (let h = 15; h < 18; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const available = Math.random() > 0.25;
+        const available = pseudoRandom(slotIndex++) > 0.2;
         result.push({
           time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
-          display: `${h > 12 ? h - 12 : h}:${m.toString().padStart(2, '0')} PM`,
+          display: `${h - 12}:${m.toString().padStart(2, '0')} PM`,
           serial: available ? serial++ : 0,
           available,
           period: 'afternoon',
@@ -121,10 +135,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     // Evening: 6 PM - 9 PM
     for (let h = 18; h < 21; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const available = Math.random() > 0.25;
+        const available = pseudoRandom(slotIndex++) > 0.2;
         result.push({
           time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
-          display: `${h > 12 ? h - 12 : h}:${m.toString().padStart(2, '0')} PM`,
+          display: `${h - 12}:${m.toString().padStart(2, '0')} PM`,
           serial: available ? serial++ : 0,
           available,
           period: 'evening',
@@ -133,17 +147,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     }
     
     return result;
-  }, []);
+  }, [selectedDate]);
 
   // Calculate fee
   const baseFee = chamber.fee;
   const fee = visitType === 'FOLLOW_UP' ? Math.round(baseFee * 0.5) : visitType === 'REPORT' ? Math.round(baseFee * 0.3) : baseFee;
   const discount = baseFee - fee;
 
-  // Validate phone
+  // Validate phone - more lenient for BD numbers
   const isValidPhone = (phone: string) => {
     const digits = phone.replace(/\D/g, '');
-    return /^(01[3-9]\d{8}|1[3-9]\d{8})$/.test(digits);
+    // Accept: 01712345678 (11 digits) or 1712345678 (10 digits)
+    return digits.length >= 10 && digits.length <= 11;
   };
 
   // Handle booking
@@ -156,11 +171,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   };
 
   // Can proceed to next step?
-  const canProceed = () => {
-    if (step === 1) return true;
-    if (step === 2) return selectedDate && selectedSlot;
-    if (step === 3) return patientName.trim() && isValidPhone(patientPhone);
-    return false;
+  const canProceed = (): boolean => {
+    switch (step) {
+      case 1:
+        return true; // Always can proceed from step 1
+      case 2:
+        return !!(selectedDate && selectedSlot); // Need date and slot
+      case 3:
+        return !!(patientName.trim().length >= 2 && patientPhone.length >= 10); // Name and phone
+      default:
+        return false;
+    }
   };
 
   // Success Screen
@@ -372,7 +393,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                       {slots.filter(s => s.period === 'morning').slice(0, 8).map((slot) => (
                         <button
                           key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot(slot)}
+                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: slot.serial, display: slot.display })}
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
@@ -398,7 +419,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                       {slots.filter(s => s.period === 'afternoon').slice(0, 8).map((slot) => (
                         <button
                           key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot(slot)}
+                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: slot.serial, display: slot.display })}
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
@@ -424,7 +445,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                       {slots.filter(s => s.period === 'evening').slice(0, 8).map((slot) => (
                         <button
                           key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot(slot)}
+                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: slot.serial, display: slot.display })}
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
