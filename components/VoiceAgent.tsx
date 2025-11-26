@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { GoogleGenAI, Modality } from '@google/genai';
 import { MOCK_DOCTORS } from '../data/mockData';
 
 // ============ CONFIGURATION ============
@@ -7,7 +8,6 @@ const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
 
 // ============ AUDIO HELPERS ============
 
-// Convert Float32Array to PCM16 blob
 function float32ToPCM16Blob(float32Data: Float32Array): { data: string; mimeType: string } {
   const int16 = new Int16Array(float32Data.length);
   for (let i = 0; i < float32Data.length; i++) {
@@ -27,7 +27,6 @@ function float32ToPCM16Blob(float32Data: Float32Array): { data: string; mimeType
   };
 }
 
-// Decode base64 to Uint8Array
 function base64ToUint8Array(base64: string): Uint8Array {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
@@ -37,13 +36,8 @@ function base64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
-// Decode PCM16 to AudioBuffer
-async function pcm16ToAudioBuffer(
-  data: Uint8Array,
-  audioContext: AudioContext,
-  sampleRate: number = 24000
-): Promise<AudioBuffer> {
-  const int16Data = new Int16Array(data.buffer);
+function pcm16ToAudioBuffer(data: Uint8Array, audioContext: AudioContext, sampleRate: number = 24000): AudioBuffer {
+  const int16Data = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
   const float32Data = new Float32Array(int16Data.length);
   
   for (let i = 0; i < int16Data.length; i++) {
@@ -56,11 +50,8 @@ async function pcm16ToAudioBuffer(
   return audioBuffer;
 }
 
-// Downsample audio to target sample rate
 function downsampleBuffer(buffer: Float32Array, inputSampleRate: number, outputSampleRate: number): Float32Array {
-  if (inputSampleRate === outputSampleRate) {
-    return buffer;
-  }
+  if (inputSampleRate === outputSampleRate) return buffer;
   
   const ratio = inputSampleRate / outputSampleRate;
   const newLength = Math.round(buffer.length / ratio);
@@ -74,14 +65,19 @@ function downsampleBuffer(buffer: Float32Array, inputSampleRate: number, outputS
   return result;
 }
 
+// ============ GREETING ============
+function getTimeBasedGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'সুপ্রভাত';
+  if (hour >= 12 && hour < 17) return 'শুভ দুপুর';
+  if (hour >= 17 && hour < 20) return 'শুভ সন্ধ্যা';
+  return 'শুভ রাত্রি';
+}
+
 // ============ SYSTEM PROMPT ============
 function buildSystemPrompt(): string {
-  const today = new Date().toLocaleDateString('bn-BD', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
+  const today = new Date().toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const greeting = getTimeBasedGreeting();
   
   const doctorList = MOCK_DOCTORS.slice(0, 10).map(d => 
     `${d.name} (${d.specialties[0]}) - ${d.chambers[0]?.name}, ফি: ৳${d.chambers[0]?.fee}`
@@ -91,23 +87,27 @@ function buildSystemPrompt(): string {
 ## আপনার পরিচয়
 আপনি নির্ণয় কেয়ার (Nirnoy Care) এর AI ভয়েস এসিস্ট্যান্ট।
 
-## নির্দেশনা
-- বাংলাদেশী বাংলায় কথা বলুন
-- প্রথমে বলুন: "আসসালামু আলাইকুম! নির্ণয় কেয়ারে স্বাগতম। কীভাবে সাহায্য করতে পারি?"
-- সংক্ষিপ্ত উত্তর দিন (১-২ বাক্য)
+## অত্যন্ত গুরুত্বপূর্ণ - প্রথম কথা
+কল শুরু হওয়ার সাথে সাথেই প্রথমে নিজে থেকে বলুন:
+"আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। কীভাবে সাহায্য করতে পারি?"
+
+## ভাষা নির্দেশনা
+শুধুমাত্র বাংলাদেশী বাংলায় কথা বলুন। "জি", "আচ্ছা", "ঠিক আছে", "ভাই", "আপা" ব্যবহার করুন।
 
 ## আজকের তারিখ: ${today}
 
 ## ডাক্তার তালিকা:
 ${doctorList}
 
-## কাজ
+## কাজ:
 1. ডাক্তার খোঁজা
 2. অ্যাপয়েন্টমেন্ট বুকিং
 3. ফি ও সময়সূচী জানানো
 
-## জরুরি অবস্থা
+## জরুরি অবস্থা:
 বুকে ব্যথা, শ্বাসকষ্ট বললে: "এটা ইমার্জেন্সি! 999 এ কল করুন।"
+
+## সংক্ষিপ্ত উত্তর দিন (১-২ বাক্য)।
 `;
 }
 
@@ -123,43 +123,55 @@ export const VoiceAgent: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Refs
+  const aiClientRef = useRef<GoogleGenAI | null>(null);
+  const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const inputContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const websocketRef = useRef<WebSocket | null>(null);
   const audioQueueRef = useRef<AudioBufferSourceNode[]>([]);
   const nextPlayTimeRef = useRef<number>(0);
+  const isConnectedRef = useRef(false);
 
-  // Cleanup function
+  // Initialize AI client
+  useEffect(() => {
+    if (hasValidApiKey) {
+      aiClientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    }
+  }, []);
+
+  // Cleanup
   const cleanup = useCallback(() => {
-    // Stop audio sources
+    isConnectedRef.current = false;
+    
     audioQueueRef.current.forEach(source => {
       try { source.stop(); } catch (e) {}
     });
     audioQueueRef.current = [];
     
-    // Close WebSocket
-    if (websocketRef.current) {
-      try { websocketRef.current.close(); } catch (e) {}
-      websocketRef.current = null;
+    if (sessionRef.current) {
+      try { sessionRef.current.close(); } catch (e) {}
+      sessionRef.current = null;
     }
     
-    // Stop media stream
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
     }
     
-    // Disconnect processor
     if (processorRef.current) {
       try { processorRef.current.disconnect(); } catch (e) {}
       processorRef.current = null;
     }
     
-    // Close audio context
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       try { audioContextRef.current.close(); } catch (e) {}
       audioContextRef.current = null;
+    }
+    
+    if (inputContextRef.current && inputContextRef.current.state !== 'closed') {
+      try { inputContextRef.current.close(); } catch (e) {}
+      inputContextRef.current = null;
     }
     
     nextPlayTimeRef.current = 0;
@@ -170,14 +182,38 @@ export const VoiceAgent: React.FC = () => {
     setError(null);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
 
+  // Play audio
+  const playAudioBuffer = useCallback((buffer: AudioBuffer, audioContext: AudioContext) => {
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    
+    const currentTime = audioContext.currentTime;
+    const startTime = Math.max(currentTime, nextPlayTimeRef.current);
+    
+    source.start(startTime);
+    nextPlayTimeRef.current = startTime + buffer.duration;
+    
+    audioQueueRef.current.push(source);
+    
+    source.onended = () => {
+      const index = audioQueueRef.current.indexOf(source);
+      if (index > -1) audioQueueRef.current.splice(index, 1);
+      
+      if (audioQueueRef.current.length === 0 && status === 'speaking') {
+        setStatus('listening');
+        setStatusText('কথা বলুন...');
+      }
+    };
+  }, [status]);
+
   // Start session
   const startSession = async () => {
-    if (!hasValidApiKey) {
+    if (!hasValidApiKey || !aiClientRef.current) {
       setError('API Key কনফিগার করা হয়নি');
       return;
     }
@@ -189,132 +225,129 @@ export const VoiceAgent: React.FC = () => {
       setStatusText('কানেক্ট হচ্ছে...');
       setError(null);
 
-      // Get microphone
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        }
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       });
       mediaStreamRef.current = stream;
 
-      // Create audio context
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const audioContext = new AudioContextClass({ sampleRate: 24000 });
-      audioContextRef.current = audioContext;
-
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
+      audioContextRef.current = new AudioContextClass({ sampleRate: 24000 });
+      
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
       }
 
-      // Connect to Gemini
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
-      const ws = new WebSocket(wsUrl);
-      websocketRef.current = ws;
+      const systemPrompt = buildSystemPrompt();
 
-      ws.onopen = () => {
-        const setupMessage = {
-          setup: {
-            model: 'models/gemini-2.0-flash-exp',
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: 'Kore' }
-                }
-              }
+      const session = await aiClientRef.current.live.connect({
+        model: 'gemini-2.0-flash-exp',
+        config: {
+          responseModalities: [Modality.AUDIO],
+          systemInstruction: systemPrompt,
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
             },
-            systemInstruction: {
-              parts: [{ text: buildSystemPrompt() }]
-            }
-          }
-        };
-        ws.send(JSON.stringify(setupMessage));
-      };
+          },
+        },
+        callbacks: {
+          onopen: () => {
+            isConnectedRef.current = true;
+            setStatus('connected');
+            setStatusText('সংযুক্ত হয়েছে...');
 
-      ws.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data);
+            // Trigger greeting
+            setTimeout(() => {
+              if (sessionRef.current && isConnectedRef.current) {
+                sessionRef.current.sendClientContent({
+                  turns: [{ role: 'user', parts: [{ text: 'হ্যালো' }] }],
+                  turnComplete: true
+                });
+              }
+            }, 500);
 
-          if (data.setupComplete) {
-            setStatus('listening');
-            setStatusText('কথা বলুন...');
-            startAudioCapture(stream, audioContext, ws);
-          }
-
-          if (data.serverContent?.modelTurn?.parts) {
-            for (const part of data.serverContent.modelTurn.parts) {
-              if (part.inlineData?.data) {
-                setStatus('speaking');
-                setStatusText('বলছে...');
-                
-                const audioData = base64ToUint8Array(part.inlineData.data);
-                const audioBuffer = await pcm16ToAudioBuffer(audioData, audioContext, 24000);
-                playAudioBuffer(audioBuffer, audioContext);
+            startAudioCapture(stream);
+          },
+          onmessage: (message: any) => {
+            const audioPart = message.serverContent?.modelTurn?.parts?.find(
+              (p: any) => p.inlineData?.mimeType?.startsWith('audio/')
+            );
+            
+            if (audioPart?.inlineData?.data && audioContextRef.current) {
+              setStatus('speaking');
+              setStatusText('বলছে...');
+              
+              try {
+                const audioData = base64ToUint8Array(audioPart.inlineData.data);
+                const audioBuffer = pcm16ToAudioBuffer(audioData, audioContextRef.current, 24000);
+                playAudioBuffer(audioBuffer, audioContextRef.current);
+              } catch (e) {
+                console.error('Audio decode error:', e);
               }
             }
-          }
+            
+            if (message.serverContent?.turnComplete) {
+              setStatus('listening');
+              setStatusText('কথা বলুন...');
+            }
 
-          if (data.serverContent?.turnComplete) {
-            setStatus('listening');
-            setStatusText('কথা বলুন...');
-          }
-        } catch (e) {
-          console.error('Message parse error:', e);
-        }
-      };
+            if (message.serverContent?.interrupted) {
+              audioQueueRef.current.forEach(s => { try { s.stop(); } catch (e) {} });
+              audioQueueRef.current = [];
+              if (audioContextRef.current) {
+                nextPlayTimeRef.current = audioContextRef.current.currentTime;
+              }
+            }
+          },
+          onclose: () => {
+            isConnectedRef.current = false;
+            cleanup();
+          },
+          onerror: (err: any) => {
+            console.error('Session error:', err);
+            setError('সংযোগে সমস্যা');
+            setStatus('error');
+            cleanup();
+          },
+        },
+      });
 
-      ws.onerror = () => {
-        setError('সংযোগে সমস্যা');
-        setStatus('error');
-        setStatusText('ত্রুটি');
-      };
-
-      ws.onclose = () => {
-        if (status !== 'error') {
-          cleanup();
-        }
-      };
+      sessionRef.current = session;
 
     } catch (err: any) {
       let errorMsg = 'ভয়েস এজেন্ট শুরু করা যাচ্ছে না';
-      if (err.name === 'NotAllowedError') {
-        errorMsg = 'মাইক্রোফোন পারমিশন দিন';
-      }
+      if (err.name === 'NotAllowedError') errorMsg = 'মাইক্রোফোন পারমিশন দিন';
       setError(errorMsg);
       setStatus('error');
       cleanup();
     }
   };
 
-  // Start audio capture
-  const startAudioCapture = (stream: MediaStream, audioContext: AudioContext, ws: WebSocket) => {
-    const source = audioContext.createMediaStreamSource(stream);
-    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+  // Audio capture
+  const startAudioCapture = (stream: MediaStream) => {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    inputContextRef.current = new AudioContextClass();
+    const source = inputContextRef.current.createMediaStreamSource(stream);
+    
+    const processor = inputContextRef.current.createScriptProcessor(4096, 1, 1);
     processorRef.current = processor;
 
     let audioBuffer: Float32Array[] = [];
     let lastSendTime = Date.now();
 
     processor.onaudioprocess = (event) => {
-      if (ws.readyState !== WebSocket.OPEN) return;
+      if (!isConnectedRef.current || !sessionRef.current) return;
 
       const inputData = event.inputBuffer.getChannelData(0);
 
-      // Volume visualization
       let sum = 0;
-      for (let i = 0; i < inputData.length; i++) {
-        sum += inputData[i] * inputData[i];
-      }
+      for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
       const rms = Math.sqrt(sum / inputData.length);
       setVolume(Math.min(1, rms * 5));
 
-      // Downsample to 16kHz
-      const downsampled = downsampleBuffer(new Float32Array(inputData), audioContext.sampleRate, 16000);
+      const downsampled = downsampleBuffer(new Float32Array(inputData), inputContextRef.current!.sampleRate, 16000);
       audioBuffer.push(downsampled);
 
-      // Send every 100ms
       const now = Date.now();
       if (now - lastSendTime >= 100 && audioBuffer.length > 0) {
         const totalLength = audioBuffer.reduce((acc, buf) => acc + buf.length, 0);
@@ -327,14 +360,7 @@ export const VoiceAgent: React.FC = () => {
 
         const pcmBlob = float32ToPCM16Blob(combined);
         try {
-          ws.send(JSON.stringify({
-            realtimeInput: {
-              mediaChunks: [{
-                mimeType: pcmBlob.mimeType,
-                data: pcmBlob.data
-              }]
-            }
-          }));
+          sessionRef.current.sendRealtimeInput({ media: pcmBlob });
         } catch (e) {
           console.error('Send error:', e);
         }
@@ -345,33 +371,7 @@ export const VoiceAgent: React.FC = () => {
     };
 
     source.connect(processor);
-    processor.connect(audioContext.destination);
-  };
-
-  // Play audio buffer
-  const playAudioBuffer = (buffer: AudioBuffer, audioContext: AudioContext) => {
-    const source = audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContext.destination);
-
-    const currentTime = audioContext.currentTime;
-    const startTime = Math.max(currentTime, nextPlayTimeRef.current);
-
-    source.start(startTime);
-    nextPlayTimeRef.current = startTime + buffer.duration;
-
-    audioQueueRef.current.push(source);
-
-    source.onended = () => {
-      const index = audioQueueRef.current.indexOf(source);
-      if (index > -1) {
-        audioQueueRef.current.splice(index, 1);
-      }
-      if (audioQueueRef.current.length === 0 && status === 'speaking') {
-        setStatus('listening');
-        setStatusText('কথা বলুন...');
-      }
-    };
+    processor.connect(inputContextRef.current.destination);
   };
 
   return (
@@ -401,9 +401,7 @@ export const VoiceAgent: React.FC = () => {
             <p className="text-xs text-slate-600 font-medium text-center">{statusText}</p>
           </div>
           
-          {error && (
-            <p className="text-xs text-red-500 text-center mb-2">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-500 text-center mb-2">{error}</p>}
           
           <p className="text-[10px] text-slate-400 text-center">AI can make mistakes. Verify important info.</p>
         </div>

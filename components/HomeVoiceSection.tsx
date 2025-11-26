@@ -1,12 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { GoogleGenAI, Modality } from '@google/genai';
 import { MOCK_DOCTORS } from '../data/mockData';
 
 // ============ CONFIGURATION ============
-// For production, set this in your environment or use a config service
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
-
-// Check if we have a valid API key
 const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
 
 // ============ AUDIO HELPERS ============
@@ -42,12 +39,12 @@ function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 // Decode PCM16 to AudioBuffer
-async function pcm16ToAudioBuffer(
+function pcm16ToAudioBuffer(
   data: Uint8Array,
   audioContext: AudioContext,
   sampleRate: number = 24000
-): Promise<AudioBuffer> {
-  const int16Data = new Int16Array(data.buffer);
+): AudioBuffer {
+  const int16Data = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
   const float32Data = new Float32Array(int16Data.length);
   
   for (let i = 0; i < int16Data.length; i++) {
@@ -88,7 +85,7 @@ function getTimeBasedGreeting(): string {
 }
 
 // ============ SYSTEM PROMPT ============
-function buildSystemPrompt(agentNumber: number, isLoggedIn: boolean): string {
+function buildSystemPrompt(agentNumber: number, isMale: boolean): string {
   const today = new Date().toLocaleDateString('bn-BD', { 
     weekday: 'long', 
     year: 'numeric', 
@@ -102,38 +99,69 @@ function buildSystemPrompt(agentNumber: number, isLoggedIn: boolean): string {
     `${d.name} (${d.specialties[0]}) - ${d.chambers[0]?.name}, ফি: ৳${d.chambers[0]?.fee}`
   ).join('\n');
 
+  const genderContext = isMale 
+    ? 'আপনি একজন পুরুষ এসিস্ট্যান্ট। পুরুষসুলভ কিন্তু বিনয়ী ভাবে কথা বলুন।'
+    : 'আপনি একজন মহিলা এসিস্ট্যান্ট। মহিলাসুলভ এবং সহানুভূতিশীল ভাবে কথা বলুন।';
+
   return `
 ## আপনার পরিচয়
-আপনি "Nirnoy ${agentNumber}", নির্ণয় কেয়ার (Nirnoy Care) এর AI ভয়েস এসিস্ট্যান্ট।
+আপনি "Nirnoy ${agentNumber}", নির্ণয় কেয়ার (Nirnoy Care) এর অফিসিয়াল AI ভয়েস এসিস্ট্যান্ট।
+${genderContext}
 
-## গুরুত্বপূর্ণ নির্দেশনা
-- শুধুমাত্র বাংলাদেশী বাংলায় কথা বলুন
-- প্রথমেই বলুন: "আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। আমি Nirnoy ${agentNumber}। কীভাবে সাহায্য করতে পারি?"
-- সংক্ষিপ্ত উত্তর দিন (১-২ বাক্য)
-- "জি", "আচ্ছা", "ঠিক আছে" ব্যবহার করুন
+## অত্যন্ত গুরুত্বপূর্ণ - প্রথম কথা (MUST DO FIRST)
+কল শুরু হওয়ার সাথে সাথেই আপনাকে অবশ্যই প্রথমে নিজে থেকে বলতে হবে:
+"আসসালামু আলাইকুম! ${greeting}! নির্ণয় কেয়ারে স্বাগতম। আমি Nirnoy ${agentNumber}। কীভাবে সাহায্য করতে পারি?"
 
-## আজকের তারিখ
-${today}
+এটা বলার জন্য ইউজারের কিছু বলার অপেক্ষা করবেন না। কল কানেক্ট হলেই প্রথমে আপনি সালাম দিয়ে শুরু করবেন।
 
-## ডাক্তার তালিকা
+## ভাষা নির্দেশনা (বাংলাদেশী বাংলা - NOT কলকাতার বাংলা)
+শুধুমাত্র বাংলাদেশী বাংলায় কথা বলুন। কলকাতার বাংলা ব্যবহার করবেন না।
+
+### যা বলবেন:
+- "জি" (হ্যাঁ বোঝাতে)
+- "আচ্ছা" (বোঝা গেছে)
+- "ঠিক আছে" (okay)
+- "ভাই" বা "ভাইয়া" (পুরুষদের জন্য)
+- "আপা" বা "বোন" (মহিলাদের জন্য)
+- "কেমন আছেন?"
+- "বলেন" (tell me)
+- "করে দিচ্ছি" / "কইরা দিচ্ছি"
+- "হয়ে গেছে" / "হইছে"
+
+### যা বলবেন না (কলকাতার স্টাইল):
+- "দাদা" ❌ (use ভাই)
+- "দিদি" ❌ (use আপা)
+- "হ্যাঁ গো" ❌
+- "এক্ষুনি" ❌ (use এখনই)
+- "বেশ" ❌ (use ঠিক আছে)
+
+## আজকের তারিখ: ${today}
+
+## ডাক্তার তালিকা:
 ${doctorList}
 
-## আপনার কাজ
+## আপনার কাজ:
 1. ডাক্তার খোঁজায় সাহায্য করা
-2. অ্যাপয়েন্টমেন্ট বুকিং করা
+2. অ্যাপয়েন্টমেন্ট বুকিং করা  
 3. ফি ও সময়সূচী জানানো
 4. সাধারণ স্বাস্থ্য প্রশ্নের উত্তর দেওয়া
 
-## বুকিং প্রক্রিয়া
-${isLoggedIn ? 
-'ইউজার লগইন আছে। সরাসরি নাম ও তারিখ জিজ্ঞেস করে বুকিং করুন।' : 
-'গেস্ট ইউজার। প্রথমে মোবাইল নম্বর নিন, তারপর OTP ভেরিফাই করে বুকিং করুন।'}
+## বুকিং প্রক্রিয়া:
+1. জিজ্ঞেস করুন: "কোন ধরনের ডাক্তার দরকার?" বা "কী সমস্যা?"
+2. ডাক্তার সাজেস্ট করুন
+3. রোগীর নাম জিজ্ঞেস করুন
+4. মোবাইল নম্বর নিন
+5. কনফার্ম করুন এবং সিরিয়াল দিন
 
-## জরুরি অবস্থা
-বুকে ব্যথা, শ্বাসকষ্ট বললে বলুন: "এটা ইমার্জেন্সি! এখনই 999 এ কল করুন বা নিকটস্থ হাসপাতালে যান।"
+## জরুরি অবস্থা:
+বুকে ব্যথা, শ্বাসকষ্ট, অজ্ঞান হওয়া বললে সাথে সাথে বলুন:
+"এটা ইমার্জেন্সি! এখনই 999 এ কল করুন বা নিকটস্থ হাসপাতালে যান!"
 
-## শেষ করতে
+## কথোপকথন শেষ করতে:
 "আর কিছু লাগবে?" জিজ্ঞেস করুন। শেষে "আল্লাহ হাফেজ" বা "ধন্যবাদ, ভালো থাকবেন" বলুন।
+
+## সংক্ষিপ্ত উত্তর:
+১-২ বাক্যে উত্তর দিন। লম্বা লম্বা কথা বলবেন না।
 `;
 }
 
@@ -150,8 +178,6 @@ interface VoiceAgentState {
 
 // ============ MAIN COMPONENT ============
 export const HomeVoiceSection: React.FC = () => {
-  const navigate = useNavigate();
-  
   const [state, setState] = useState<VoiceAgentState>({
     activeAgent: null,
     status: 'idle',
@@ -161,25 +187,36 @@ export const HomeVoiceSection: React.FC = () => {
   });
 
   // Refs for audio handling
+  const aiClientRef = useRef<GoogleGenAI | null>(null);
+  const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const workletNodeRef = useRef<AudioWorkletNode | ScriptProcessorNode | null>(null);
-  const websocketRef = useRef<WebSocket | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<AudioBufferSourceNode[]>([]);
   const nextPlayTimeRef = useRef<number>(0);
+  const isConnectedRef = useRef(false);
+
+  // Initialize AI client
+  useEffect(() => {
+    if (hasValidApiKey) {
+      aiClientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    }
+  }, []);
 
   // Cleanup function
   const cleanup = useCallback(() => {
+    isConnectedRef.current = false;
+    
     // Stop all audio sources
     audioQueueRef.current.forEach(source => {
       try { source.stop(); } catch (e) {}
     });
     audioQueueRef.current = [];
     
-    // Close WebSocket
-    if (websocketRef.current) {
-      try { websocketRef.current.close(); } catch (e) {}
-      websocketRef.current = null;
+    // Close session
+    if (sessionRef.current) {
+      try { sessionRef.current.close(); } catch (e) {}
+      sessionRef.current = null;
     }
     
     // Stop media stream
@@ -188,10 +225,10 @@ export const HomeVoiceSection: React.FC = () => {
       mediaStreamRef.current = null;
     }
     
-    // Disconnect worklet
-    if (workletNodeRef.current) {
-      try { workletNodeRef.current.disconnect(); } catch (e) {}
-      workletNodeRef.current = null;
+    // Disconnect processor
+    if (processorRef.current) {
+      try { processorRef.current.disconnect(); } catch (e) {}
+      processorRef.current = null;
     }
     
     // Close audio context
@@ -216,13 +253,43 @@ export const HomeVoiceSection: React.FC = () => {
     return () => cleanup();
   }, [cleanup]);
 
+  // Play audio buffer
+  const playAudioBuffer = useCallback((buffer: AudioBuffer, audioContext: AudioContext) => {
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    
+    const currentTime = audioContext.currentTime;
+    const startTime = Math.max(currentTime, nextPlayTimeRef.current);
+    
+    source.start(startTime);
+    nextPlayTimeRef.current = startTime + buffer.duration;
+    
+    audioQueueRef.current.push(source);
+    
+    source.onended = () => {
+      const index = audioQueueRef.current.indexOf(source);
+      if (index > -1) {
+        audioQueueRef.current.splice(index, 1);
+      }
+      
+      if (audioQueueRef.current.length === 0) {
+        setState(prev => {
+          if (prev.status === 'speaking') {
+            return { ...prev, status: 'listening', statusText: 'কথা বলুন...' };
+          }
+          return prev;
+        });
+      }
+    };
+  }, []);
+
   // Start voice session
   const startSession = async (agentNumber: 1 | 2) => {
-    // Check API key
-    if (!hasValidApiKey) {
+    if (!hasValidApiKey || !aiClientRef.current) {
       setState(prev => ({
         ...prev,
-        error: 'API Key কনফিগার করা হয়নি। .env ফাইলে VITE_GEMINI_API_KEY সেট করুন।',
+        error: 'API Key কনফিগার করা হয়নি।',
         status: 'error',
         statusText: 'কনফিগারেশন ত্রুটি',
       }));
@@ -246,115 +313,128 @@ export const HomeVoiceSection: React.FC = () => {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 16000, // Request 16kHz if supported
         } 
       });
       mediaStreamRef.current = stream;
 
-      // Create audio context
+      // Create audio context for playback (24kHz output)
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const audioContext = new AudioContextClass({ sampleRate: 24000 });
       audioContextRef.current = audioContext;
       
-      // Resume context (required for some browsers)
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
       }
 
-      // Get user login status
-      const isLoggedIn = !!localStorage.getItem('nirnoy_role');
-      const systemPrompt = buildSystemPrompt(agentNumber, isLoggedIn);
-
-      // Connect to Gemini Live API via WebSocket
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
+      // Build system prompt
+      // Nirnoy 1 = Male (Charon voice), Nirnoy 2 = Female (Kore voice)
+      const isMale = agentNumber === 1;
+      const systemPrompt = buildSystemPrompt(agentNumber, isMale);
       
-      const ws = new WebSocket(wsUrl);
-      websocketRef.current = ws;
+      // Voice selection: Male = Charon, Female = Kore
+      const voiceName = isMale ? 'Charon' : 'Kore';
 
-      ws.onopen = () => {
-        console.log('WebSocket connected');
-        
-        // Send setup message
-        const setupMessage = {
-          setup: {
-            model: 'models/gemini-2.0-flash-exp',
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: agentNumber === 1 ? 'Aoede' : 'Kore'
-                  }
-                }
-              }
+      console.log(`Starting session with voice: ${voiceName}`);
+
+      // Connect to Gemini Live API
+      const session = await aiClientRef.current.live.connect({
+        model: 'gemini-2.0-flash-exp',
+        config: {
+          responseModalities: [Modality.AUDIO],
+          systemInstruction: systemPrompt,
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voiceName,
+              },
             },
-            systemInstruction: {
-              parts: [{ text: systemPrompt }]
-            }
-          }
-        };
-        
-        ws.send(JSON.stringify(setupMessage));
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          // Handle setup complete
-          if (data.setupComplete) {
-            console.log('Setup complete, starting audio capture');
+          },
+        },
+        callbacks: {
+          onopen: () => {
+            console.log('Session opened');
+            isConnectedRef.current = true;
             
             setState(prev => ({
               ...prev,
-              status: 'listening',
-              statusText: 'কথা বলুন...',
+              status: 'connected',
+              statusText: 'সংযুক্ত হয়েছে...',
             }));
+
+            // Send initial greeting prompt to make AI speak first
+            setTimeout(() => {
+              if (sessionRef.current && isConnectedRef.current) {
+                console.log('Sending greeting prompt');
+                sessionRef.current.sendClientContent({
+                  turns: [{
+                    role: 'user',
+                    parts: [{ text: 'হ্যালো' }]
+                  }],
+                  turnComplete: true
+                });
+              }
+            }, 500);
+
+            // Start audio capture
+            startAudioCapture(stream, audioContext);
+          },
+          onmessage: (message: any) => {
+            // Handle audio response
+            const audioPart = message.serverContent?.modelTurn?.parts?.find(
+              (p: any) => p.inlineData?.mimeType?.startsWith('audio/')
+            );
             
-            // Start capturing audio
-            startAudioCapture(stream, audioContext, ws);
-          }
-          
-          // Handle audio response
-          if (data.serverContent?.modelTurn?.parts) {
-            for (const part of data.serverContent.modelTurn.parts) {
-              if (part.inlineData?.data) {
-                setState(prev => ({ ...prev, status: 'speaking', statusText: 'বলছে...' }));
-                
-                const audioData = base64ToUint8Array(part.inlineData.data);
-                const audioBuffer = await pcm16ToAudioBuffer(audioData, audioContext, 24000);
-                
-                playAudioBuffer(audioBuffer, audioContext);
+            if (audioPart?.inlineData?.data && audioContextRef.current) {
+              setState(prev => ({ ...prev, status: 'speaking', statusText: 'বলছে...' }));
+              
+              try {
+                const audioData = base64ToUint8Array(audioPart.inlineData.data);
+                const audioBuffer = pcm16ToAudioBuffer(audioData, audioContextRef.current, 24000);
+                playAudioBuffer(audioBuffer, audioContextRef.current);
+              } catch (e) {
+                console.error('Audio decode error:', e);
               }
             }
-          }
-          
-          // Handle turn complete
-          if (data.serverContent?.turnComplete) {
-            setState(prev => ({ ...prev, status: 'listening', statusText: 'কথা বলুন...' }));
-          }
-          
-        } catch (e) {
-          console.error('Message parse error:', e);
-        }
-      };
+            
+            // Handle turn complete
+            if (message.serverContent?.turnComplete) {
+              setState(prev => ({ 
+                ...prev, 
+                status: 'listening', 
+                statusText: 'কথা বলুন...' 
+              }));
+            }
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setState(prev => ({
-          ...prev,
-          error: 'সংযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।',
-          status: 'error',
-          statusText: 'ত্রুটি',
-        }));
-      };
+            // Handle interruption
+            if (message.serverContent?.interrupted) {
+              audioQueueRef.current.forEach(s => {
+                try { s.stop(); } catch (e) {}
+              });
+              audioQueueRef.current = [];
+              if (audioContextRef.current) {
+                nextPlayTimeRef.current = audioContextRef.current.currentTime;
+              }
+            }
+          },
+          onclose: () => {
+            console.log('Session closed');
+            isConnectedRef.current = false;
+            cleanup();
+          },
+          onerror: (error: any) => {
+            console.error('Session error:', error);
+            setState(prev => ({
+              ...prev,
+              error: 'সংযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।',
+              status: 'error',
+              statusText: 'ত্রুটি',
+            }));
+            cleanup();
+          },
+        },
+      });
 
-      ws.onclose = () => {
-        console.log('WebSocket closed');
-        if (state.status !== 'error') {
-          cleanup();
-        }
-      };
+      sessionRef.current = session;
 
     } catch (err: any) {
       console.error('Session start error:', err);
@@ -364,6 +444,8 @@ export const HomeVoiceSection: React.FC = () => {
         errorMessage = 'মাইক্রোফোন পারমিশন দিন।';
       } else if (err.name === 'NotFoundError') {
         errorMessage = 'মাইক্রোফোন পাওয়া যাচ্ছে না।';
+      } else if (err.message) {
+        errorMessage = `ত্রুটি: ${err.message}`;
       }
       
       setState(prev => ({
@@ -376,21 +458,22 @@ export const HomeVoiceSection: React.FC = () => {
     }
   };
 
-  // Start audio capture and send to WebSocket
-  const startAudioCapture = (stream: MediaStream, audioContext: AudioContext, ws: WebSocket) => {
-    const source = audioContext.createMediaStreamSource(stream);
+  // Start audio capture and send to session
+  const startAudioCapture = (stream: MediaStream, audioContext: AudioContext) => {
+    // Create a separate context for input at native sample rate
+    const inputContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const source = inputContext.createMediaStreamSource(stream);
     
-    // Use ScriptProcessorNode (deprecated but widely supported)
     const bufferSize = 4096;
-    const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
-    workletNodeRef.current = processor;
+    const processor = inputContext.createScriptProcessor(bufferSize, 1, 1);
+    processorRef.current = processor;
     
     let audioBuffer: Float32Array[] = [];
-    const SEND_INTERVAL = 100; // Send every 100ms
+    const SEND_INTERVAL = 100;
     let lastSendTime = Date.now();
     
     processor.onaudioprocess = (event) => {
-      if (ws.readyState !== WebSocket.OPEN) return;
+      if (!isConnectedRef.current || !sessionRef.current) return;
       
       const inputData = event.inputBuffer.getChannelData(0);
       
@@ -402,15 +485,13 @@ export const HomeVoiceSection: React.FC = () => {
       const rms = Math.sqrt(sum / inputData.length);
       setState(prev => ({ ...prev, volume: Math.min(1, rms * 5) }));
       
-      // Downsample to 16kHz if needed
-      const inputSampleRate = audioContext.sampleRate;
-      const downsampled = downsampleBuffer(new Float32Array(inputData), inputSampleRate, 16000);
+      // Downsample to 16kHz
+      const downsampled = downsampleBuffer(new Float32Array(inputData), inputContext.sampleRate, 16000);
       audioBuffer.push(downsampled);
       
       // Send audio every SEND_INTERVAL ms
       const now = Date.now();
       if (now - lastSendTime >= SEND_INTERVAL && audioBuffer.length > 0) {
-        // Combine buffers
         const totalLength = audioBuffer.reduce((acc, buf) => acc + buf.length, 0);
         const combined = new Float32Array(totalLength);
         let offset = 0;
@@ -419,18 +500,12 @@ export const HomeVoiceSection: React.FC = () => {
           offset += buf.length;
         }
         
-        // Convert to PCM16 and send
         const pcmBlob = float32ToPCM16Blob(combined);
         
         try {
-          ws.send(JSON.stringify({
-            realtimeInput: {
-              mediaChunks: [{
-                mimeType: pcmBlob.mimeType,
-                data: pcmBlob.data
-              }]
-            }
-          }));
+          sessionRef.current.sendRealtimeInput({
+            media: pcmBlob
+          });
         } catch (e) {
           console.error('Send error:', e);
         }
@@ -441,40 +516,7 @@ export const HomeVoiceSection: React.FC = () => {
     };
     
     source.connect(processor);
-    processor.connect(audioContext.destination);
-  };
-
-  // Play audio buffer
-  const playAudioBuffer = (buffer: AudioBuffer, audioContext: AudioContext) => {
-    const source = audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContext.destination);
-    
-    // Schedule playback
-    const currentTime = audioContext.currentTime;
-    const startTime = Math.max(currentTime, nextPlayTimeRef.current);
-    
-    source.start(startTime);
-    nextPlayTimeRef.current = startTime + buffer.duration;
-    
-    audioQueueRef.current.push(source);
-    
-    source.onended = () => {
-      const index = audioQueueRef.current.indexOf(source);
-      if (index > -1) {
-        audioQueueRef.current.splice(index, 1);
-      }
-      
-      // Check if all audio finished
-      if (audioQueueRef.current.length === 0) {
-        setState(prev => {
-          if (prev.status === 'speaking') {
-            return { ...prev, status: 'listening', statusText: 'কথা বলুন...' };
-          }
-          return prev;
-        });
-      }
-    };
+    processor.connect(inputContext.destination);
   };
 
   // Render volume bars
@@ -506,15 +548,15 @@ export const HomeVoiceSection: React.FC = () => {
     const isActive = state.activeAgent === agentNumber;
     const isOtherActive = state.activeAgent !== null && state.activeAgent !== agentNumber;
     const isSpeaking = isActive && state.status === 'speaking';
-    const isBlue = agentNumber === 1;
+    const isMale = agentNumber === 1;
     
     return (
       <div className={`relative bg-white rounded-2xl p-6 border-2 transition-all duration-300 ${
         isActive 
-          ? isBlue ? 'border-blue-500 shadow-xl shadow-blue-500/10' : 'border-slate-800 shadow-xl shadow-slate-800/10'
+          ? isMale ? 'border-blue-500 shadow-xl shadow-blue-500/10' : 'border-pink-500 shadow-xl shadow-pink-500/10'
           : isOtherActive 
             ? 'border-slate-100 opacity-50' 
-            : isBlue ? 'border-slate-200 hover:border-blue-300 hover:shadow-lg' : 'border-slate-200 hover:border-slate-400 hover:shadow-lg'
+            : isMale ? 'border-slate-200 hover:border-blue-300 hover:shadow-lg' : 'border-slate-200 hover:border-pink-300 hover:shadow-lg'
       }`}>
         {/* Active indicator */}
         {isActive && (
@@ -528,17 +570,20 @@ export const HomeVoiceSection: React.FC = () => {
         
         {/* Agent icon */}
         <div className="w-20 h-20 mx-auto mb-4 relative">
-          <div className={`absolute inset-0 rounded-full ${isBlue ? 'bg-blue-100' : 'bg-slate-100'}`}></div>
+          <div className={`absolute inset-0 rounded-full ${isMale ? 'bg-blue-100' : 'bg-pink-100'}`}></div>
           <div className="absolute inset-1 bg-white rounded-full flex items-center justify-center">
-            <i className={`fas fa-headset text-3xl ${isBlue ? 'text-blue-500' : 'text-slate-600'}`}></i>
+            <i className={`fas ${isMale ? 'fa-user-tie' : 'fa-user'} text-3xl ${isMale ? 'text-blue-500' : 'text-pink-500'}`}></i>
           </div>
           {isSpeaking && (
-            <div className={`absolute inset-0 rounded-full border-2 ${isBlue ? 'border-blue-400' : 'border-slate-600'} animate-ping opacity-30`}></div>
+            <div className={`absolute inset-0 rounded-full border-2 ${isMale ? 'border-blue-400' : 'border-pink-400'} animate-ping opacity-30`}></div>
           )}
         </div>
         
         <h3 className="text-lg font-bold text-slate-800 text-center mb-1">Nirnoy {agentNumber}</h3>
-        <p className="text-sm text-slate-500 text-center mb-6">AI স্বাস্থ্য সহায়ক</p>
+        <p className={`text-sm text-center mb-1 ${isMale ? 'text-blue-500' : 'text-pink-500'}`}>
+          {isMale ? '🎙️ পুরুষ কণ্ঠ' : '🎙️ মহিলা কণ্ঠ'}
+        </p>
+        <p className="text-xs text-slate-500 text-center mb-6">AI স্বাস্থ্য সহায়ক</p>
         
         {isActive ? (
           <div className="space-y-4">
@@ -548,7 +593,7 @@ export const HomeVoiceSection: React.FC = () => {
             </div>
             
             {/* Status */}
-            <p className={`text-center text-sm font-medium animate-pulse ${isBlue ? 'text-blue-600' : 'text-slate-600'}`}>
+            <p className={`text-center text-sm font-medium animate-pulse ${isMale ? 'text-blue-600' : 'text-pink-600'}`}>
               <i className={`${isSpeaking ? 'fas fa-volume-up' : 'fas fa-microphone'} mr-2`}></i>
               {state.statusText}
             </p>
@@ -566,9 +611,9 @@ export const HomeVoiceSection: React.FC = () => {
             onClick={() => startSession(agentNumber)}
             disabled={isOtherActive}
             className={`w-full py-3 rounded-xl font-medium transition flex items-center justify-center gap-2 ${
-              isBlue 
+              isMale 
                 ? 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-300' 
-                : 'bg-slate-800 text-white hover:bg-slate-900 disabled:bg-slate-400'
+                : 'bg-pink-500 text-white hover:bg-pink-600 disabled:bg-pink-300'
             } disabled:cursor-not-allowed`}
           >
             <i className="fas fa-phone"></i> কথা বলুন
@@ -621,7 +666,7 @@ export const HomeVoiceSection: React.FC = () => {
         <div className="mt-8 text-center">
           <p className="text-sm text-slate-500 flex items-center justify-center gap-2">
             <i className="fas fa-info-circle"></i>
-            দুটি এজেন্টের কাজ একই। যেকোনো একটি বেছে নিন।
+            Nirnoy 1 পুরুষ কণ্ঠে, Nirnoy 2 মহিলা কণ্ঠে কথা বলে। দুটোর কাজ একই।
           </p>
         </div>
         
