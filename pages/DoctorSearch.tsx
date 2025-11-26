@@ -1,614 +1,462 @@
-
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MOCK_DOCTORS } from '../data/mockData';
 import { useLanguage } from '../contexts/LanguageContext';
 
-// Extract unique values for filters
+// Extract unique values
 const ALL_SPECIALTIES = [...new Set(MOCK_DOCTORS.flatMap(d => d.specialties))].sort();
 const ALL_LOCATIONS = [...new Set(MOCK_DOCTORS.map(d => d.chambers[0]?.area).filter(Boolean))].sort();
-const ALL_HOSPITALS = [...new Set(MOCK_DOCTORS.map(d => d.chambers[0]?.name).filter(Boolean))].sort();
 
-// Fee ranges
-const FEE_RANGES = [
-  { label: 'Any Fee', labelBn: 'যেকোনো ফি', min: 0, max: Infinity },
-  { label: 'Under ৳500', labelBn: '৳৫০০ এর নিচে', min: 0, max: 500 },
-  { label: '৳500 - ৳800', labelBn: '৳৫০০ - ৳৮০০', min: 500, max: 800 },
-  { label: '৳800 - ৳1200', labelBn: '৳৮০০ - ৳১২০০', min: 800, max: 1200 },
-  { label: 'Above ৳1200', labelBn: '৳১২০০ এর উপরে', min: 1200, max: Infinity },
-];
+// Specialty icons and colors
+const SPECIALTY_META: Record<string, { icon: string; color: string; colorClass: string }> = {
+  'Internal Medicine': { icon: 'fa-stethoscope', color: '#3b82f6', colorClass: 'bg-blue-500' },
+  'Cardiology': { icon: 'fa-heartbeat', color: '#ef4444', colorClass: 'bg-red-500' },
+  'Gynaecology & Obstetrics': { icon: 'fa-venus', color: '#ec4899', colorClass: 'bg-pink-500' },
+  'Paediatrics': { icon: 'fa-baby', color: '#06b6d4', colorClass: 'bg-cyan-500' },
+  'Orthopedics': { icon: 'fa-bone', color: '#f97316', colorClass: 'bg-orange-500' },
+  'Dermatology': { icon: 'fa-allergies', color: '#8b5cf6', colorClass: 'bg-purple-500' },
+  'ENT': { icon: 'fa-head-side-cough', color: '#14b8a6', colorClass: 'bg-teal-500' },
+  'Eye (Ophthalmology)': { icon: 'fa-eye', color: '#6366f1', colorClass: 'bg-indigo-500' },
+  'Neurology': { icon: 'fa-brain', color: '#f59e0b', colorClass: 'bg-amber-500' },
+  'Psychiatry': { icon: 'fa-brain', color: '#10b981', colorClass: 'bg-emerald-500' },
+  'Gastroenterology': { icon: 'fa-stomach', color: '#84cc16', colorClass: 'bg-lime-500' },
+  'Nephrology': { icon: 'fa-kidneys', color: '#f43f5e', colorClass: 'bg-rose-500' },
+  'Pulmonology (Chest)': { icon: 'fa-lungs', color: '#0ea5e9', colorClass: 'bg-sky-500' },
+  'Endocrinology & Diabetes': { icon: 'fa-syringe', color: '#a855f7', colorClass: 'bg-violet-500' },
+  'General Surgery': { icon: 'fa-scalpel', color: '#64748b', colorClass: 'bg-slate-500' },
+  'Dental Surgery': { icon: 'fa-tooth', color: '#22c55e', colorClass: 'bg-green-500' },
+};
 
-// Experience ranges
-const EXPERIENCE_RANGES = [
-  { label: 'Any Experience', labelBn: 'যেকোনো অভিজ্ঞতা', min: 0, max: Infinity },
-  { label: '5-10 Years', labelBn: '৫-১০ বছর', min: 5, max: 10 },
-  { label: '10-15 Years', labelBn: '১০-১৫ বছর', min: 10, max: 15 },
-  { label: '15-20 Years', labelBn: '১৫-২০ বছর', min: 15, max: 20 },
-  { label: '20+ Years', labelBn: '২০+ বছর', min: 20, max: Infinity },
-];
+const getSpecialtyMeta = (specialty: string) => {
+  return SPECIALTY_META[specialty] || { icon: 'fa-user-md', color: '#6b7280', colorClass: 'bg-gray-500' };
+};
 
 export const DoctorSearch: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
+  const isBn = language === 'bn';
   
-  // Search & Filter State
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('');
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [selectedHospital, setSelectedHospital] = useState<string>('');
-  const [selectedGender, setSelectedGender] = useState<string>('');
-  const [selectedFeeRange, setSelectedFeeRange] = useState<number>(0);
-  const [selectedExperience, setSelectedExperience] = useState<number>(0);
-  const [selectedRating, setSelectedRating] = useState<number>(0);
-  const [sortBy, setSortBy] = useState<string>('rating');
+  // Get initial values from URL params
+  const initialSpecialty = searchParams.get('specialty') || '';
+  const initialSearch = searchParams.get('q') || '';
   
-  // Mobile filter panel toggle
-  const [showFilters, setShowFilters] = useState(false);
+  // State
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [selectedSpecialty, setSelectedSpecialty] = useState(initialSpecialty);
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedGender, setSelectedGender] = useState('');
+  const [sortBy, setSortBy] = useState('rating');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
-  // Filtered and sorted doctors
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.set('q', searchTerm);
+    if (selectedSpecialty) params.set('specialty', selectedSpecialty);
+    setSearchParams(params, { replace: true });
+  }, [searchTerm, selectedSpecialty, setSearchParams]);
+
+  // Filter doctors
   const filteredDoctors = useMemo(() => {
     let results = MOCK_DOCTORS.filter(d => {
-      // Text search
       const matchesSearch = !searchTerm || 
         d.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         d.specialties.some(s => s.toLowerCase().includes(searchTerm.toLowerCase())) ||
         d.chambers[0]?.name.toLowerCase().includes(searchTerm.toLowerCase());
       
-      // Specialty filter
       const matchesSpecialty = !selectedSpecialty || d.specialties.includes(selectedSpecialty);
-      
-      // Location filter
       const matchesLocation = !selectedLocation || d.chambers[0]?.area === selectedLocation;
-      
-      // Hospital filter
-      const matchesHospital = !selectedHospital || d.chambers[0]?.name === selectedHospital;
-      
-      // Gender filter
       const matchesGender = !selectedGender || d.gender === selectedGender;
-      
-      // Fee range filter
-      const feeRange = FEE_RANGES[selectedFeeRange];
-      const fee = d.chambers[0]?.fee || 0;
-      const matchesFee = fee >= feeRange.min && fee <= feeRange.max;
-      
-      // Experience filter
-      const expRange = EXPERIENCE_RANGES[selectedExperience];
-      const matchesExperience = d.experience >= expRange.min && d.experience <= expRange.max;
-      
-      // Rating filter
-      const matchesRating = selectedRating === 0 || d.rating >= selectedRating;
 
-      return matchesSearch && matchesSpecialty && matchesLocation && matchesHospital && 
-             matchesGender && matchesFee && matchesExperience && matchesRating;
+      return matchesSearch && matchesSpecialty && matchesLocation && matchesGender;
     });
 
-    // Sort results
+    // Sort
     switch (sortBy) {
-      case 'rating':
-        results.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'experience':
-        results.sort((a, b) => b.experience - a.experience);
-        break;
-      case 'fee-low':
-        results.sort((a, b) => (a.chambers[0]?.fee || 0) - (b.chambers[0]?.fee || 0));
-        break;
-      case 'fee-high':
-        results.sort((a, b) => (b.chambers[0]?.fee || 0) - (a.chambers[0]?.fee || 0));
-        break;
-      case 'name':
-        results.sort((a, b) => a.name.localeCompare(b.name));
-        break;
+      case 'rating': results.sort((a, b) => b.rating - a.rating); break;
+      case 'experience': results.sort((a, b) => b.experience - a.experience); break;
+      case 'fee-low': results.sort((a, b) => (a.chambers[0]?.fee || 0) - (b.chambers[0]?.fee || 0)); break;
+      case 'fee-high': results.sort((a, b) => (b.chambers[0]?.fee || 0) - (a.chambers[0]?.fee || 0)); break;
     }
 
     return results;
-  }, [searchTerm, selectedSpecialty, selectedLocation, selectedHospital, selectedGender, 
-      selectedFeeRange, selectedExperience, selectedRating, sortBy]);
+  }, [searchTerm, selectedSpecialty, selectedLocation, selectedGender, sortBy]);
 
-  // Clear all filters
+  // Get specialty counts
+  const specialtyCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    MOCK_DOCTORS.forEach(d => {
+      d.specialties.forEach(s => {
+        counts[s] = (counts[s] || 0) + 1;
+      });
+    });
+    return counts;
+  }, []);
+
+  // Top specialties for quick filter
+  const topSpecialties = Object.entries(specialtyCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([name]) => name);
+
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedSpecialty('');
     setSelectedLocation('');
-    setSelectedHospital('');
     setSelectedGender('');
-    setSelectedFeeRange(0);
-    setSelectedExperience(0);
-    setSelectedRating(0);
     setSortBy('rating');
   };
 
-  // Count active filters
-  const activeFilterCount = [
-    selectedSpecialty, selectedLocation, selectedHospital, selectedGender,
-    selectedFeeRange > 0, selectedExperience > 0, selectedRating > 0
-  ].filter(Boolean).length;
-
-  // Translations
-  const t = {
-    title: language === 'bn' ? 'ডাক্তার খুঁজুন' : 'Find a Doctor',
-    searchPlaceholder: language === 'bn' ? 'নাম, বিশেষজ্ঞতা বা হাসপাতাল দিয়ে খুঁজুন...' : 'Search by name, specialty or hospital...',
-    filters: language === 'bn' ? 'ফিল্টার' : 'Filters',
-    clearAll: language === 'bn' ? 'সব মুছুন' : 'Clear All',
-    specialty: language === 'bn' ? 'বিশেষজ্ঞতা' : 'Specialty',
-    allSpecialties: language === 'bn' ? 'সব বিশেষজ্ঞতা' : 'All Specialties',
-    location: language === 'bn' ? 'এলাকা' : 'Location',
-    allLocations: language === 'bn' ? 'সব এলাকা' : 'All Locations',
-    hospital: language === 'bn' ? 'হাসপাতাল' : 'Hospital',
-    allHospitals: language === 'bn' ? 'সব হাসপাতাল' : 'All Hospitals',
-    gender: language === 'bn' ? 'লিঙ্গ' : 'Gender',
-    anyGender: language === 'bn' ? 'যেকোনো' : 'Any Gender',
-    male: language === 'bn' ? 'পুরুষ' : 'Male',
-    female: language === 'bn' ? 'মহিলা' : 'Female',
-    fee: language === 'bn' ? 'ফি' : 'Consultation Fee',
-    experience: language === 'bn' ? 'অভিজ্ঞতা' : 'Experience',
-    rating: language === 'bn' ? 'রেটিং' : 'Rating',
-    anyRating: language === 'bn' ? 'যেকোনো রেটিং' : 'Any Rating',
-    andAbove: language === 'bn' ? 'ও উপরে' : '& above',
-    sortBy: language === 'bn' ? 'সাজান' : 'Sort By',
-    sortRating: language === 'bn' ? 'সর্বোচ্চ রেটিং' : 'Highest Rating',
-    sortExperience: language === 'bn' ? 'সর্বোচ্চ অভিজ্ঞতা' : 'Most Experienced',
-    sortFeeLow: language === 'bn' ? 'কম ফি' : 'Lowest Fee',
-    sortFeeHigh: language === 'bn' ? 'বেশি ফি' : 'Highest Fee',
-    sortName: language === 'bn' ? 'নাম (A-Z)' : 'Name (A-Z)',
-    results: language === 'bn' ? 'জন ডাক্তার পাওয়া গেছে' : 'doctors found',
-    nextAvailable: language === 'bn' ? 'পরবর্তী সময়:' : 'Next available:',
-    consultationFee: language === 'bn' ? 'পরামর্শ ফি' : 'Consultation Fee',
-    bookAppointment: language === 'bn' ? 'অ্যাপয়েন্টমেন্ট বুক করুন' : 'Book Appointment',
-    noResults: language === 'bn' ? 'কোনো ডাক্তার পাওয়া যায়নি।' : 'No doctors found matching your criteria.',
-    years: language === 'bn' ? 'বছর' : 'years',
-    patients: language === 'bn' ? 'রোগী' : 'patients',
-  };
+  const hasActiveFilters = searchTerm || selectedSpecialty || selectedLocation || selectedGender;
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Search Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-16 z-40 shadow-sm">
-        <div className="container mx-auto px-4 py-4 max-w-7xl">
-          <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
-            {/* Search Input */}
-            <div className="flex-1 relative">
-              <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-              <input 
-                type="text" 
-                placeholder={t.searchPlaceholder}
-                className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-slate-800 bg-slate-50"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+      {/* Hero Search Section */}
+      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-black mb-3">
+              {isBn ? 'আপনার ডাক্তার খুঁজুন' : 'Find Your Doctor'}
+            </h1>
+            <p className="text-blue-100 text-lg">
+              {isBn ? `${MOCK_DOCTORS.length}+ বিশেষজ্ঞ ডাক্তার আপনার সেবায়` : `${MOCK_DOCTORS.length}+ expert doctors at your service`}
+            </p>
+          </div>
 
-            {/* Quick Filters (Desktop) */}
-            <div className="hidden lg:flex items-center gap-3">
-              <select 
-                value={selectedSpecialty}
-                onChange={(e) => setSelectedSpecialty(e.target.value)}
-                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 outline-none hover:border-teal-400 transition cursor-pointer"
-              >
-                <option value="">{t.allSpecialties}</option>
-                {ALL_SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-
-              <select 
+          {/* Main Search Bar */}
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-2xl p-2 shadow-2xl flex flex-col md:flex-row gap-2">
+              <div className="flex-1 flex items-center px-4 bg-slate-50 rounded-xl">
+                <i className="fas fa-search text-slate-400 mr-3"></i>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={isBn ? 'ডাক্তার, বিশেষত্ব বা হাসপাতাল...' : 'Doctor, specialty or hospital...'}
+                  className="flex-1 py-3 bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600">
+                    <i className="fas fa-times"></i>
+                  </button>
+                )}
+              </div>
+              
+              <select
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
-                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 outline-none hover:border-teal-400 transition cursor-pointer"
+                className="px-4 py-3 bg-slate-50 rounded-xl text-slate-700 outline-none border-0 cursor-pointer"
               >
-                <option value="">{t.allLocations}</option>
+                <option value="">{isBn ? 'সব এলাকা' : 'All Areas'}</option>
                 {ALL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
-
-              <select 
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 outline-none hover:border-teal-400 transition cursor-pointer"
+              
+              <button
+                onClick={() => {}}
+                className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg"
               >
-                <option value="rating">{t.sortRating}</option>
-                <option value="experience">{t.sortExperience}</option>
-                <option value="fee-low">{t.sortFeeLow}</option>
-                <option value="fee-high">{t.sortFeeHigh}</option>
-                <option value="name">{t.sortName}</option>
-              </select>
+                <i className="fas fa-search mr-2"></i>
+                {isBn ? 'খুঁজুন' : 'Search'}
+              </button>
             </div>
-
-            {/* Mobile Filter Toggle */}
-            <button 
-              onClick={() => setShowFilters(!showFilters)}
-              className="lg:hidden flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-xl font-medium"
-            >
-              <i className="fas fa-sliders-h"></i>
-              {t.filters}
-              {activeFilterCount > 0 && (
-                <span className="bg-teal-500 text-white text-xs px-2 py-0.5 rounded-full">{activeFilterCount}</span>
-              )}
-            </button>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        <div className="flex gap-6">
+      {/* Specialty Quick Filters */}
+      <div className="bg-white border-b border-slate-200 sticky top-16 z-30">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            <button
+              onClick={() => setSelectedSpecialty('')}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition ${
+                !selectedSpecialty
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {isBn ? 'সব' : 'All'}
+            </button>
+            
+            {topSpecialties.map(spec => {
+              const meta = getSpecialtyMeta(spec);
+              const isActive = selectedSpecialty === spec;
+              return (
+                <button
+                  key={spec}
+                  onClick={() => setSelectedSpecialty(isActive ? '' : spec)}
+                  className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition ${
+                    isActive
+                      ? `${meta.colorClass} text-white shadow-lg`
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <i className={`fas ${meta.icon} text-xs`}></i>
+                  <span className="whitespace-nowrap">{spec}</span>
+                  <span className={`text-xs ${isActive ? 'text-white/80' : 'text-slate-400'}`}>
+                    ({specialtyCounts[spec]})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
           
-          {/* Sidebar Filters (Desktop) */}
-          <aside className="hidden lg:block w-72 flex-shrink-0">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm sticky top-36 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          {/* Sidebar Filters */}
+          <aside className="lg:w-72 flex-shrink-0">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm sticky top-40 overflow-hidden">
+              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                  <i className="fas fa-filter text-teal-600"></i> {t.filters}
+                  <i className="fas fa-sliders-h text-blue-500"></i>
+                  {isBn ? 'ফিল্টার' : 'Filters'}
                 </h3>
-                {activeFilterCount > 0 && (
-                  <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 font-medium">
-                    {t.clearAll}
+                {hasActiveFilters && (
+                  <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-600 font-medium">
+                    {isBn ? 'রিসেট' : 'Reset'}
                   </button>
                 )}
               </div>
 
-              <div className="p-4 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto custom-scrollbar">
-                
-                {/* Specialty */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.specialty}</label>
-                  <select 
-                    value={selectedSpecialty}
-                    onChange={(e) => setSelectedSpecialty(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-teal-500 text-sm"
-                  >
-                    <option value="">{t.allSpecialties}</option>
-                    {ALL_SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-
-                {/* Location */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.location}</label>
-                  <select 
-                    value={selectedLocation}
-                    onChange={(e) => setSelectedLocation(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-teal-500 text-sm"
-                  >
-                    <option value="">{t.allLocations}</option>
-                    {ALL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-
-                {/* Hospital */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.hospital}</label>
-                  <select 
-                    value={selectedHospital}
-                    onChange={(e) => setSelectedHospital(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 outline-none focus:ring-2 focus:ring-teal-500 text-sm"
-                  >
-                    <option value="">{t.allHospitals}</option>
-                    {ALL_HOSPITALS.map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
-                </div>
-
+              <div className="p-4 space-y-6">
                 {/* Gender */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.gender}</label>
-                  <div className="flex gap-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                    {isBn ? 'ডাক্তারের লিঙ্গ' : 'Doctor Gender'}
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
                     {[
-                      { value: '', label: t.anyGender },
-                      { value: 'Male', label: t.male },
-                      { value: 'Female', label: t.female },
+                      { value: '', label: isBn ? 'সব' : 'All', icon: 'fa-users' },
+                      { value: 'Male', label: isBn ? 'পুরুষ' : 'Male', icon: 'fa-mars' },
+                      { value: 'Female', label: isBn ? 'মহিলা' : 'Female', icon: 'fa-venus' },
                     ].map(opt => (
                       <button
                         key={opt.value}
                         onClick={() => setSelectedGender(opt.value)}
-                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition ${
-                          selectedGender === opt.value 
-                            ? 'bg-teal-500 text-white' 
+                        className={`py-2.5 px-3 rounded-xl text-sm font-medium transition flex flex-col items-center gap-1 ${
+                          selectedGender === opt.value
+                            ? 'bg-blue-500 text-white shadow-lg'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
+                        <i className={`fas ${opt.icon}`}></i>
+                        <span className="text-xs">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sort */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                    {isBn ? 'সাজান' : 'Sort By'}
+                  </label>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'rating', label: isBn ? 'সর্বোচ্চ রেটিং' : 'Highest Rating', icon: 'fa-star' },
+                      { value: 'experience', label: isBn ? 'অভিজ্ঞতা' : 'Experience', icon: 'fa-briefcase' },
+                      { value: 'fee-low', label: isBn ? 'কম ফি' : 'Lowest Fee', icon: 'fa-arrow-down' },
+                      { value: 'fee-high', label: isBn ? 'বেশি ফি' : 'Highest Fee', icon: 'fa-arrow-up' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setSortBy(opt.value)}
+                        className={`w-full py-2.5 px-4 rounded-xl text-sm font-medium transition flex items-center gap-3 ${
+                          sortBy === opt.value
+                            ? 'bg-blue-50 text-blue-700 border-2 border-blue-200'
+                            : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-2 border-transparent'
+                        }`}
+                      >
+                        <i className={`fas ${opt.icon} w-4`}></i>
                         {opt.label}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Fee Range */}
+                {/* All Specialties */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.fee}</label>
-                  <div className="space-y-1">
-                    {FEE_RANGES.map((range, idx) => (
-                      <label key={idx} className="flex items-center gap-2 cursor-pointer group">
-                        <input 
-                          type="radio" 
-                          name="feeRange"
-                          checked={selectedFeeRange === idx}
-                          onChange={() => setSelectedFeeRange(idx)}
-                          className="w-4 h-4 text-teal-600 border-slate-300 focus:ring-teal-500"
-                        />
-                        <span className="text-sm text-slate-600 group-hover:text-slate-800">
-                          {language === 'bn' ? range.labelBn : range.label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Experience */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.experience}</label>
-                  <div className="space-y-1">
-                    {EXPERIENCE_RANGES.map((range, idx) => (
-                      <label key={idx} className="flex items-center gap-2 cursor-pointer group">
-                        <input 
-                          type="radio" 
-                          name="experience"
-                          checked={selectedExperience === idx}
-                          onChange={() => setSelectedExperience(idx)}
-                          className="w-4 h-4 text-teal-600 border-slate-300 focus:ring-teal-500"
-                        />
-                        <span className="text-sm text-slate-600 group-hover:text-slate-800">
-                          {language === 'bn' ? range.labelBn : range.label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Rating */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.rating}</label>
-                  <div className="space-y-1">
-                    {[0, 4.5, 4.0, 3.5].map(rating => (
-                      <label key={rating} className="flex items-center gap-2 cursor-pointer group">
-                        <input 
-                          type="radio" 
-                          name="rating"
-                          checked={selectedRating === rating}
-                          onChange={() => setSelectedRating(rating)}
-                          className="w-4 h-4 text-teal-600 border-slate-300 focus:ring-teal-500"
-                        />
-                        <span className="text-sm text-slate-600 group-hover:text-slate-800 flex items-center gap-1">
-                          {rating === 0 ? t.anyRating : (
-                            <>
-                              <i className="fas fa-star text-yellow-500 text-xs"></i>
-                              {rating} {t.andAbove}
-                            </>
-                          )}
-                        </span>
-                      </label>
-                    ))}
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                    {isBn ? 'সব বিশেষত্ব' : 'All Specialties'}
+                  </label>
+                  <div className="max-h-64 overflow-y-auto space-y-1 pr-2">
+                    {ALL_SPECIALTIES.map(spec => {
+                      const meta = getSpecialtyMeta(spec);
+                      const isActive = selectedSpecialty === spec;
+                      return (
+                        <button
+                          key={spec}
+                          onClick={() => setSelectedSpecialty(isActive ? '' : spec)}
+                          className={`w-full py-2 px-3 rounded-lg text-sm transition flex items-center justify-between ${
+                            isActive
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <i className={`fas ${meta.icon} text-xs`} style={{ color: meta.color }}></i>
+                            <span className="truncate">{spec}</span>
+                          </span>
+                          <span className="text-xs text-slate-400">({specialtyCounts[spec]})</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </div>
           </aside>
 
-          {/* Mobile Filter Panel */}
-          {showFilters && (
-            <div className="fixed inset-0 bg-black/50 z-50 lg:hidden" onClick={() => setShowFilters(false)}>
-              <div 
-                className="absolute right-0 top-0 h-full w-80 bg-white shadow-2xl overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0">
-                  <h3 className="font-bold text-slate-800">{t.filters}</h3>
-                  <button onClick={() => setShowFilters(false)} className="text-slate-400 hover:text-slate-600">
-                    <i className="fas fa-times text-xl"></i>
-                  </button>
-                </div>
-
-                <div className="p-4 space-y-6">
-                  {/* Same filter content as desktop sidebar */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.specialty}</label>
-                    <select 
-                      value={selectedSpecialty}
-                      onChange={(e) => setSelectedSpecialty(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm"
-                    >
-                      <option value="">{t.allSpecialties}</option>
-                      {ALL_SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.location}</label>
-                    <select 
-                      value={selectedLocation}
-                      onChange={(e) => setSelectedLocation(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm"
-                    >
-                      <option value="">{t.allLocations}</option>
-                      {ALL_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.hospital}</label>
-                    <select 
-                      value={selectedHospital}
-                      onChange={(e) => setSelectedHospital(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm"
-                    >
-                      <option value="">{t.allHospitals}</option>
-                      {ALL_HOSPITALS.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.gender}</label>
-                    <select 
-                      value={selectedGender}
-                      onChange={(e) => setSelectedGender(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm"
-                    >
-                      <option value="">{t.anyGender}</option>
-                      <option value="Male">{t.male}</option>
-                      <option value="Female">{t.female}</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.fee}</label>
-                    <select 
-                      value={selectedFeeRange}
-                      onChange={(e) => setSelectedFeeRange(Number(e.target.value))}
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm"
-                    >
-                      {FEE_RANGES.map((range, idx) => (
-                        <option key={idx} value={idx}>{language === 'bn' ? range.labelBn : range.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.sortBy}</label>
-                    <select 
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm"
-                    >
-                      <option value="rating">{t.sortRating}</option>
-                      <option value="experience">{t.sortExperience}</option>
-                      <option value="fee-low">{t.sortFeeLow}</option>
-                      <option value="fee-high">{t.sortFeeHigh}</option>
-                      <option value="name">{t.sortName}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="p-4 border-t border-slate-100 sticky bottom-0 bg-white">
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={clearFilters}
-                      className="flex-1 py-3 border border-slate-200 rounded-xl font-medium text-slate-600 hover:bg-slate-50"
-                    >
-                      {t.clearAll}
-                    </button>
-                    <button 
-                      onClick={() => setShowFilters(false)}
-                      className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700"
-                    >
-                      {language === 'bn' ? 'দেখুন' : 'Apply'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Results */}
-          <main className="flex-1">
-            {/* Results Count */}
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-slate-600">
-                <span className="font-bold text-slate-800">{filteredDoctors.length}</span> {t.results}
-              </p>
+          <main className="flex-1 min-w-0">
+            {/* Results Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-slate-600">
+                  <span className="font-bold text-slate-900 text-xl">{filteredDoctors.length}</span>
+                  {' '}{isBn ? 'জন ডাক্তার পাওয়া গেছে' : 'doctors found'}
+                </p>
+                {selectedSpecialty && (
+                  <p className="text-sm text-blue-600 mt-1">
+                    <i className="fas fa-filter mr-1"></i>
+                    {selectedSpecialty}
+                    <button onClick={() => setSelectedSpecialty('')} className="ml-2 text-slate-400 hover:text-slate-600">
+                      <i className="fas fa-times"></i>
+                    </button>
+                  </p>
+                )}
+              </div>
               
-              {/* Active Filter Tags */}
-              {activeFilterCount > 0 && (
-                <div className="hidden md:flex items-center gap-2 flex-wrap">
-                  {selectedSpecialty && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 text-teal-700 text-xs rounded-full border border-teal-100">
-                      {selectedSpecialty}
-                      <button onClick={() => setSelectedSpecialty('')} className="hover:text-teal-900"><i className="fas fa-times"></i></button>
-                    </span>
-                  )}
-                  {selectedLocation && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100">
-                      {selectedLocation}
-                      <button onClick={() => setSelectedLocation('')} className="hover:text-blue-900"><i className="fas fa-times"></i></button>
-                    </span>
-                  )}
-                  {selectedGender && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 text-purple-700 text-xs rounded-full border border-purple-100">
-                      {selectedGender}
-                      <button onClick={() => setSelectedGender('')} className="hover:text-purple-900"><i className="fas fa-times"></i></button>
-                    </span>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:bg-slate-100'}`}
+                >
+                  <i className="fas fa-list"></i>
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-slate-400 hover:bg-slate-100'}`}
+                >
+                  <i className="fas fa-th-large"></i>
+                </button>
+              </div>
             </div>
 
             {/* Doctor Cards */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {filteredDoctors.map(doctor => (
-                <div 
-                  key={doctor.id} 
-                  className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col sm:flex-row gap-5 hover:shadow-lg hover:border-teal-200 transition-all cursor-pointer group"
-                  onClick={() => navigate(`/doctors/${doctor.id}`)}
-                >
-                  <div className="relative">
-                    <img 
-                      src={doctor.image} 
-                      alt={doctor.name} 
-                      className="w-24 h-24 rounded-xl object-cover bg-slate-100 group-hover:scale-105 transition-transform" 
-                    />
-                    <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
-                      <i className="fas fa-star text-[10px]"></i>
-                      {doctor.rating}
-                    </div>
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start gap-2 mb-1">
-                      <h3 className="text-lg font-bold text-slate-800 group-hover:text-teal-600 transition truncate">{doctor.name}</h3>
-                    </div>
-                    
-                    <p className="text-sm text-slate-500 mb-2 truncate">{doctor.degrees}</p>
-                    
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {doctor.specialties.map(s => (
-                        <span key={s} className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-100 font-medium">{s}</span>
-                      ))}
-                    </div>
-                    
-                    <div className="flex items-center gap-4 text-sm text-slate-500 mb-3">
-                      <span className="flex items-center gap-1">
-                        <i className="fas fa-briefcase-medical text-slate-400"></i>
-                        {doctor.experience} {t.years}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <i className="fas fa-users text-slate-400"></i>
-                        {doctor.patientCount}+ {t.patients}
-                      </span>
+            {filteredDoctors.length > 0 ? (
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
+                {filteredDoctors.map(doctor => (
+                  <div
+                    key={doctor.id}
+                    onClick={() => navigate(`/doctors/${doctor.id}`)}
+                    className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-xl hover:border-blue-200 transition-all cursor-pointer group"
+                  >
+                    <div className="flex gap-5">
+                      {/* Avatar */}
+                      <div className="relative flex-shrink-0">
+                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center overflow-hidden">
+                          {doctor.image ? (
+                            <img src={doctor.image} alt={doctor.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <i className="fas fa-user-md text-3xl text-blue-400"></i>
+                          )}
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 bg-amber-400 text-amber-900 px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow">
+                          <i className="fas fa-star text-[10px]"></i>
+                          {doctor.rating}
+                        </div>
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition truncate">
+                          {doctor.name}
+                        </h3>
+                        <p className="text-sm text-slate-500 truncate mb-2">{doctor.degrees}</p>
+                        
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {doctor.specialties.slice(0, 2).map(s => {
+                            const meta = getSpecialtyMeta(s);
+                            return (
+                              <span
+                                key={s}
+                                className="text-xs px-2 py-1 rounded-full font-medium"
+                                style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
+                              >
+                                {s}
+                              </span>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex items-center gap-4 text-sm text-slate-500">
+                          <span className="flex items-center gap-1.5">
+                            <i className="fas fa-briefcase text-slate-400"></i>
+                            {doctor.experience} {isBn ? 'বছর' : 'yrs'}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <i className="fas fa-map-marker-alt text-slate-400"></i>
+                            {doctor.chambers[0]?.area}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Price & Action */}
+                      <div className="flex flex-col items-end justify-between">
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">{isBn ? 'ফি' : 'Fee'}</p>
+                          <p className="text-2xl font-black text-slate-800">৳{doctor.chambers[0]?.fee}</p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/doctors/${doctor.id}`);
+                          }}
+                          className="px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/20"
+                        >
+                          {isBn ? 'বুক করুন' : 'Book'}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center text-sm text-slate-600 mb-1">
-                      <i className="fas fa-map-marker-alt w-4 text-center mr-2 text-teal-500"></i>
-                      <span className="truncate">{doctor.chambers[0]?.name}, {doctor.chambers[0]?.area}</span>
-                    </div>
-                    
-                    <div className="flex items-center text-sm text-slate-600">
-                      <i className="fas fa-clock w-4 text-center mr-2 text-teal-500"></i>
-                      {t.nextAvailable} <span className="text-green-600 font-medium ml-1">{doctor.nextAvailable}</span>
+                    {/* Chamber Info */}
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <i className="fas fa-hospital text-blue-500"></i>
+                        <span className="truncate">{doctor.chambers[0]?.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-green-600 font-medium">
+                          <i className="fas fa-clock mr-1"></i>
+                          {doctor.nextAvailable}
+                        </span>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="sm:border-l sm:border-slate-100 sm:pl-5 flex sm:flex-col justify-between items-end sm:items-center gap-3">
-                    <div className="text-center">
-                      <p className="text-xs text-slate-400 mb-1">{t.consultationFee}</p>
-                      <p className="text-2xl font-bold text-slate-800">৳{doctor.chambers[0]?.fee}</p>
-                    </div>
-                    <button 
-                      className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition-colors whitespace-nowrap shadow-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/doctors/${doctor.id}`);
-                      }}
-                    >
-                      {t.bookAppointment}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {filteredDoctors.length === 0 && (
+                ))}
+              </div>
+            ) : (
               <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-                <i className="fas fa-user-md text-6xl mb-4 text-slate-200"></i>
-                <p className="text-slate-500 text-lg">{t.noResults}</p>
-                <button 
+                <div className="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
+                  <i className="fas fa-search text-3xl text-slate-300"></i>
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                  {isBn ? 'কোনো ডাক্তার পাওয়া যায়নি' : 'No doctors found'}
+                </h3>
+                <p className="text-slate-500 mb-4">
+                  {isBn ? 'অন্য ফিল্টার ব্যবহার করে দেখুন' : 'Try different filters'}
+                </p>
+                <button
                   onClick={clearFilters}
-                  className="mt-4 text-teal-600 font-medium hover:underline"
+                  className="px-6 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition"
                 >
-                  {t.clearAll}
+                  {isBn ? 'ফিল্টার রিসেট করুন' : 'Reset Filters'}
                 </button>
               </div>
             )}
@@ -618,3 +466,5 @@ export const DoctorSearch: React.FC = () => {
     </div>
   );
 };
+
+export default DoctorSearch;
