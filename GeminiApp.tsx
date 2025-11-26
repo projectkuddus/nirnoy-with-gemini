@@ -89,7 +89,7 @@ const AppContent: React.FC = () => {
   return (
     <Layout role={role} handleLogout={handleLogout}>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<Landing onDevLogin={handleLogin} />} />
         <Route
           path="/login"
           element={

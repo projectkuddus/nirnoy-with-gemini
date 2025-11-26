@@ -1,6 +1,60 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { UserRole } from '../types';
+
+// ============ DEV LOGIN PANEL - Quick Access for Testing ============
+const DevLoginPanel: React.FC<{ onDevLogin: (role: UserRole) => void }> = ({ onDevLogin }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <div className="fixed bottom-4 right-4 z-50">
+      {isOpen ? (
+        <div className="bg-slate-900 text-white rounded-2xl shadow-2xl p-4 w-72 animate-fade-in">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-bold flex items-center gap-2">
+              <i className="fas fa-code text-yellow-400"></i> Dev Access
+            </span>
+            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white" title="Close" aria-label="Close dev panel">
+              <i className="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <div className="space-y-2">
+            <button
+              onClick={() => onDevLogin(UserRole.PATIENT)}
+              className="w-full py-3 bg-teal-500 hover:bg-teal-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
+            >
+              <i className="fas fa-user"></i>
+              Login as Patient
+            </button>
+            <button
+              onClick={() => onDevLogin(UserRole.DOCTOR)}
+              className="w-full py-3 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
+            >
+              <i className="fas fa-user-md"></i>
+              Login as Doctor
+            </button>
+          </div>
+          
+          <div className="mt-3 pt-3 border-t border-slate-700 text-xs text-slate-400">
+            <p className="mb-1"><strong>Test Patient:</strong> Rahim Ahmed</p>
+            <p className="mb-1"><strong>Test Doctor:</strong> Dr. Fatima Khan</p>
+            <p className="text-yellow-500 mt-2"><i className="fas fa-exclamation-triangle mr-1"></i>Dev mode only</p>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="w-14 h-14 bg-slate-900 hover:bg-slate-800 text-yellow-400 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110"
+          title="Dev Login"
+        >
+          <i className="fas fa-code text-xl"></i>
+        </button>
+      )}
+    </div>
+  );
+};
 
 // ============ NIRNOY BRAIN GRAPHIC - Neural Network Style ============
 const NirnoyBrainGraphic: React.FC = () => (
@@ -178,7 +232,11 @@ const VoiceAgentCard: React.FC<{
 };
 
 // ============ MAIN LANDING PAGE ============
-export const Landing: React.FC = () => {
+interface LandingProps {
+  onDevLogin?: (role: UserRole) => void;
+}
+
+export const Landing: React.FC<LandingProps> = ({ onDevLogin }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
@@ -200,6 +258,22 @@ export const Landing: React.FC = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     navigate('/search');
+  };
+
+  // Dev login handler
+  const handleDevLogin = (role: UserRole) => {
+    if (onDevLogin) {
+      onDevLogin(role);
+    } else {
+      // Fallback: directly set localStorage and navigate
+      localStorage.setItem('nirnoy_role', role);
+      if (role === UserRole.PATIENT) {
+        navigate('/patient-dashboard');
+      } else if (role === UserRole.DOCTOR) {
+        navigate('/doctor-dashboard');
+      }
+      window.location.reload(); // Force reload to pick up the role
+    }
   };
 
   const stats = [
@@ -507,6 +581,9 @@ export const Landing: React.FC = () => {
             </div>
          </div>
       </footer>
+
+      {/* Dev Login Panel - Floating button for quick testing */}
+      <DevLoginPanel onDevLogin={handleDevLogin} />
     </div>
   );
 };
