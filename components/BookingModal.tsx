@@ -255,10 +255,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden animate-slide-up sm:animate-scale-in">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-slide-up sm:animate-scale-in">
         
-        {/* Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-teal-500 p-4 text-white">
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-teal-600 to-teal-500 p-4 text-white rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold">{t.title}</h2>
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition">
@@ -280,8 +280,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           </div>
         </div>
 
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center gap-2 py-3 bg-slate-50 border-b border-slate-100">
+        {/* Progress Steps - Fixed */}
+        <div className="flex-shrink-0 flex items-center justify-center gap-2 py-3 bg-slate-50 border-b border-slate-100">
           {[1, 2, 3].map((s) => (
             <React.Fragment key={s}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition ${
@@ -294,8 +294,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           ))}
         </div>
 
-        {/* Content */}
-        <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 min-h-0">
           
           {/* Step 1: Visit Type */}
           {step === 1 && (
@@ -562,8 +562,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-100 bg-white flex gap-3">
+        {/* Footer - Fixed at bottom */}
+        <div className="flex-shrink-0 p-4 border-t border-slate-100 bg-white flex gap-3 rounded-b-2xl">
           {step > 1 && (
             <button
               onClick={() => setStep((step - 1) as 1 | 2)}
