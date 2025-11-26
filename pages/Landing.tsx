@@ -2,175 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 
-// ============ NIRNOY NEURAL BACKGROUND - All Lines Connect to Center ============
-const NirnoyNeuralBackground: React.FC = () => {
-  // Center position where NIRNOY logo is (in hero section, roughly 75% from left on desktop)
-  const centerX = 75; // Right side where logo appears
-  const centerY = 22; // Upper area where hero is
-
-  // Nodes scattered randomly across the page - all will connect to center
-  const nodes = [
-    // Far corners and edges
-    { icon: 'fa-user-md', label: 'ডাক্তার', x: 3, y: 5, size: 3 },
-    { icon: 'fa-hospital', label: 'হাসপাতাল', x: 97, y: 8, size: 4 },
-    { icon: 'fa-heartbeat', label: 'স্বাস্থ্য', x: 2, y: 95, size: 3 },
-    { icon: 'fa-ambulance', label: 'ইমার্জেন্সি', x: 96, y: 92, size: 4 },
-    // Top scattered
-    { icon: 'fa-calendar-check', label: 'অ্যাপয়েন্টমেন্ট', x: 18, y: 3, size: 2 },
-    { icon: 'fa-pills', label: 'ওষুধ', x: 38, y: 8, size: 3 },
-    { icon: 'fa-stethoscope', label: 'পরীক্ষা', x: 55, y: 4, size: 2 },
-    // Left side
-    { icon: 'fa-file-medical', label: 'রিপোর্ট', x: 5, y: 28, size: 4 },
-    { icon: 'fa-clock', label: 'লাইভ কিউ', x: 8, y: 52, size: 3 },
-    { icon: 'fa-bell', label: 'নোটিফিকেশন', x: 4, y: 75, size: 2 },
-    // Right side
-    { icon: 'fa-brain', label: 'AI সহায়ক', x: 94, y: 35, size: 3 },
-    { icon: 'fa-phone', label: 'সাপোর্ট', x: 92, y: 58, size: 2 },
-    { icon: 'fa-microscope', label: 'ল্যাব', x: 95, y: 78, size: 4 },
-    // Bottom scattered
-    { icon: 'fa-syringe', label: 'টিকা', x: 22, y: 88, size: 3 },
-    { icon: 'fa-dna', label: 'জেনেটিক্স', x: 45, y: 94, size: 2 },
-    { icon: 'fa-lungs', label: 'শ্বাসতন্ত্র', x: 68, y: 90, size: 3 },
-    // Middle scattered (avoiding center area)
-    { icon: 'fa-tooth', label: 'দন্ত', x: 15, y: 42, size: 2 },
-    { icon: 'fa-eye', label: 'চক্ষু', x: 25, y: 65, size: 3 },
-    { icon: 'fa-hand-holding-medical', label: 'কেয়ার', x: 35, y: 55, size: 2 },
-    { icon: 'fa-notes-medical', label: 'নোটস', x: 12, y: 18, size: 3 },
-    { icon: 'fa-procedures', label: 'ট্রিটমেন্ট', x: 28, y: 78, size: 4 },
-    { icon: 'fa-x-ray', label: 'এক্স-রে', x: 52, y: 68, size: 2 },
-    { icon: 'fa-tablets', label: 'ট্যাবলেট', x: 82, y: 45, size: 3 },
-    { icon: 'fa-vial', label: 'টেস্ট', x: 88, y: 68, size: 2 },
-  ];
-
-  // Small dots for complexity
-  const microDots = [
-    { x: 8, y: 12 }, { x: 28, y: 6 }, { x: 48, y: 2 }, { x: 88, y: 15 },
-    { x: 3, y: 38 }, { x: 18, y: 35 }, { x: 6, y: 62 }, { x: 22, y: 72 },
-    { x: 35, y: 85 }, { x: 58, y: 82 }, { x: 78, y: 95 }, { x: 92, y: 82 },
-    { x: 98, y: 48 }, { x: 85, y: 25 }, { x: 42, y: 45 }, { x: 62, y: 55 },
-    { x: 15, y: 58 }, { x: 32, y: 32 }, { x: 72, y: 72 }, { x: 48, y: 78 },
-  ];
-
-  // Generate curved path FROM node TO center (NIRNOY)
-  const generatePathToCenter = (x: number, y: number, index: number) => {
-    // Control point offsets for organic curves
-    const seed = index * 13 + 5;
-    const curveOffset = ((seed % 30) - 15) * 0.5;
-    
-    // Calculate midpoint with offset for curve
-    const midX = (x + centerX) / 2 + curveOffset;
-    const midY = (y + centerY) / 2 + curveOffset * 0.7;
-    
-    // Quadratic bezier from node to center
-    return `M${x},${y} Q${midX},${midY} ${centerX},${centerY}`;
-  };
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-      {/* Full page SVG - all lines connect to NIRNOY center */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <defs>
-          {/* Gradient fading towards center */}
-          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#93c5fd" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.15" />
-          </linearGradient>
-        </defs>
-
-        {/* Neural lines from each node TO center */}
-        {nodes.map((node, i) => (
-          <path
-            key={`line-${i}`}
-            d={generatePathToCenter(node.x, node.y, i)}
-            fill="none"
-            stroke="#93c5fd"
-            strokeWidth="0.25"
-            opacity="0.5"
-          />
-        ))}
-
-        {/* Lighter lines from micro dots TO center */}
-        {microDots.map((dot, i) => (
-          <path
-            key={`dot-line-${i}`}
-            d={generatePathToCenter(dot.x, dot.y, i + 30)}
-            fill="none"
-            stroke="#bfdbfe"
-            strokeWidth="0.15"
-            opacity="0.35"
-          />
-        ))}
-
-        {/* Center point indicator */}
-        <circle cx={centerX} cy={centerY} r="1.5" fill="#3b82f6" opacity="0.3" />
-      </svg>
-
-      {/* Micro dots */}
-      {microDots.map((dot, i) => (
-        <div
-          key={`dot-${i}`}
-          className="absolute w-1.5 h-1.5 rounded-full bg-blue-300/50"
-          style={{
-            left: `${dot.x}%`,
-            top: `${dot.y}%`,
-            transform: 'translate(-50%, -50%)',
-          }}
-        />
-      ))}
-
-      {/* Floating nodes with icons */}
-      {nodes.map((node, i) => {
-        const sizeMap: Record<number, { container: string; icon: string }> = {
-          2: { container: 'w-5 h-5', icon: 'text-[8px]' },
-          3: { container: 'w-6 h-6', icon: 'text-[9px]' },
-          4: { container: 'w-7 h-7', icon: 'text-[10px]' },
-        };
-        const sizes = sizeMap[node.size] || sizeMap[3];
-        
-        return (
-          <div
-            key={`node-${i}`}
-            className={`absolute ${sizes.container} group pointer-events-auto`}
-            style={{
-              left: `${node.x}%`,
-              top: `${node.y}%`,
-              transform: 'translate(-50%, -50%)',
-            }}
-          >
-            {/* Node body */}
-            <div className="absolute inset-0 bg-white/90 rounded-full shadow-sm border border-blue-200/60 flex items-center justify-center group-hover:bg-white group-hover:shadow-md group-hover:border-blue-300 transition-all duration-300 cursor-default">
-              <i className={`fas ${node.icon} ${sizes.icon} text-blue-400 group-hover:text-blue-500 transition-colors`}></i>
-            </div>
-            
-            {/* Tooltip */}
-            <div className="absolute left-1/2 -translate-x-1/2 -bottom-5 opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap z-50">
-              <span className="text-[8px] font-medium text-slate-500 bg-white px-1.5 py-0.5 rounded shadow-sm border border-slate-100">
-                {node.label}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-// ============ NIRNOY CENTER LOGO - Bold & Clean (No animations) ============
-const NirnoyCenterLogo: React.FC = () => (
-  <div className="relative w-32 h-32 mx-auto">
-    {/* Soft glow */}
-    <div className="absolute -inset-6 bg-blue-400/15 rounded-full blur-2xl"></div>
-    
-    {/* Core sphere */}
-    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 shadow-2xl" style={{ boxShadow: '0 0 50px rgba(59, 130, 246, 0.35)' }}>
-      {/* Inner highlight */}
-      <div className="absolute inset-3 rounded-full bg-gradient-to-br from-white/25 via-transparent to-transparent"></div>
+// ============ ANIMATED HEALTH GRAPHIC ============
+const HealthGraphic: React.FC = () => (
+  <div className="relative w-full max-w-md mx-auto">
+    {/* Central Circle with Pulse */}
+    <div className="relative w-64 h-64 mx-auto">
+      {/* Outer rings */}
+      <div className="absolute inset-0 border-2 border-blue-100 rounded-full animate-ping opacity-20"></div>
+      <div className="absolute inset-4 border border-blue-200 rounded-full"></div>
+      <div className="absolute inset-8 border border-blue-100 rounded-full"></div>
       
-      {/* NIRNOY text - BOLD */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-white text-2xl font-black tracking-wider" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
-          NIRNOY
-        </span>
+      {/* Center */}
+      <div className="absolute inset-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-xl shadow-blue-500/30">
+        <div className="text-center text-white">
+          <i className="fas fa-heartbeat text-4xl mb-2"></i>
+          <p className="text-xs font-bold uppercase tracking-wider">Nirnoy</p>
+        </div>
+      </div>
+
+      {/* Floating Icons */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
+        <i className="fas fa-user-md text-blue-500 text-lg"></i>
+      </div>
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
+        <i className="fas fa-calendar-check text-blue-500 text-lg"></i>
+      </div>
+      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
+        <i className="fas fa-notes-medical text-blue-500 text-lg"></i>
+      </div>
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center border border-slate-100">
+        <i className="fas fa-clock text-blue-500 text-lg"></i>
       </div>
     </div>
   </div>
@@ -307,9 +168,7 @@ export const Landing: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-white font-sans relative">
-      {/* Neural Network Background - Spreads across entire page */}
-      <NirnoyNeuralBackground />
+    <div className="min-h-screen bg-white font-sans">
       
       {/* ============ HEADER ============ */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
@@ -400,9 +259,9 @@ export const Landing: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Nirnoy Center Logo */}
-            <div className="hidden lg:flex items-center justify-center">
-              <NirnoyCenterLogo />
+            {/* Right: Health Graphic */}
+            <div className="hidden lg:block">
+              <HealthGraphic />
             </div>
           </div>
         </div>
