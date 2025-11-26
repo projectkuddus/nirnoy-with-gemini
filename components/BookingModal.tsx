@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Doctor, Chamber } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -8,607 +8,569 @@ interface BookingModalProps {
   onClose: () => void;
 }
 
-type VisitType = 'NEW' | 'FOLLOW_UP' | 'REPORT_CHECK';
-type ConsultationType = 'CHAMBER' | 'ONLINE';
-type Step = 'visit-type' | 'slot' | 'details' | 'confirm' | 'success';
+type VisitType = 'NEW' | 'FOLLOW_UP' | 'REPORT';
 
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onClose }) => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
-  // Steps
-  const [step, setStep] = useState<Step>('visit-type');
-  
-  // Booking data
+  // State
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [visitType, setVisitType] = useState<VisitType>('NEW');
-  const [consultationType, setConsultationType] = useState<ConsultationType>('CHAMBER');
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTime, setSelectedTime] = useState<string>('');
-  const [patientDetails, setPatientDetails] = useState({ 
-    name: '', 
-    phone: '', 
-    symptoms: '' 
-  });
-  
-  // UI state
+  const [selectedSlot, setSelectedSlot] = useState<{ time: string; serial: number } | null>(null);
+  const [patientName, setPatientName] = useState('');
+  const [patientPhone, setPatientPhone] = useState('');
+  const [symptoms, setSymptoms] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [serialNumber, setSerialNumber] = useState<number | null>(null);
-  const [estimatedTime, setEstimatedTime] = useState<string>('');
-
-  // Calculate fee based on visit type
-  const calculateFee = () => {
-    const baseFee = chamber.fee;
-    switch (visitType) {
-      case 'FOLLOW_UP':
-        return Math.round(baseFee * 0.5);
-      case 'REPORT_CHECK':
-        return Math.round(baseFee * 0.3);
-      default:
-        return baseFee;
-    }
-  };
-
-  // Generate next 7 days
-  const dates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    const dayName = d.toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { weekday: 'short' });
-    const dateNum = d.getDate();
-    const month = d.toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { month: 'short' });
-    return {
-      label: `${dayName}`,
-      dateNum: dateNum.toString(),
-      month: month,
-      value: d.toISOString().split('T')[0],
-      isToday: i === 0,
-    };
-  });
-
-  // Generate time slots based on chamber times
-  const generateSlots = () => {
-    const slots: { time: string; available: boolean; serial: number }[] = [];
-    const [startHour, startMin] = chamber.startTime.split(':').map(Number);
-    const [endHour, endMin] = chamber.endTime.split(':').map(Number);
-    const slotDuration = chamber.slotDuration || 15;
-    
-    let currentMinutes = startHour * 60 + startMin;
-    const endMinutes = endHour * 60 + endMin;
-    let serial = 1;
-    
-    while (currentMinutes < endMinutes) {
-      const hours = Math.floor(currentMinutes / 60);
-      const mins = currentMinutes % 60;
-      const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-      
-      // Randomly mark some as unavailable for demo
-      const available = Math.random() > 0.3;
-      
-      slots.push({
-        time: timeStr,
-        available,
-        serial: available ? serial++ : 0,
-      });
-      
-      currentMinutes += slotDuration;
-    }
-    
-    return slots;
-  };
-
-  const slots = generateSlots();
-
-  // Set serial number when slot is selected
-  useEffect(() => {
-    if (selectedTime) {
-      const slot = slots.find(s => s.time === selectedTime);
-      if (slot) {
-        setSerialNumber(slot.serial);
-        // Calculate estimated time
-        const [hours, mins] = selectedTime.split(':').map(Number);
-        const totalMins = hours * 60 + mins;
-        const estimatedHours = Math.floor(totalMins / 60);
-        const estimatedMins = totalMins % 60;
-        const period = estimatedHours >= 12 ? 'PM' : 'AM';
-        const displayHours = estimatedHours > 12 ? estimatedHours - 12 : estimatedHours;
-        setEstimatedTime(`${displayHours}:${estimatedMins.toString().padStart(2, '0')} ${period}`);
-      }
-    }
-  }, [selectedTime]);
-
-  const handleConfirm = () => {
-    setIsSubmitting(true);
-    // Simulate API Call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setStep('success');
-    }, 1500);
-  };
-
-  // Visit type options
-  const visitTypes = [
-    {
-      type: 'NEW' as VisitType,
-      icon: 'fa-user-plus',
-      title: isBn ? 'নতুন রোগী' : 'New Patient',
-      subtitle: isBn ? 'প্রথমবার দেখাচ্ছেন' : 'First time consultation',
-      fee: chamber.fee,
-      color: 'teal',
-    },
-    {
-      type: 'FOLLOW_UP' as VisitType,
-      icon: 'fa-sync-alt',
-      title: isBn ? 'ফলো-আপ' : 'Follow-up',
-      subtitle: isBn ? 'আগের সমস্যার জন্য' : 'For ongoing treatment',
-      fee: Math.round(chamber.fee * 0.5),
-      color: 'blue',
-      discount: '50%',
-    },
-    {
-      type: 'REPORT_CHECK' as VisitType,
-      icon: 'fa-file-medical',
-      title: isBn ? 'রিপোর্ট দেখানো' : 'Report Check',
-      subtitle: isBn ? 'টেস্ট রিপোর্ট নিয়ে আসছেন' : 'Showing test results',
-      fee: Math.round(chamber.fee * 0.3),
-      color: 'purple',
-      discount: '70%',
-    },
-  ];
+  const [bookingComplete, setBookingComplete] = useState(false);
 
   // Translations
   const t = {
-    bookAppointment: isBn ? 'অ্যাপয়েন্টমেন্ট বুক করুন' : 'Book Appointment',
-    selectVisitType: isBn ? 'ভিজিটের ধরন নির্বাচন করুন' : 'Select Visit Type',
-    selectDateTime: isBn ? 'তারিখ ও সময় নির্বাচন করুন' : 'Select Date & Time',
-    patientInfo: isBn ? 'রোগীর তথ্য' : 'Patient Information',
-    confirmBooking: isBn ? 'বুকিং নিশ্চিত করুন' : 'Confirm Booking',
-    consultationType: isBn ? 'পরামর্শের ধরন' : 'Consultation Type',
-    inPerson: isBn ? 'চেম্বারে' : 'In-Person',
-    online: isBn ? 'অনলাইন' : 'Online',
+    title: isBn ? 'অ্যাপয়েন্টমেন্ট বুক করুন' : 'Book Appointment',
+    step1: isBn ? 'ভিজিটের ধরন' : 'Visit Type',
+    step2: isBn ? 'তারিখ ও সময়' : 'Date & Time',
+    step3: isBn ? 'রোগীর তথ্য' : 'Patient Info',
+    newConsult: isBn ? 'নতুন রোগী' : 'New Patient',
+    newDesc: isBn ? 'প্রথমবার এই ডাক্তারের কাছে যাচ্ছেন' : 'First time visiting this doctor',
+    followUp: isBn ? 'ফলো-আপ' : 'Follow-up',
+    followUpDesc: isBn ? 'আগে দেখিয়েছেন, পুনরায় চেকআপ' : 'Previously visited, follow-up checkup',
+    report: isBn ? 'রিপোর্ট দেখানো' : 'Report Check',
+    reportDesc: isBn ? 'শুধু টেস্ট রিপোর্ট দেখাতে' : 'Only showing test reports',
     selectDate: isBn ? 'তারিখ নির্বাচন করুন' : 'Select Date',
-    availableSlots: isBn ? 'সময় নির্বাচন করুন' : 'Available Slots',
-    continue: isBn ? 'এগিয়ে যান' : 'Continue',
-    back: isBn ? 'পিছনে' : 'Back',
+    selectTime: isBn ? 'সময় নির্বাচন করুন' : 'Select Time',
+    morning: isBn ? 'সকাল' : 'Morning',
+    afternoon: isBn ? 'দুপুর' : 'Afternoon',
+    evening: isBn ? 'সন্ধ্যা' : 'Evening',
+    serial: isBn ? 'সিরিয়াল' : 'Serial',
     patientName: isBn ? 'রোগীর নাম' : 'Patient Name',
-    phoneNumber: isBn ? 'ফোন নম্বর' : 'Phone Number',
-    symptoms: isBn ? 'সমস্যা / লক্ষণ' : 'Chief Complaint / Symptoms',
-    optional: isBn ? 'ঐচ্ছিক' : 'Optional',
-    bookingSummary: isBn ? 'বুকিং সারাংশ' : 'Booking Summary',
-    doctor: isBn ? 'ডাক্তার' : 'Doctor',
-    chamber: isBn ? 'চেম্বার' : 'Chamber',
-    dateTime: isBn ? 'তারিখ ও সময়' : 'Date & Time',
-    serialNo: isBn ? 'সিরিয়াল নং' : 'Serial No',
-    estimatedTime: isBn ? 'আনুমানিক সময়' : 'Est. Time',
-    visitFee: isBn ? 'ভিজিট ফি' : 'Visit Fee',
-    confirm: isBn ? 'নিশ্চিত করুন' : 'Confirm Booking',
-    bookingConfirmed: isBn ? 'বুকিং সম্পন্ন!' : 'Booking Confirmed!',
-    yourSerial: isBn ? 'আপনার সিরিয়াল' : 'Your Serial',
-    smsNote: isBn ? 'SMS পাঠানো হয়েছে' : 'SMS confirmation sent',
-    done: isBn ? 'সম্পন্ন' : 'Done',
+    phone: isBn ? 'মোবাইল নম্বর' : 'Mobile Number',
+    symptoms: isBn ? 'সমস্যা/লক্ষণ' : 'Problem/Symptoms',
+    symptomsPlaceholder: isBn ? 'সংক্ষেপে আপনার সমস্যা লিখুন...' : 'Briefly describe your problem...',
+    next: isBn ? 'পরবর্তী' : 'Next',
+    back: isBn ? 'পিছনে' : 'Back',
+    confirm: isBn ? 'কনফার্ম করুন' : 'Confirm Booking',
+    confirming: isBn ? 'বুক হচ্ছে...' : 'Booking...',
+    fee: isBn ? 'ফি' : 'Fee',
+    discount: isBn ? 'ছাড়' : 'Discount',
+    total: isBn ? 'মোট' : 'Total',
     today: isBn ? 'আজ' : 'Today',
+    tomorrow: isBn ? 'আগামীকাল' : 'Tomorrow',
     booked: isBn ? 'বুকড' : 'Booked',
-    discount: isBn ? 'ছাড়' : 'OFF',
+    available: isBn ? 'খালি আছে' : 'Available',
+    successTitle: isBn ? 'বুকিং সফল!' : 'Booking Confirmed!',
+    successMsg: isBn ? 'আপনার অ্যাপয়েন্টমেন্ট কনফার্ম হয়েছে' : 'Your appointment has been confirmed',
+    serialNo: isBn ? 'সিরিয়াল নং' : 'Serial No',
+    estTime: isBn ? 'আনুমানিক সময়' : 'Est. Time',
+    smsSent: isBn ? 'SMS পাঠানো হয়েছে' : 'SMS sent to',
+    done: isBn ? 'ঠিক আছে' : 'Done',
+    chamber: isBn ? 'চেম্বার' : 'Chamber',
   };
 
-  // Progress indicator
-  const steps: Step[] = ['visit-type', 'slot', 'details', 'confirm'];
-  const currentStepIndex = steps.indexOf(step);
+  // Generate next 7 days
+  const dates = useMemo(() => {
+    const bengaliDays = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহ', 'শুক্র', 'শনি'];
+    const englishDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return {
+        value: d.toISOString().split('T')[0],
+        day: isBn ? bengaliDays[d.getDay()] : englishDays[d.getDay()],
+        date: d.getDate(),
+        isToday: i === 0,
+        isTomorrow: i === 1,
+      };
+    });
+  }, [isBn]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
-        
-        {/* Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-teal-700 p-5 text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-          <div className="relative z-10">
-            <div className="flex justify-between items-start">
+  // Generate time slots
+  const slots = useMemo(() => {
+    const result: { time: string; display: string; serial: number; available: boolean; period: string }[] = [];
+    let serial = 1;
+    
+    // Morning: 9 AM - 12 PM
+    for (let h = 9; h < 12; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const available = Math.random() > 0.25;
+        result.push({
+          time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
+          display: `${h > 12 ? h - 12 : h}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`,
+          serial: available ? serial++ : 0,
+          available,
+          period: 'morning',
+        });
+      }
+    }
+    
+    // Afternoon: 3 PM - 6 PM
+    for (let h = 15; h < 18; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const available = Math.random() > 0.25;
+        result.push({
+          time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
+          display: `${h > 12 ? h - 12 : h}:${m.toString().padStart(2, '0')} PM`,
+          serial: available ? serial++ : 0,
+          available,
+          period: 'afternoon',
+        });
+      }
+    }
+    
+    // Evening: 6 PM - 9 PM
+    for (let h = 18; h < 21; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const available = Math.random() > 0.25;
+        result.push({
+          time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
+          display: `${h > 12 ? h - 12 : h}:${m.toString().padStart(2, '0')} PM`,
+          serial: available ? serial++ : 0,
+          available,
+          period: 'evening',
+        });
+      }
+    }
+    
+    return result;
+  }, []);
+
+  // Calculate fee
+  const baseFee = chamber.fee;
+  const fee = visitType === 'FOLLOW_UP' ? Math.round(baseFee * 0.5) : visitType === 'REPORT' ? Math.round(baseFee * 0.3) : baseFee;
+  const discount = baseFee - fee;
+
+  // Validate phone
+  const isValidPhone = (phone: string) => {
+    const digits = phone.replace(/\D/g, '');
+    return /^(01[3-9]\d{8}|1[3-9]\d{8})$/.test(digits);
+  };
+
+  // Handle booking
+  const handleBooking = async () => {
+    setIsSubmitting(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setIsSubmitting(false);
+    setBookingComplete(true);
+  };
+
+  // Can proceed to next step?
+  const canProceed = () => {
+    if (step === 1) return true;
+    if (step === 2) return selectedDate && selectedSlot;
+    if (step === 3) return patientName.trim() && isValidPhone(patientPhone);
+    return false;
+  };
+
+  // Success Screen
+  if (bookingComplete) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-scale-in">
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-8 text-center text-white">
+            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fas fa-check text-4xl"></i>
+            </div>
+            <h2 className="text-2xl font-bold mb-1">{t.successTitle}</h2>
+            <p className="opacity-90">{t.successMsg}</p>
+          </div>
+          
+          <div className="p-6">
+            {/* Doctor Info */}
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
+              <img src={doctor.image} alt={doctor.name} className="w-12 h-12 rounded-lg object-cover" />
               <div>
-                <h2 className="text-xl font-bold">{t.bookAppointment}</h2>
-                <p className="text-teal-100 text-sm mt-1 flex items-center gap-2">
-                  <img src={doctor.image} alt="" className="w-6 h-6 rounded-full border border-white/30" />
-                  {doctor.name}
-                </p>
-                <p className="text-teal-200 text-xs flex items-center gap-1 mt-1">
-                  <i className="fas fa-hospital-alt"></i>
-                  {chamber.name}
-                </p>
+                <p className="font-bold text-slate-800">{doctor.name}</p>
+                <p className="text-sm text-slate-500">{chamber.name}</p>
               </div>
-              <button onClick={onClose} className="text-white/70 hover:text-white transition p-2 hover:bg-white/10 rounded-full">
-                <i className="fas fa-times text-lg"></i>
-              </button>
             </div>
 
-            {/* Progress Steps */}
-            {step !== 'success' && (
-              <div className="flex items-center gap-2 mt-4">
-                {steps.map((s, i) => (
-                  <React.Fragment key={s}>
-                    <div className={`h-2 flex-1 rounded-full transition-all ${
-                      i <= currentStepIndex ? 'bg-white' : 'bg-white/30'
-                    }`}></div>
-                  </React.Fragment>
-                ))}
+            {/* Booking Details */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-teal-50 rounded-xl p-4 text-center">
+                <p className="text-xs text-teal-600 uppercase font-bold mb-1">{t.serialNo}</p>
+                <p className="text-3xl font-bold text-teal-700">{selectedSlot?.serial || 1}</p>
               </div>
-            )}
+              <div className="bg-slate-50 rounded-xl p-4 text-center">
+                <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t.estTime}</p>
+                <p className="text-xl font-bold text-slate-700">{selectedSlot?.display || '10:00 AM'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-sm mb-6">
+              <div className="flex justify-between">
+                <span className="text-slate-500">{isBn ? 'তারিখ' : 'Date'}</span>
+                <span className="font-bold text-slate-700">{selectedDate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">{isBn ? 'ভিজিটের ধরন' : 'Visit Type'}</span>
+                <span className="font-bold text-slate-700">
+                  {visitType === 'NEW' ? t.newConsult : visitType === 'FOLLOW_UP' ? t.followUp : t.report}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">{t.total}</span>
+                <span className="font-bold text-teal-600">৳{fee}</span>
+              </div>
+            </div>
+
+            <div className="bg-emerald-50 rounded-xl p-3 flex items-center gap-3 mb-6">
+              <i className="fas fa-sms text-emerald-600"></i>
+              <p className="text-sm text-emerald-700">{t.smsSent} <span className="font-bold">{patientPhone}</span></p>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-slate-900 transition"
+            >
+              {t.done}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden animate-slide-up sm:animate-scale-in">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-teal-600 to-teal-500 p-4 text-white">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold">{t.title}</h2>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition">
+              <i className="fas fa-times"></i>
+            </button>
+          </div>
+          
+          {/* Doctor Mini Card */}
+          <div className="flex items-center gap-3">
+            <img src={doctor.image} alt={doctor.name} className="w-10 h-10 rounded-lg object-cover border-2 border-white/30" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold truncate">{doctor.name}</p>
+              <p className="text-xs opacity-80 truncate">{chamber.name}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs opacity-80">{t.fee}</p>
+              <p className="font-bold">৳{fee}</p>
+            </div>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-5 overflow-y-auto custom-scrollbar flex-1">
+        {/* Progress Steps */}
+        <div className="flex items-center justify-center gap-2 py-3 bg-slate-50 border-b border-slate-100">
+          {[1, 2, 3].map((s) => (
+            <React.Fragment key={s}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition ${
+                step >= s ? 'bg-teal-500 text-white' : 'bg-slate-200 text-slate-500'
+              }`}>
+                {step > s ? <i className="fas fa-check text-xs"></i> : s}
+              </div>
+              {s < 3 && <div className={`w-8 h-0.5 ${step > s ? 'bg-teal-500' : 'bg-slate-200'}`}></div>}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 200px)' }}>
           
           {/* Step 1: Visit Type */}
-          {step === 'visit-type' && (
-            <div className="space-y-4 animate-fade-in">
-              <h3 className="font-bold text-slate-800 text-lg">{t.selectVisitType}</h3>
+          {step === 1 && (
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-slate-500 uppercase">{t.step1}</p>
               
-              <div className="space-y-3">
-                {visitTypes.map((vt) => (
-                  <button
-                    key={vt.type}
-                    onClick={() => setVisitType(vt.type)}
-                    className={`w-full p-4 rounded-2xl border-2 text-left transition-all flex items-center gap-4 group ${
-                      visitType === vt.type 
-                        ? `border-${vt.color}-500 bg-${vt.color}-50 shadow-lg` 
-                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl transition-all ${
-                      visitType === vt.type 
-                        ? `bg-${vt.color}-500 text-white` 
-                        : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
-                    }`}>
-                      <i className={`fas ${vt.icon}`}></i>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-800">{vt.title}</h4>
-                        {vt.discount && (
-                          <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            {vt.discount} {t.discount}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-slate-500">{vt.subtitle}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-slate-800">৳{vt.fee}</p>
-                      {vt.discount && (
-                        <p className="text-xs text-slate-400 line-through">৳{chamber.fee}</p>
+              {[
+                { type: 'NEW' as VisitType, icon: 'fa-user-plus', title: t.newConsult, desc: t.newDesc, color: 'teal' },
+                { type: 'FOLLOW_UP' as VisitType, icon: 'fa-redo', title: t.followUp, desc: t.followUpDesc, color: 'blue', badge: '50% ছাড়' },
+                { type: 'REPORT' as VisitType, icon: 'fa-file-medical', title: t.report, desc: t.reportDesc, color: 'purple', badge: '70% ছাড়' },
+              ].map((item) => (
+                <button
+                  key={item.type}
+                  onClick={() => setVisitType(item.type)}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition flex items-center gap-4 ${
+                    visitType === item.type 
+                      ? `border-${item.color}-500 bg-${item.color}-50` 
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    visitType === item.type ? `bg-${item.color}-500 text-white` : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    <i className={`fas ${item.icon} text-lg`}></i>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-slate-800">{item.title}</p>
+                      {item.badge && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                          {item.badge}
+                        </span>
                       )}
                     </div>
-                  </button>
-                ))}
-              </div>
+                    <p className="text-sm text-slate-500">{item.desc}</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    visitType === item.type ? 'border-teal-500 bg-teal-500' : 'border-slate-300'
+                  }`}>
+                    {visitType === item.type && <i className="fas fa-check text-white text-xs"></i>}
+                  </div>
+                </button>
+              ))}
 
-              <button 
-                onClick={() => setStep('slot')}
-                className="w-full py-4 bg-teal-600 text-white font-bold rounded-2xl shadow-lg hover:bg-teal-700 transition flex items-center justify-center gap-2"
-              >
-                {t.continue} <i className="fas fa-arrow-right"></i>
-              </button>
+              {/* Fee Summary */}
+              {visitType !== 'NEW' && (
+                <div className="bg-green-50 rounded-xl p-3 flex items-center justify-between">
+                  <span className="text-sm text-green-700">
+                    <i className="fas fa-tag mr-2"></i>
+                    {t.discount}: ৳{discount}
+                  </span>
+                  <span className="font-bold text-green-700">{t.total}: ৳{fee}</span>
+                </div>
+              )}
             </div>
           )}
 
           {/* Step 2: Date & Time */}
-          {step === 'slot' && (
-            <div className="space-y-5 animate-fade-in">
-              {/* Consultation Type */}
+          {step === 2 && (
+            <div className="space-y-4">
+              {/* Date Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">{t.consultationType}</label>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => setConsultationType('CHAMBER')}
-                    className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-2 transition ${
-                      consultationType === 'CHAMBER' 
-                        ? 'border-teal-500 bg-teal-50 text-teal-700' 
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <i className="fas fa-hospital-alt"></i> {t.inPerson}
-                  </button>
-                  <button 
-                    onClick={() => setConsultationType('ONLINE')}
-                    className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center gap-2 transition ${
-                      consultationType === 'ONLINE' 
-                        ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <i className="fas fa-video"></i> {t.online}
-                  </button>
-                </div>
-              </div>
-
-              {/* Date Selection - Horizontal Scroll */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">{t.selectDate}</label>
+                <p className="text-sm font-bold text-slate-500 uppercase mb-3">{t.selectDate}</p>
                 <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-                  {dates.map((date) => (
+                  {dates.map((d) => (
                     <button
-                      key={date.value}
-                      onClick={() => setSelectedDate(date.value)}
-                      className={`flex-shrink-0 w-16 py-3 rounded-xl text-center transition-all ${
-                        selectedDate === date.value 
-                          ? 'bg-slate-900 text-white shadow-lg scale-105' 
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      key={d.value}
+                      onClick={() => setSelectedDate(d.value)}
+                      className={`flex-shrink-0 w-16 py-3 rounded-xl text-center transition ${
+                        selectedDate === d.value
+                          ? 'bg-teal-500 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                     >
-                      <p className="text-[10px] font-bold uppercase opacity-70">{date.label}</p>
-                      <p className="text-xl font-bold">{date.dateNum}</p>
-                      <p className="text-[10px] opacity-70">{date.month}</p>
-                      {date.isToday && (
-                        <span className="text-[8px] bg-green-500 text-white px-1.5 rounded-full">{t.today}</span>
-                      )}
+                      <p className="text-xs font-medium opacity-80">
+                        {d.isToday ? t.today : d.isTomorrow ? t.tomorrow : d.day}
+                      </p>
+                      <p className="text-xl font-bold">{d.date}</p>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Time Slots Grid */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-3">
-                  {t.availableSlots}
-                  <span className="text-slate-400 font-normal ml-2">({chamber.startTime} - {chamber.endTime})</span>
-                </label>
-                <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
-                  {slots.map((slot) => (
-                    <button
-                      key={slot.time}
-                      onClick={() => slot.available && setSelectedTime(slot.time)}
-                      disabled={!slot.available}
-                      className={`py-2.5 rounded-xl text-sm font-mono transition-all relative ${
-                        !slot.available 
-                          ? 'bg-slate-100 text-slate-300 cursor-not-allowed line-through' 
-                          : selectedTime === slot.time 
-                            ? 'bg-teal-600 text-white shadow-lg scale-105' 
-                            : 'bg-slate-100 text-slate-700 hover:bg-teal-50 hover:text-teal-700'
-                      }`}
-                    >
-                      {slot.time}
-                      {slot.available && selectedTime === slot.time && (
-                        <span className="absolute -top-1 -right-1 bg-yellow-400 text-yellow-900 text-[9px] font-bold px-1.5 rounded-full shadow">
-                          #{slot.serial}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Time Selection */}
+              {selectedDate && (
+                <div>
+                  <p className="text-sm font-bold text-slate-500 uppercase mb-3">{t.selectTime}</p>
+                  
+                  {/* Morning */}
+                  <div className="mb-4">
+                    <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
+                      <i className="fas fa-sun text-amber-400"></i> {t.morning}
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {slots.filter(s => s.period === 'morning').slice(0, 8).map((slot) => (
+                        <button
+                          key={slot.time}
+                          onClick={() => slot.available && setSelectedSlot(slot)}
+                          disabled={!slot.available}
+                          className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
+                            selectedSlot?.time === slot.time
+                              ? 'bg-teal-500 text-white'
+                              : slot.available
+                                ? 'bg-slate-100 text-slate-700 hover:bg-teal-50 hover:text-teal-700'
+                                : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
+                          }`}
+                        >
+                          {slot.display.replace(' AM', '').replace(' PM', '')}
+                          {slot.available && <span className="text-[10px] opacity-60 block">#{slot.serial}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => setStep('visit-type')}
-                  className="flex-1 py-3 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition"
-                >
-                  <i className="fas fa-arrow-left mr-2"></i> {t.back}
-                </button>
-                <button 
-                  onClick={() => setStep('details')}
-                  disabled={!selectedDate || !selectedTime}
-                  className="flex-[2] py-3 bg-teal-600 text-white font-bold rounded-xl shadow-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {t.continue} <i className="fas fa-arrow-right"></i>
-                </button>
-              </div>
+                  {/* Afternoon */}
+                  <div className="mb-4">
+                    <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
+                      <i className="fas fa-cloud-sun text-orange-400"></i> {t.afternoon}
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {slots.filter(s => s.period === 'afternoon').slice(0, 8).map((slot) => (
+                        <button
+                          key={slot.time}
+                          onClick={() => slot.available && setSelectedSlot(slot)}
+                          disabled={!slot.available}
+                          className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
+                            selectedSlot?.time === slot.time
+                              ? 'bg-teal-500 text-white'
+                              : slot.available
+                                ? 'bg-slate-100 text-slate-700 hover:bg-teal-50 hover:text-teal-700'
+                                : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
+                          }`}
+                        >
+                          {slot.display.replace(' AM', '').replace(' PM', '')}
+                          {slot.available && <span className="text-[10px] opacity-60 block">#{slot.serial}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Evening */}
+                  <div>
+                    <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
+                      <i className="fas fa-moon text-indigo-400"></i> {t.evening}
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {slots.filter(s => s.period === 'evening').slice(0, 8).map((slot) => (
+                        <button
+                          key={slot.time}
+                          onClick={() => slot.available && setSelectedSlot(slot)}
+                          disabled={!slot.available}
+                          className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
+                            selectedSlot?.time === slot.time
+                              ? 'bg-teal-500 text-white'
+                              : slot.available
+                                ? 'bg-slate-100 text-slate-700 hover:bg-teal-50 hover:text-teal-700'
+                                : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
+                          }`}
+                        >
+                          {slot.display.replace(' AM', '').replace(' PM', '')}
+                          {slot.available && <span className="text-[10px] opacity-60 block">#{slot.serial}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Selected Summary */}
+                  {selectedSlot && (
+                    <div className="mt-4 bg-teal-50 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center text-white font-bold">
+                          #{selectedSlot.serial}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-teal-800">{t.serial} #{selectedSlot.serial}</p>
+                          <p className="text-xs text-teal-600">{selectedSlot.display}</p>
+                        </div>
+                      </div>
+                      <i className="fas fa-check-circle text-teal-500 text-xl"></i>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {/* Step 3: Patient Details */}
-          {step === 'details' && (
-            <div className="space-y-5 animate-fade-in">
-              <h3 className="font-bold text-slate-800 text-lg">{t.patientInfo}</h3>
-
-              {/* Quick Info Card */}
-              <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-600">
-                    <i className="fas fa-calendar-check"></i>
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-800">{new Date(selectedDate).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-                    <p className="text-sm text-slate-500">{selectedTime} • {consultationType === 'ONLINE' ? t.online : t.inPerson}</p>
-                  </div>
-                </div>
-                <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full font-bold text-sm">
-                  #{serialNumber}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.patientName} *</label>
-                  <input 
-                    type="text" 
-                    value={patientDetails.name}
-                    onChange={(e) => setPatientDetails({...patientDetails, name: e.target.value})}
-                    className="w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-lg"
-                    placeholder={isBn ? 'পুরো নাম লিখুন' : 'Enter full name'}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.phoneNumber} *</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">+880</span>
-                    <input 
-                      type="tel" 
-                      value={patientDetails.phone}
-                      onChange={(e) => setPatientDetails({...patientDetails, phone: e.target.value})}
-                      className="w-full p-4 pl-16 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none text-lg font-mono"
-                      placeholder="1XXXXXXXXX"
-                      maxLength={10}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
-                    {t.symptoms} <span className="text-slate-400 font-normal">({t.optional})</span>
-                  </label>
-                  <textarea 
-                    value={patientDetails.symptoms}
-                    onChange={(e) => setPatientDetails({...patientDetails, symptoms: e.target.value})}
-                    className="w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none h-24"
-                    placeholder={isBn ? 'আপনার সমস্যা সংক্ষেপে লিখুন...' : 'Briefly describe your problem...'}
-                  ></textarea>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => setStep('slot')}
-                  className="flex-1 py-3 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition"
-                >
-                  <i className="fas fa-arrow-left mr-2"></i> {t.back}
-                </button>
-                <button 
-                  onClick={() => setStep('confirm')}
-                  disabled={!patientDetails.name || !patientDetails.phone}
-                  className="flex-[2] py-3 bg-teal-600 text-white font-bold rounded-xl shadow-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {t.continue} <i className="fas fa-arrow-right"></i>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Confirmation */}
-          {step === 'confirm' && (
-            <div className="space-y-5 animate-fade-in">
-              <h3 className="font-bold text-slate-800 text-lg">{t.bookingSummary}</h3>
-
-              <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="p-4 space-y-3">
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-                    <span className="text-slate-500">{t.doctor}</span>
-                    <span className="font-bold text-slate-800">{doctor.name}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-                    <span className="text-slate-500">{t.chamber}</span>
-                    <span className="font-bold text-slate-800">{chamber.name}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-                    <span className="text-slate-500">{t.dateTime}</span>
-                    <span className="font-bold text-slate-800">
-                      {new Date(selectedDate).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { month: 'short', day: 'numeric' })}, {selectedTime}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-                    <span className="text-slate-500">{t.serialNo}</span>
-                    <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full font-bold">#{serialNumber}</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-                    <span className="text-slate-500">{t.estimatedTime}</span>
-                    <span className="font-bold text-green-600">{estimatedTime}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">{t.visitFee}</span>
-                    <div className="text-right">
-                      <span className="text-2xl font-bold text-teal-600">৳{calculateFee()}</span>
-                      {visitType !== 'NEW' && (
-                        <span className="text-sm text-slate-400 line-through ml-2">৳{chamber.fee}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Visit Type Badge */}
-                <div className={`p-3 text-center text-sm font-bold ${
-                  visitType === 'NEW' ? 'bg-teal-100 text-teal-800' :
-                  visitType === 'FOLLOW_UP' ? 'bg-blue-100 text-blue-800' :
-                  'bg-purple-100 text-purple-800'
-                }`}>
-                  {visitTypes.find(v => v.type === visitType)?.title}
-                </div>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                <i className="fas fa-info-circle text-amber-500 mt-0.5"></i>
-                <p className="text-sm text-amber-800">
-                  {isBn 
-                    ? 'বুকিং নিশ্চিত করার পর আপনার ফোনে SMS পাঠানো হবে। অ্যাপয়েন্টমেন্টের ১৫ মিনিট আগে পৌঁছাবেন।'
-                    : 'You will receive an SMS confirmation. Please arrive 15 minutes before your appointment.'
-                  }
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setStep('details')}
-                  className="flex-1 py-4 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition"
-                >
-                  <i className="fas fa-arrow-left mr-2"></i> {t.back}
-                </button>
-                <button 
-                  onClick={handleConfirm}
-                  disabled={isSubmitting}
-                  className="flex-[2] py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition disabled:opacity-70 flex justify-center items-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <><i className="fas fa-circle-notch fa-spin"></i> {isBn ? 'প্রক্রিয়াকরণ...' : 'Processing...'}</>
-                  ) : (
-                    <><i className="fas fa-check-circle"></i> {t.confirm}</>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Success */}
-          {step === 'success' && (
-            <div className="text-center py-6 animate-fade-in">
-              <div className="relative inline-block mb-6">
-                <div className="h-24 w-24 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 text-4xl">
-                  <i className="fas fa-check animate-bounce"></i>
-                </div>
-                <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-yellow-900 w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
-                  #{serialNumber}
-                </div>
-              </div>
-
-              <h3 className="text-2xl font-bold text-slate-800 mb-2">{t.bookingConfirmed}</h3>
+          {step === 3 && (
+            <div className="space-y-4">
+              <p className="text-sm font-bold text-slate-500 uppercase">{t.step3}</p>
               
-              <p className="text-slate-600 mb-6 max-w-sm mx-auto">
-                {isBn 
-                  ? `${doctor.name}-এর সাথে আপনার অ্যাপয়েন্টমেন্ট নিশ্চিত হয়েছে।`
-                  : `Your appointment with ${doctor.name} is confirmed.`
-                }
-              </p>
-
-              <div className="bg-slate-50 rounded-2xl p-5 mb-6 max-w-sm mx-auto border border-slate-200">
-                <div className="grid grid-cols-2 gap-4 text-left">
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase">{t.serialNo}</p>
-                    <p className="text-3xl font-bold text-teal-600">#{serialNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase">{t.estimatedTime}</p>
-                    <p className="text-xl font-bold text-slate-800">{estimatedTime}</p>
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-200">
-                  <p className="text-sm text-slate-600">
-                    <i className="fas fa-map-marker-alt text-teal-500 mr-2"></i>
-                    {chamber.name}, {chamber.address}
-                  </p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t.patientName} *</label>
+                <input
+                  type="text"
+                  value={patientName}
+                  onChange={(e) => setPatientName(e.target.value)}
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition"
+                  placeholder={isBn ? 'রোগীর পুরো নাম' : 'Full name of patient'}
+                />
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-green-600 text-sm mb-6">
-                <i className="fas fa-sms"></i>
-                <span>{t.smsNote} +880{patientDetails.phone}</span>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t.phone} *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">+880</span>
+                  <input
+                    type="tel"
+                    value={patientPhone}
+                    onChange={(e) => setPatientPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    className={`w-full p-3 pl-14 border-2 rounded-xl outline-none transition ${
+                      patientPhone && !isValidPhone(patientPhone) ? 'border-red-300' : 'border-slate-200 focus:border-teal-500'
+                    }`}
+                    placeholder="1712345678"
+                  />
+                  {patientPhone && isValidPhone(patientPhone) && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500">
+                      <i className="fas fa-check-circle"></i>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">{isBn ? 'SMS এ কনফার্মেশন পাঠানো হবে' : 'Confirmation will be sent via SMS'}</p>
               </div>
 
-              <button 
-                onClick={onClose}
-                className="w-full max-w-sm py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition"
-              >
-                {t.done}
-              </button>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t.symptoms}</label>
+                <textarea
+                  value={symptoms}
+                  onChange={(e) => setSymptoms(e.target.value)}
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition resize-none"
+                  rows={3}
+                  placeholder={t.symptomsPlaceholder}
+                />
+              </div>
+
+              {/* Booking Summary */}
+              <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">{isBn ? 'ডাক্তার' : 'Doctor'}</span>
+                  <span className="font-medium text-slate-700">{doctor.name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">{t.chamber}</span>
+                  <span className="font-medium text-slate-700">{chamber.name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">{isBn ? 'তারিখ' : 'Date'}</span>
+                  <span className="font-medium text-slate-700">{selectedDate}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">{isBn ? 'সময়' : 'Time'}</span>
+                  <span className="font-medium text-slate-700">{selectedSlot?.display}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">{t.serial}</span>
+                  <span className="font-bold text-teal-600">#{selectedSlot?.serial}</span>
+                </div>
+                <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
+                  <span className="font-bold text-slate-700">{t.total}</span>
+                  <span className="font-bold text-teal-600 text-lg">৳{fee}</span>
+                </div>
+              </div>
             </div>
           )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-slate-100 bg-white flex gap-3">
+          {step > 1 && (
+            <button
+              onClick={() => setStep((step - 1) as 1 | 2)}
+              className="px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition"
+            >
+              <i className="fas fa-arrow-left mr-2"></i>{t.back}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              if (step < 3) setStep((step + 1) as 2 | 3);
+              else handleBooking();
+            }}
+            disabled={!canProceed() || isSubmitting}
+            className="flex-1 bg-gradient-to-r from-teal-600 to-teal-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? (
+              <><i className="fas fa-spinner fa-spin mr-2"></i>{t.confirming}</>
+            ) : step === 3 ? (
+              <><i className="fas fa-check mr-2"></i>{t.confirm}</>
+            ) : (
+              <>{t.next}<i className="fas fa-arrow-right ml-2"></i></>
+            )}
+          </button>
         </div>
       </div>
     </div>
   );
 };
+
+export default BookingModal;
