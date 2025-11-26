@@ -2,106 +2,184 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 
-// ============ NIRNOY CORE GRAPHIC - Neural/Solar System Style ============
+// ============ NIRNOY NEURAL BRAIN - Organic 3D-like Network ============
 const NirnoyCoreGraphic: React.FC = () => {
-  // Orbiting elements representing different healthcare aspects
-  const orbitingNodes = [
-    { icon: 'fa-user-md', label: 'ডাক্তার', angle: 0, orbit: 1, color: '#3b82f6' },
-    { icon: 'fa-hospital', label: 'হাসপাতাল', angle: 45, orbit: 2, color: '#0ea5e9' },
-    { icon: 'fa-calendar-check', label: 'অ্যাপয়েন্টমেন্ট', angle: 90, orbit: 1, color: '#3b82f6' },
-    { icon: 'fa-pills', label: 'ওষুধ', angle: 135, orbit: 2, color: '#0ea5e9' },
-    { icon: 'fa-heartbeat', label: 'স্বাস্থ্য', angle: 180, orbit: 1, color: '#3b82f6' },
-    { icon: 'fa-file-medical', label: 'রিপোর্ট', angle: 225, orbit: 2, color: '#0ea5e9' },
-    { icon: 'fa-clock', label: 'লাইভ কিউ', angle: 270, orbit: 1, color: '#3b82f6' },
-    { icon: 'fa-bell', label: 'নোটিফিকেশন', angle: 315, orbit: 2, color: '#0ea5e9' },
+  // Floating nodes at random-ish organic positions (like neurons)
+  const neuralNodes = [
+    { icon: 'fa-user-md', label: 'ডাক্তার', x: 45, y: 15, size: 'lg', delay: 0 },
+    { icon: 'fa-hospital', label: 'হাসপাতাল', x: 85, y: 25, size: 'md', delay: 0.5 },
+    { icon: 'fa-calendar-check', label: 'অ্যাপয়েন্টমেন্ট', x: 95, y: 55, size: 'lg', delay: 1 },
+    { icon: 'fa-pills', label: 'ওষুধ', x: 80, y: 85, size: 'sm', delay: 1.5 },
+    { icon: 'fa-heartbeat', label: 'স্বাস্থ্য', x: 55, y: 95, size: 'md', delay: 2 },
+    { icon: 'fa-file-medical', label: 'রিপোর্ট', x: 20, y: 80, size: 'lg', delay: 2.5 },
+    { icon: 'fa-clock', label: 'লাইভ কিউ', x: 5, y: 50, size: 'md', delay: 3 },
+    { icon: 'fa-bell', label: 'নোটিফিকেশন', x: 15, y: 20, size: 'sm', delay: 3.5 },
+    { icon: 'fa-stethoscope', label: 'পরীক্ষা', x: 70, y: 10, size: 'sm', delay: 4 },
+    { icon: 'fa-ambulance', label: 'ইমার্জেন্সি', x: 98, y: 40, size: 'sm', delay: 4.5 },
+    { icon: 'fa-brain', label: 'AI সহায়ক', x: 8, y: 35, size: 'sm', delay: 5 },
+    { icon: 'fa-phone', label: 'সাপোর্ট', x: 30, y: 5, size: 'sm', delay: 5.5 },
   ];
 
+  // Generate curved paths from center to each node
+  const generateCurvedPath = (x: number, y: number, index: number) => {
+    const centerX = 50;
+    const centerY = 50;
+    // Create bezier curve with random control points for organic feel
+    const ctrl1X = centerX + (x - centerX) * 0.3 + (index % 2 === 0 ? 10 : -10);
+    const ctrl1Y = centerY + (y - centerY) * 0.3 + (index % 3 === 0 ? 15 : -15);
+    const ctrl2X = centerX + (x - centerX) * 0.7 + (index % 2 === 0 ? -8 : 8);
+    const ctrl2Y = centerY + (y - centerY) * 0.7 + (index % 3 === 0 ? -10 : 10);
+    return `M${centerX},${centerY} C${ctrl1X},${ctrl1Y} ${ctrl2X},${ctrl2Y} ${x},${y}`;
+  };
+
   return (
-    <div className="relative w-80 h-80 mx-auto">
-      {/* SVG for connection lines */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 320 320">
-        {/* Outer orbit ring */}
-        <circle cx="160" cy="160" r="140" fill="none" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
-        {/* Inner orbit ring */}
-        <circle cx="160" cy="160" r="100" fill="none" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
-        
-        {/* Neural connection lines from center to nodes */}
-        {orbitingNodes.map((node, i) => {
-          const radius = node.orbit === 1 ? 100 : 140;
-          const x = 160 + radius * Math.cos((node.angle * Math.PI) / 180);
-          const y = 160 + radius * Math.sin((node.angle * Math.PI) / 180);
-          return (
-            <line
-              key={i}
-              x1="160"
-              y1="160"
-              x2={x}
-              y2={y}
-              stroke="#dbeafe"
-              strokeWidth="2"
+    <div className="relative w-[340px] h-[340px] mx-auto">
+      {/* Background ambient glow */}
+      <div className="absolute inset-0 bg-gradient-radial from-blue-100/50 via-transparent to-transparent rounded-full"></div>
+      
+      {/* SVG for neural connections */}
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          {/* Gradient for neural paths */}
+          <linearGradient id="neuralGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.6" />
+            <stop offset="50%" stopColor="#60a5fa" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.1" />
+          </linearGradient>
+          
+          {/* Glow filter */}
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          {/* Animated dash pattern */}
+          <pattern id="flowPattern" patternUnits="userSpaceOnUse" width="8" height="1">
+            <circle cx="2" cy="0.5" r="1" fill="#3b82f6" opacity="0.8">
+              <animate attributeName="cx" from="-2" to="10" dur="1.5s" repeatCount="indefinite" />
+            </circle>
+          </pattern>
+        </defs>
+
+        {/* Neural connection paths - curved organic lines */}
+        {neuralNodes.map((node, i) => (
+          <g key={`path-${i}`}>
+            {/* Main path */}
+            <path
+              d={generateCurvedPath(node.x, node.y, i)}
+              fill="none"
+              stroke="url(#neuralGradient)"
+              strokeWidth="0.5"
+              opacity="0.6"
               className="animate-pulse"
-              style={{ animationDelay: `${i * 0.2}s` }}
+            />
+            {/* Animated flow dots */}
+            <circle r="1" fill="#3b82f6" opacity="0.8" filter="url(#glow)">
+              <animateMotion
+                dur={`${2 + (i * 0.3)}s`}
+                repeatCount="indefinite"
+                path={generateCurvedPath(node.x, node.y, i)}
+              />
+            </circle>
+            {/* Secondary slower dot */}
+            <circle r="0.6" fill="#60a5fa" opacity="0.5">
+              <animateMotion
+                dur={`${3 + (i * 0.4)}s`}
+                repeatCount="indefinite"
+                path={generateCurvedPath(node.x, node.y, i)}
+                begin={`${i * 0.2}s`}
+              />
+            </circle>
+          </g>
+        ))}
+
+        {/* Cross connections between nearby nodes */}
+        {neuralNodes.slice(0, 8).map((node, i) => {
+          const nextNode = neuralNodes[(i + 1) % 8];
+          const midX = (node.x + nextNode.x) / 2 + (i % 2 === 0 ? 5 : -5);
+          const midY = (node.y + nextNode.y) / 2 + (i % 2 === 0 ? -5 : 5);
+          return (
+            <path
+              key={`cross-${i}`}
+              d={`M${node.x},${node.y} Q${midX},${midY} ${nextNode.x},${nextNode.y}`}
+              fill="none"
+              stroke="#93c5fd"
+              strokeWidth="0.3"
+              opacity="0.3"
             />
           );
         })}
-        
-        {/* Data flow particles on lines */}
-        {orbitingNodes.map((node, i) => {
-          const radius = node.orbit === 1 ? 100 : 140;
-          const x = 160 + radius * Math.cos((node.angle * Math.PI) / 180);
-          const y = 160 + radius * Math.sin((node.angle * Math.PI) / 180);
-          return (
-            <circle key={`particle-${i}`} r="3" fill="#3b82f6" opacity="0.6">
-              <animateMotion
-                dur={`${2 + i * 0.3}s`}
-                repeatCount="indefinite"
-                path={`M160,160 L${x},${y}`}
-              />
-            </circle>
-          );
-        })}
+
+        {/* Central pulsing rings */}
+        <circle cx="50" cy="50" r="12" fill="none" stroke="#3b82f6" strokeWidth="0.3" opacity="0.3">
+          <animate attributeName="r" from="12" to="20" dur="2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="50" cy="50" r="12" fill="none" stroke="#3b82f6" strokeWidth="0.3" opacity="0.3">
+          <animate attributeName="r" from="12" to="20" dur="2s" repeatCount="indefinite" begin="0.5s" />
+          <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" begin="0.5s" />
+        </circle>
+        <circle cx="50" cy="50" r="12" fill="none" stroke="#3b82f6" strokeWidth="0.3" opacity="0.3">
+          <animate attributeName="r" from="12" to="20" dur="2s" repeatCount="indefinite" begin="1s" />
+          <animate attributeName="opacity" from="0.4" to="0" dur="2s" repeatCount="indefinite" begin="1s" />
+        </circle>
       </svg>
 
-      {/* Outer glow ring */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/5 via-transparent to-blue-500/5 animate-spin" style={{ animationDuration: '20s' }}></div>
-
-      {/* Center Core - Nirnoy */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28">
-        {/* Pulse rings */}
-        <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping"></div>
-        <div className="absolute inset-2 rounded-full bg-blue-500/10 animate-pulse"></div>
+      {/* Center Core - Nirnoy Brain */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 z-20">
+        {/* Outer glow */}
+        <div className="absolute -inset-4 bg-blue-400/20 rounded-full blur-xl animate-pulse"></div>
         
-        {/* Core */}
-        <div className="absolute inset-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full shadow-xl shadow-blue-500/40 flex items-center justify-center">
-          <div className="text-center text-white">
-            <span className="text-2xl font-bold block">ন</span>
-            <span className="text-[8px] font-bold uppercase tracking-widest">Nirnoy</span>
+        {/* Core sphere */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700 rounded-full shadow-2xl shadow-blue-500/50">
+          {/* Inner highlight for 3D effect */}
+          <div className="absolute inset-2 bg-gradient-to-br from-white/30 via-transparent to-transparent rounded-full"></div>
+          
+          {/* Content */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center text-white">
+              <span className="text-3xl font-bold block drop-shadow-lg">ন</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest opacity-90">Nirnoy</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Orbiting Nodes */}
-      {orbitingNodes.map((node, i) => {
-        const radius = node.orbit === 1 ? 100 : 140;
-        const x = 160 + radius * Math.cos((node.angle * Math.PI) / 180);
-        const y = 160 + radius * Math.sin((node.angle * Math.PI) / 180);
+      {/* Floating Neural Nodes */}
+      {neuralNodes.map((node, i) => {
+        const sizeClasses = {
+          sm: 'w-8 h-8',
+          md: 'w-10 h-10',
+          lg: 'w-12 h-12',
+        };
+        const iconSizes = { sm: 'text-xs', md: 'text-sm', lg: 'text-base' };
         
         return (
           <div
             key={i}
-            className="absolute w-10 h-10 -ml-5 -mt-5 group"
-            style={{ left: x, top: y }}
+            className={`absolute ${sizeClasses[node.size as keyof typeof sizeClasses]} group`}
+            style={{
+              left: `${node.x}%`,
+              top: `${node.y}%`,
+              transform: 'translate(-50%, -50%)',
+              animation: `float ${3 + (i % 3)}s ease-in-out infinite`,
+              animationDelay: `${node.delay}s`,
+            }}
           >
-            <div 
-              className="w-full h-full bg-white rounded-xl shadow-lg border border-slate-100 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-xl cursor-default"
-              style={{ boxShadow: `0 4px 20px ${node.color}20` }}
-            >
-              <i className={`fas ${node.icon} text-sm`} style={{ color: node.color }}></i>
+            {/* Node glow */}
+            <div className="absolute inset-0 bg-blue-400/30 rounded-full blur-md group-hover:bg-blue-400/50 transition-all"></div>
+            
+            {/* Node body */}
+            <div className="absolute inset-0 bg-white rounded-full shadow-lg border border-blue-100 flex items-center justify-center group-hover:scale-110 group-hover:shadow-xl transition-all duration-300 cursor-default">
+              <i className={`fas ${node.icon} ${iconSizes[node.size as keyof typeof iconSizes]} text-blue-500`}></i>
             </div>
             
-            {/* Tooltip */}
-            <div className="absolute left-1/2 -translate-x-1/2 -bottom-8 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-              <span className="text-xs font-medium text-slate-600 bg-white px-2 py-1 rounded shadow-sm border border-slate-100">
+            {/* Tooltip on hover */}
+            <div className="absolute left-1/2 -translate-x-1/2 -bottom-7 opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap z-30 pointer-events-none">
+              <span className="text-[10px] font-medium text-slate-600 bg-white/90 backdrop-blur px-2 py-1 rounded-full shadow-lg border border-slate-100">
                 {node.label}
               </span>
             </div>
@@ -109,11 +187,13 @@ const NirnoyCoreGraphic: React.FC = () => {
         );
       })}
 
-      {/* Decorative corner elements */}
-      <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-blue-200 rounded-tl"></div>
-      <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-blue-200 rounded-tr"></div>
-      <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-blue-200 rounded-bl"></div>
-      <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-blue-200 rounded-br"></div>
+      {/* Floating animation keyframes */}
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+          50% { transform: translate(-50%, -50%) translateY(-8px); }
+        }
+      `}</style>
     </div>
   );
 };
