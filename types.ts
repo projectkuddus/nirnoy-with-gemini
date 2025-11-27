@@ -1,169 +1,224 @@
-
+// User Roles
 export enum UserRole {
+  GUEST = 'GUEST',
   PATIENT = 'PATIENT',
   DOCTOR = 'DOCTOR',
   ADMIN = 'ADMIN',
-  GUEST = 'GUEST'
 }
 
-export enum AppointmentStatus {
-  REQUESTED = 'REQUESTED',
-  CONFIRMED = 'CONFIRMED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  NO_SHOW = 'NO_SHOW',
-  CANCELLED = 'CANCELLED'
-}
-
-export enum VisitType {
-  NEW = 'NEW',
-  FOLLOW_UP = 'FOLLOW_UP',
-  REPORT_CHECK = 'REPORT_CHECK'
-}
-
-export enum ConsultationType {
-  CHAMBER = 'CHAMBER',
-  ONLINE = 'ONLINE'
-}
-
-export interface Chamber {
+// User Types
+export interface User {
   id: string;
   name: string;
-  address: string;
-  area?: string;
-  startTime: string;
-  endTime: string;
-  slotDuration: number; // minutes
-  fee: number;
-}
-
-export interface PrescriptionItem {
-  medicine: string;
-  dosage: string;
-  duration: string;
-  instruction: string;
-}
-
-export interface VisitRecord {
-  id: string;
-  date: string;
-  diagnosis: string;
-  prescription: PrescriptionItem[];
-  notes: string;
-  doctorName: string;
-}
-
-export interface PatientProfile {
-  id: string;
-  name: string;
-  age: number;
-  gender: string;
+  nameBn?: string;
+  email?: string;
   phone: string;
-  bloodGroup: string;
-  history: VisitRecord[];
-  intakeFormAnswers?: Record<string, string>;
+  role: UserRole;
+  avatarUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface PatientSummary {
+// Patient
+export interface Patient {
   id: string;
-  name: string;
-  age: number;
-  gender: string;
-  lastVisit: string;
-  totalVisits: number;
-  condition: string;
-  phone: string;
-  riskLevel?: 'High' | 'Medium' | 'Low';
+  userId: string;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female' | 'other';
+  bloodGroup?: string;
+  heightCm?: number;
+  weightKg?: number;
+  emergencyContact?: string;
+  emergencyRelation?: string;
+  address?: string;
+  city?: string;
+  district?: string;
+  healthConditions?: string[];
+  allergies?: string[];
+  medications?: string[];
+  familyId?: string;
 }
 
+// Doctor
 export interface Doctor {
   id: string;
+  userId: string;
   name: string;
-  specialties: string[];
+  nameBn?: string;
   degrees: string;
-  chambers: Chamber[];
-  image: string;
+  specialties: string[];
   experience: number;
   rating: number;
-  patientCount: number;
-  bio: string;
+  totalReviews: number;
+  totalPatients: number;
+  bmdcNumber: string;
+  bio?: string;
+  bioBn?: string;
+  image?: string;
+  gender?: 'Male' | 'Female';
+  isVerified: boolean;
+  isActive: boolean;
+  chambers: Chamber[];
   nextAvailable?: string;
-  gender?: string;
-  aiSettings?: {
-    autoDraftRx: boolean;
-    languagePreference: 'Bangla' | 'English';
-  }
 }
 
+// Chamber
+export interface Chamber {
+  id: string;
+  doctorId: string;
+  name: string;
+  address: string;
+  area: string;
+  city: string;
+  phone?: string;
+  fee: number;
+  followUpFee: number;
+  schedule: ChamberSchedule[];
+  facilities?: string[];
+}
+
+export interface ChamberSchedule {
+  day: string;
+  startTime: string;
+  endTime: string;
+  maxPatients: number;
+}
+
+// Appointment
 export interface Appointment {
   id: string;
   patientId: string;
-  patientName: string;
-  patientAge?: number;
-  patientGender?: string;
-  patientPhone?: string;
   doctorId: string;
-  doctorName?: string;
-  chamberId: string; // Links to specific location
-  clinicName?: string;
+  chamberId?: string;
   date: string;
   time: string;
-  status: AppointmentStatus;
-  visitType: VisitType;
-  consultationType: ConsultationType;
-  serialNumber?: number;
-  symptoms?: string;
-  fee?: number;
-  prescription?: PrescriptionItem[];
-  diagnosis?: string;
+  serialNumber: number;
+  status: 'scheduled' | 'confirmed' | 'in_queue' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
+  visitType: 'new' | 'follow_up' | 'report_review';
+  fee: number;
+  isPaid: boolean;
+  paymentMethod?: string;
+  intakeForm?: PatientIntakeForm;
+  notes?: string;
+  createdAt: string;
+  completedAt?: string;
 }
 
-export interface ChatMessage {
-  role: 'user' | 'model';
-  text: string;
-  timestamp: number;
-}
-
-// --- Copilot Types ---
-
-export interface InboxMessage {
-  id: string;
-  sender: string;
-  preview: string;
-  fullText: string;
-  category: 'Emergency' | 'Clarification' | 'Admin';
-  timestamp: string;
-  isRead: boolean;
-}
-
-export interface LearningResource {
-  id: string;
-  title: string;
-  type: 'Guideline' | 'Article' | 'Case';
-  summary: string;
-  source: string;
-}
-
-export interface AnalyticMetric {
-  label: string;
-  value: string | number;
-  trend: 'up' | 'down' | 'neutral';
-  trendValue: string;
-  description?: string;
-}
-
-export interface ClinicalNote {
+// Patient Intake Form
+export interface PatientIntakeForm {
   chiefComplaint: string;
-  history: string;
-  examination: string; // Vitals, observations
-  diagnosis: string;
-  plan: string;
+  symptoms: string[];
+  duration: string;
+  severity: 'mild' | 'moderate' | 'severe';
+  previousReports?: string[];
+  additionalNotes?: string;
 }
 
-export interface PatientCohort {
+// Health Record
+export interface HealthRecord {
+  id: string;
+  patientId: string;
+  doctorId?: string;
+  appointmentId?: string;
+  recordType: 'consultation' | 'diagnosis' | 'prescription' | 'lab_report' | 'imaging' | 'vital_signs' | 'symptom' | 'medication';
+  title: string;
+  description?: string;
+  data: Record<string, any>;
+  bodyRegion?: string;
+  severity?: 'mild' | 'moderate' | 'severe' | 'critical';
+  isEmergency: boolean;
+  tags?: string[];
+  createdAt: string;
+}
+
+// Prescription
+export interface Prescription {
+  id: string;
+  appointmentId: string;
+  doctorId: string;
+  patientId: string;
+  medications: PrescriptionItem[];
+  instructions?: string;
+  followUpDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface PrescriptionItem {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+}
+
+// Chat Message
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+// Family
+export interface Family {
   id: string;
   name: string;
-  count: number;
+  createdBy: string;
+  members: FamilyMember[];
+  createdAt: string;
+}
+
+export interface FamilyMember {
+  id: string;
+  patientId: string;
+  relation: 'self' | 'spouse' | 'child' | 'parent' | 'sibling' | 'grandparent' | 'other';
+  isAdmin: boolean;
+  canViewRecords: boolean;
+  canBookAppointments: boolean;
+  joinedAt: string;
+}
+
+// Queue Entry
+export interface QueueEntry {
+  id: string;
+  appointmentId: string;
+  doctorId: string;
+  currentSerial: number;
+  totalInQueue: number;
+  estimatedWaitTime?: number;
+  delayMinutes: number;
+  doctorMessage?: string;
+  status: 'waiting' | 'next' | 'current' | 'completed';
+}
+
+// AI Insight
+export interface AIInsight {
+  id: string;
+  patientId?: string;
+  doctorId?: string;
+  location?: string;
+  insightType: 'risk_prediction' | 'health_trend' | 'pattern_detection' | 'recommendation' | 'pandemic_alert';
+  title: string;
   description: string;
-  action: string;
+  data: Record<string, any>;
+  confidenceScore: number;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  isActionable: boolean;
+  actionItems?: string[];
+  createdAt: string;
+}
+
+// Notification
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'appointment' | 'queue' | 'prescription' | 'health_alert' | 'system' | 'family';
+  title: string;
+  message: string;
+  data?: Record<string, any>;
+  isRead: boolean;
+  channels: ('sms' | 'email' | 'push')[];
+  createdAt: string;
 }

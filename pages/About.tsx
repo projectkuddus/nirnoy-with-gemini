@@ -1,14 +1,17 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import PageHeader from '../components/PageHeader';
 
 export const About: React.FC = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      <PageHeader showNav={true} showGetStarted={true} />
+      
       {/* Hero */}
-      <section className="relative py-20 bg-slate-900 text-white overflow-hidden">
+      <section className="relative pt-28 pb-20 bg-slate-900 text-white overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
         <div className="container mx-auto px-4 relative z-10 text-center">
           <h1 className="text-5xl font-bold mb-6">Revolutionizing Healthcare in Bangladesh</h1>
@@ -22,7 +25,7 @@ export const About: React.FC = () => {
       <section className="py-20 container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
           <div>
-             <div className="inline-block bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4">Our Mission</div>
+             <div className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4">Our Mission</div>
              <h2 className="text-3xl font-bold text-slate-800 mb-6">Making Quality Healthcare Accessible & Efficient</h2>
              <div className="space-y-4 text-slate-600 leading-relaxed">
                <p>
@@ -34,7 +37,7 @@ export const About: React.FC = () => {
              </div>
           </div>
           <div className="relative">
-             <div className="absolute inset-0 bg-teal-500 rounded-2xl rotate-3 opacity-20"></div>
+             <div className="absolute inset-0 bg-blue-500 rounded-2xl rotate-3 opacity-20"></div>
              <img 
                src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80" 
                alt="Doctors Team" 
@@ -60,7 +63,7 @@ export const About: React.FC = () => {
                  <p className="text-slate-500 text-sm">We build every feature with the patient's convenience and well-being in mind.</p>
               </div>
               <div className="p-8 rounded-2xl bg-slate-50 border border-slate-100 text-center hover:shadow-lg transition">
-                 <div className="w-16 h-16 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl">
+                 <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl">
                     <i className="fas fa-brain"></i>
                  </div>
                  <h3 className="text-xl font-bold mb-3">Data Driven</h3>
@@ -82,7 +85,7 @@ export const About: React.FC = () => {
          <h2 className="text-3xl font-bold text-slate-800 mb-6">Ready to experience better healthcare?</h2>
          <button 
            onClick={() => navigate('/search')}
-           className="bg-teal-600 hover:bg-teal-700 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg shadow-teal-500/30 transition"
+           className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 transition"
          >
             Find a Doctor Now
          </button>

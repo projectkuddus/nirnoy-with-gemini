@@ -3,186 +3,133 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 type Language = 'en' | 'bn';
 
 interface Translations {
-  [key: string]: {
-    en: string;
-    bn: string;
-  };
+  [key: string]: { en: string; bn: string };
 }
 
-// Comprehensive translations for the app
 export const translations: Translations = {
-  // Navbar
-  'nav.brand': { en: 'Nirnoy Care', bn: 'নির্ণয় কেয়ার' },
-  'nav.findDoctor': { en: 'Find a Doctor', bn: 'ডাক্তার খুঁজুন' },
-  'nav.forDoctors': { en: 'For Doctors', bn: 'ডাক্তারদের জন্য' },
-  'nav.myDashboard': { en: 'My Dashboard', bn: 'আমার ড্যাশবোর্ড' },
-  'nav.bookAppointment': { en: 'Book Appointment', bn: 'অ্যাপয়েন্টমেন্ট বুক করুন' },
-  'nav.myPractice': { en: 'My Practice', bn: 'আমার প্র্যাকটিস' },
-  'nav.login': { en: 'Login / Signup', bn: 'লগইন / সাইন আপ' },
+  // Brand
+  'brand.name': { en: 'Nirnoy', bn: 'নির্ণয়' },
+  'brand.tagline': { en: 'Health Synchronized', bn: 'স্বাস্থ্য সমন্বিত' },
+  
+  // Navigation
+  'nav.home': { en: 'Home', bn: 'হোম' },
+  'nav.findDoctor': { en: 'Find Doctor', bn: 'ডাক্তার খুঁজুন' },
+  'nav.myHealth': { en: 'My Health', bn: 'আমার স্বাস্থ্য' },
+  'nav.family': { en: 'Family', bn: 'পরিবার' },
+  'nav.appointments': { en: 'Appointments', bn: 'অ্যাপয়েন্টমেন্ট' },
+  'nav.login': { en: 'Login', bn: 'লগইন' },
   'nav.logout': { en: 'Logout', bn: 'লগআউট' },
-
-  // Landing Page - Hero
-  'hero.badge': { en: 'Dhaka Live Queue Active', bn: 'ঢাকা লাইভ কিউ সক্রিয়' },
+  'nav.getStarted': { en: 'Get Started', bn: 'শুরু করুন' },
+  'nav.forDoctors': { en: 'For Doctors', bn: 'ডাক্তারদের জন্য' },
+  'nav.myPractice': { en: 'My Practice', bn: 'আমার প্র্যাকটিস' },
+  
+  // Hero Section
   'hero.title1': { en: 'Healthcare,', bn: 'স্বাস্থ্যসেবা,' },
   'hero.title2': { en: 'Synchronized.', bn: 'সমন্বিত।' },
-  'hero.subtitle': { en: 'Experience the future of booking. Real-time doctor availability, live serial tracking, and AI-powered health records.', bn: 'বুকিংয়ের ভবিষ্যত অনুভব করুন। রিয়েল-টাইম ডাক্তার প্রাপ্যতা, লাইভ সিরিয়াল ট্র্যাকিং এবং AI-চালিত হেলথ রেকর্ড।' },
-  'hero.searchPlaceholder': { en: 'Search doctors, specialties...', bn: 'ডাক্তার, বিশেষজ্ঞতা খুঁজুন...' },
-  'hero.find': { en: 'Find', bn: 'খুঁজুন' },
-
+  'hero.subtitle': { en: 'AI-powered healthcare platform for Bangladesh. Find doctors, track health, connect family.', bn: 'বাংলাদেশের জন্য AI-চালিত স্বাস্থ্যসেবা প্ল্যাটফর্ম। ডাক্তার খুঁজুন, স্বাস্থ্য ট্র্যাক করুন, পরিবার সংযুক্ত করুন।' },
+  'hero.searchPlaceholder': { en: 'Search doctors, specialties...', bn: 'ডাক্তার, বিশেষত্ব খুঁজুন...' },
+  'hero.search': { en: 'Search', bn: 'খুঁজুন' },
+  
   // Specialties
   'spec.cardiology': { en: 'Cardiology', bn: 'হৃদরোগ' },
-  'spec.neurology': { en: 'Neurology', bn: 'স্নায়ুরোগ' },
-  'spec.orthopedics': { en: 'Orthopedics', bn: 'অর্থোপেডিক্স' },
   'spec.medicine': { en: 'Medicine', bn: 'মেডিসিন' },
+  'spec.gynaecology': { en: 'Gynaecology', bn: 'স্ত্রীরোগ' },
+  'spec.paediatrics': { en: 'Paediatrics', bn: 'শিশুরোগ' },
+  'spec.orthopedics': { en: 'Orthopedics', bn: 'হাড় ও জোড়া' },
   'spec.dermatology': { en: 'Dermatology', bn: 'চর্মরোগ' },
-
-  // Features Section
-  'features.topSpecialists': { en: 'Top Specialists', bn: 'শীর্ষ বিশেষজ্ঞ' },
-  'features.topSpecialistsDesc': { en: 'Instant access to 500+ BMDC verified experts from Square, Evercare, and PG Hospital.', bn: 'Square, Evercare এবং PG Hospital থেকে ৫০০+ BMDC যাচাইকৃত বিশেষজ্ঞদের তাৎক্ষণিক অ্যাক্সেস।' },
-  'features.bookAppointment': { en: 'Book Appointment', bn: 'অ্যাপয়েন্টমেন্ট বুক করুন' },
-  'features.healthIntelligence': { en: 'Health Intelligence', bn: 'হেলথ ইন্টেলিজেন্স' },
-  'features.healthIntelligenceDesc': { en: 'Nirnoy AI analyzes your prescriptions and vitals to provide personalized health insights.', bn: 'নির্ণয় AI আপনার প্রেসক্রিপশন এবং ভাইটাল বিশ্লেষণ করে ব্যক্তিগত স্বাস্থ্য অন্তর্দৃষ্টি প্রদান করে।' },
-  'features.liveQueue': { en: 'Live Queue', bn: 'লাইভ কিউ' },
-  'features.liveQueueDesc': { en: 'Track your serial in real-time. No more waiting for hours at the chamber.', bn: 'রিয়েল-টাইমে আপনার সিরিয়াল ট্র্যাক করুন। চেম্বারে ঘণ্টার পর ঘণ্টা অপেক্ষা নয়।' },
-  'features.currentSerial': { en: 'Current Serial', bn: 'বর্তমান সিরিয়াল' },
-  'features.yourSerial': { en: 'Your Serial', bn: 'আপনার সিরিয়াল' },
-  'features.seamlessExperience': { en: 'Seamless Experience', bn: 'নির্বিঘ্ন অভিজ্ঞতা' },
-  'features.seamlessExperienceDesc': { en: 'From finding the right doctor to getting digital prescriptions, we\'ve automated the entire workflow.', bn: 'সঠিক ডাক্তার খুঁজে পাওয়া থেকে ডিজিটাল প্রেসক্রিপশন পাওয়া পর্যন্ত, আমরা সম্পূর্ণ কর্মপ্রবাহ স্বয়ংক্রিয় করেছি।' },
-  'features.appointmentsBooked': { en: 'Appointments Booked', bn: 'অ্যাপয়েন্টমেন্ট বুক হয়েছে' },
-
-  // CTA Section
-  'cta.forProfessionals': { en: 'For Medical Professionals', bn: 'মেডিকেল পেশাদারদের জন্য' },
-  'cta.title1': { en: 'Your Practice,', bn: 'আপনার প্র্যাকটিস,' },
-  'cta.title2': { en: 'Supercharged.', bn: 'সুপারচার্জড।' },
-  'cta.description': { en: 'Stop managing queues on paper. Get a digital cockpit with live serial tracking, patient history ledger, and powerful AI summaries tailored for your clinical needs.', bn: 'কাগজে কিউ ম্যানেজ করা বন্ধ করুন। লাইভ সিরিয়াল ট্র্যাকিং, রোগীর ইতিহাস লেজার এবং আপনার ক্লিনিকাল প্রয়োজনের জন্য শক্তিশালী AI সারাংশ সহ একটি ডিজিটাল ককপিট পান।' },
-  'cta.joinAsDoctor': { en: 'Join as Doctor', bn: 'ডাক্তার হিসেবে যোগ দিন' },
-  'cta.viewFeatures': { en: 'View Features', bn: 'ফিচার দেখুন' },
-
-  // Voice Section
-  'voice.title': { en: 'Talk to Us Live', bn: 'বাংলায় কথা বলুন' },
-  'voice.subtitle': { en: 'Experience our AI voice agents in fluent Bangla. Ask questions, check services, or book appointments directly.', bn: 'আমাদের AI এসিস্ট্যান্টের সাথে বাংলায় কথা বলুন। ডাক্তার খুঁজুন, অ্যাপয়েন্টমেন্ট বুক করুন, প্রশ্ন করুন।' },
-  'voice.liveBeta': { en: 'Live Beta', bn: 'লাইভ বেটা' },
-  'voice.connect': { en: 'Connect', bn: 'কানেক্ট করুন' },
-  'voice.talkInBangla': { en: 'Talk in Bangla', bn: 'বাংলায় কথা বলুন' },
-  'voice.endCall': { en: 'End Call', bn: 'কল শেষ করুন' },
-  'voice.yunus': { en: 'Yunus', bn: 'ইউনুস' },
-  'voice.yunusRole': { en: 'Male • Booking & Support', bn: 'পুরুষ • বুকিং ও সাপোর্ট' },
-  'voice.arisha': { en: 'Arisha', bn: 'আরিশা' },
-  'voice.arishaRole': { en: 'Female • General Inquiry', bn: 'মহিলা • সাধারণ জিজ্ঞাসা' },
-  'voice.secure': { en: 'Private & Secure • Powered by Gemini Live', bn: 'নিরাপদ ও গোপনীয় • Powered by Gemini Live' },
-
+  'spec.ent': { en: 'ENT', bn: 'নাক-কান-গলা' },
+  'spec.eye': { en: 'Eye', bn: 'চক্ষু' },
+  'spec.neurology': { en: 'Neurology', bn: 'স্নায়ুরোগ' },
+  'spec.psychiatry': { en: 'Psychiatry', bn: 'মনোরোগ' },
+  
+  // Voice Agent
+  'voice.title': { en: 'Talk to Nree', bn: 'Nree-এর সাথে কথা বলুন' },
+  'voice.subtitle': { en: 'Our AI assistant speaks Bangla. Book appointments, ask health questions.', bn: 'আমাদের AI সহকারী বাংলায় কথা বলে। অ্যাপয়েন্টমেন্ট নিন, স্বাস্থ্য প্রশ্ন করুন।' },
+  'voice.male': { en: 'Male Voice', bn: 'পুরুষ কণ্ঠ' },
+  'voice.female': { en: 'Female Voice', bn: 'মহিলা কণ্ঠ' },
+  'voice.connect': { en: 'Connect', bn: 'কানেক্ট' },
+  'voice.endCall': { en: 'End Call', bn: 'শেষ করুন' },
+  'voice.listening': { en: 'Listening...', bn: 'শুনছি...' },
+  'voice.speaking': { en: 'Speaking...', bn: 'বলছি...' },
+  
+  // Features
+  'feature.voiceBooking': { en: 'Voice Booking', bn: 'ভয়েস বুকিং' },
+  'feature.liveQueue': { en: 'Live Queue', bn: 'লাইভ কিউ' },
+  'feature.healthRecords': { en: 'Health Records', bn: 'স্বাস্থ্য রেকর্ড' },
+  'feature.familyHealth': { en: 'Family Health', bn: 'পারিবারিক স্বাস্থ্য' },
+  'feature.aiAssistant': { en: 'AI Assistant', bn: 'AI সহকারী' },
+  'feature.smartAlerts': { en: 'Smart Alerts', bn: 'স্মার্ট এলার্ট' },
+  
+  // Doctor Dashboard
+  'doctor.dashboard': { en: 'Doctor Dashboard', bn: 'ডাক্তার ড্যাশবোর্ড' },
+  'doctor.warRoom': { en: 'War Room', bn: 'ওয়ার রুম' },
+  'doctor.todayPatients': { en: "Today's Patients", bn: 'আজকের রোগী' },
+  'doctor.queue': { en: 'Queue Management', bn: 'কিউ ম্যানেজমেন্ট' },
+  'doctor.aiCopilot': { en: 'AI Copilot', bn: 'AI কপাইলট' },
+  'doctor.prescriptions': { en: 'Prescriptions', bn: 'প্রেসক্রিপশন' },
+  'doctor.analytics': { en: 'Analytics', bn: 'বিশ্লেষণ' },
+  'doctor.settings': { en: 'Settings', bn: 'সেটিংস' },
+  
+  // Patient Dashboard
+  'patient.dashboard': { en: 'My Health', bn: 'আমার স্বাস্থ্য' },
+  'patient.healthBrain': { en: 'Health Brain', bn: 'হেলথ ব্রেইন' },
+  'patient.talkToAI': { en: 'Talk to AI', bn: 'AI-এর সাথে কথা বলুন' },
+  'patient.records': { en: 'Health Records', bn: 'স্বাস্থ্য রেকর্ড' },
+  'patient.appointments': { en: 'Appointments', bn: 'অ্যাপয়েন্টমেন্ট' },
+  'patient.prescriptions': { en: 'Prescriptions', bn: 'প্রেসক্রিপশন' },
+  'patient.family': { en: 'Family Health', bn: 'পারিবারিক স্বাস্থ্য' },
+  
+  // Family
+  'family.title': { en: 'Family Health', bn: 'পারিবারিক স্বাস্থ্য' },
+  'family.subtitle': { en: 'Look after everyone you love', bn: 'যাদের ভালোবাসেন তাদের যত্ন নিন' },
+  'family.addMember': { en: 'Add Family Member', bn: 'সদস্য যোগ করুন' },
+  'family.viewAll': { en: 'View All Members', bn: 'সব সদস্য দেখুন' },
+  'family.relation.self': { en: 'Self', bn: 'নিজে' },
+  'family.relation.spouse': { en: 'Spouse', bn: 'স্বামী/স্ত্রী' },
+  'family.relation.child': { en: 'Child', bn: 'সন্তান' },
+  'family.relation.parent': { en: 'Parent', bn: 'বাবা/মা' },
+  'family.relation.sibling': { en: 'Sibling', bn: 'ভাই/বোন' },
+  'family.relation.grandparent': { en: 'Grandparent', bn: 'দাদা/দাদি/নানা/নানি' },
+  
+  // Common
+  'common.loading': { en: 'Loading...', bn: 'লোড হচ্ছে...' },
+  'common.save': { en: 'Save', bn: 'সংরক্ষণ' },
+  'common.cancel': { en: 'Cancel', bn: 'বাতিল' },
+  'common.confirm': { en: 'Confirm', bn: 'নিশ্চিত' },
+  'common.delete': { en: 'Delete', bn: 'মুছুন' },
+  'common.edit': { en: 'Edit', bn: 'সম্পাদনা' },
+  'common.view': { en: 'View', bn: 'দেখুন' },
+  'common.back': { en: 'Back', bn: 'পিছনে' },
+  'common.next': { en: 'Next', bn: 'পরবর্তী' },
+  'common.submit': { en: 'Submit', bn: 'জমা দিন' },
+  'common.search': { en: 'Search', bn: 'খুঁজুন' },
+  'common.filter': { en: 'Filter', bn: 'ফিল্টার' },
+  'common.sort': { en: 'Sort', bn: 'সাজান' },
+  'common.all': { en: 'All', bn: 'সব' },
+  'common.noResults': { en: 'No results found', bn: 'কিছু পাওয়া যায়নি' },
+  'common.success': { en: 'Success', bn: 'সফল' },
+  'common.error': { en: 'Error', bn: 'ত্রুটি' },
+  'common.today': { en: 'Today', bn: 'আজ' },
+  'common.tomorrow': { en: 'Tomorrow', bn: 'আগামীকাল' },
+  'common.yesterday': { en: 'Yesterday', bn: 'গতকাল' },
+  'common.years': { en: 'years', bn: 'বছর' },
+  'common.experience': { en: 'Experience', bn: 'অভিজ্ঞতা' },
+  'common.rating': { en: 'Rating', bn: 'রেটিং' },
+  'common.fee': { en: 'Fee', bn: 'ফি' },
+  'common.book': { en: 'Book', bn: 'বুক করুন' },
+  'common.bookNow': { en: 'Book Now', bn: 'এখনই বুক করুন' },
+  
   // Footer
   'footer.about': { en: 'About', bn: 'সম্পর্কে' },
-  'footer.doctors': { en: 'Doctors', bn: 'ডাক্তার' },
   'footer.privacy': { en: 'Privacy', bn: 'গোপনীয়তা' },
+  'footer.terms': { en: 'Terms', bn: 'শর্তাবলী' },
   'footer.contact': { en: 'Contact', bn: 'যোগাযোগ' },
-  'footer.tagline': { en: 'Intelligent Healthcare', bn: 'বুদ্ধিমান স্বাস্থ্যসেবা' },
-  'footer.copyright': { en: 'Nirnoy Health Tech Ltd. Proudly made in Bangladesh 🇧🇩', bn: 'নির্ণয় হেলথ টেক লিমিটেড। গর্বের সাথে বাংলাদেশে তৈরি 🇧🇩' },
-
-  // Login
-  'login.patientLogin': { en: 'Patient Login', bn: 'রোগী লগইন' },
-  'login.doctorLogin': { en: 'Doctor Login', bn: 'ডাক্তার লগইন' },
-  'login.welcomeBack': { en: 'Welcome Back', bn: 'স্বাগতম' },
-  'login.doctorPortal': { en: "Doctor's Portal", bn: 'ডাক্তারের পোর্টাল' },
-  'login.patientDesc': { en: 'Access your prescriptions, appointments, and history.', bn: 'আপনার প্রেসক্রিপশন, অ্যাপয়েন্টমেন্ট এবং ইতিহাস অ্যাক্সেস করুন।' },
-  'login.doctorDesc': { en: 'Manage your practice, chambers, and patients.', bn: 'আপনার প্র্যাকটিস, চেম্বার এবং রোগীদের পরিচালনা করুন।' },
-  'login.mobileNumber': { en: 'Mobile Number', bn: 'মোবাইল নম্বর' },
-  'login.enterOtp': { en: 'Enter OTP', bn: 'OTP দিন' },
-  'login.getOtp': { en: 'Get OTP', bn: 'OTP পান' },
-  'login.verifyLogin': { en: 'Verify & Login', bn: 'যাচাই করুন ও লগইন করুন' },
-  'login.changeNumber': { en: 'Change Number', bn: 'নম্বর পরিবর্তন করুন' },
-  'login.demoHint': { en: 'Use any number. OTP is not checked.', bn: 'যেকোনো নম্বর ব্যবহার করুন। OTP চেক করা হয় না।' },
-
-  // Common
-  'common.loading': { en: 'Loading Nirnoy Care...', bn: 'নির্ণয় কেয়ার লোড হচ্ছে...' },
-  'common.dhaka': { en: 'Dhaka', bn: 'ঢাকা' },
-  'common.chittagong': { en: 'Chittagong', bn: 'চট্টগ্রাম' },
-
-  // Doctor Profile
-  'profile.back': { en: 'Back', bn: 'পিছনে' },
-  'profile.returnToDashboard': { en: 'Return to Dashboard', bn: 'ড্যাশবোর্ডে ফিরুন' },
-  'profile.notFound': { en: 'Doctor Not Found', bn: 'ডাক্তার পাওয়া যায়নি' },
-  'profile.notFoundDesc': { en: 'The profile you are looking for does not exist.', bn: 'আপনি যে প্রোফাইলটি খুঁজছেন তা বিদ্যমান নেই।' },
-  'profile.goBack': { en: 'Go Back', bn: 'ফিরে যান' },
-  'profile.patients': { en: 'Patients', bn: 'রোগী' },
-  'profile.reviews': { en: 'Reviews', bn: 'রিভিউ' },
-  'profile.experience': { en: 'Experience', bn: 'অভিজ্ঞতা' },
-  'profile.years': { en: 'years', bn: 'বছর' },
-  'profile.bmdcVerified': { en: 'BMDC Verified', bn: 'BMDC যাচাইকৃত' },
-  'profile.bmdcNumber': { en: 'BMDC No', bn: 'BMDC নং' },
-  'profile.overview': { en: 'Overview', bn: 'সংক্ষিপ্ত বিবরণ' },
-  'profile.chambers': { en: 'Chambers', bn: 'চেম্বার সমূহ' },
-  'profile.about': { en: 'About', bn: 'সম্পর্কে' },
-  'profile.qualifications': { en: 'Qualifications', bn: 'শিক্ষাগত যোগ্যতা' },
-  'profile.workExperience': { en: 'Work Experience', bn: 'কর্ম অভিজ্ঞতা' },
-  'profile.achievements': { en: 'Awards & Achievements', bn: 'পুরস্কার ও অর্জন' },
-  'profile.memberships': { en: 'Professional Memberships', bn: 'সদস্যপদ' },
-  'profile.services': { en: 'Services Offered', bn: 'সেবাসমূহ' },
-  'profile.consultationFee': { en: 'Consultation Fee', bn: 'পরামর্শ ফি' },
-  'profile.followUpFee': { en: 'Follow-up Fee', bn: 'ফলো-আপ ফি' },
-  'profile.reportCheckFee': { en: 'Report Check Fee', bn: 'রিপোর্ট দেখানো ফি' },
-  'profile.onlineFee': { en: 'Online Consultation', bn: 'অনলাইন পরামর্শ' },
-  'profile.bookAppointment': { en: 'Book Appointment', bn: 'অ্যাপয়েন্টমেন্ট বুক করুন' },
-  'profile.schedule': { en: 'Schedule', bn: 'সময়সূচী' },
-  'profile.facilities': { en: 'Facilities', bn: 'সুবিধাসমূহ' },
-  'profile.parking': { en: 'Parking', bn: 'পার্কিং' },
-  'profile.wheelchair': { en: 'Wheelchair Access', bn: 'হুইলচেয়ার' },
-  'profile.ac': { en: 'Air Conditioned', bn: 'এসি' },
-  'profile.present': { en: 'Present', bn: 'বর্তমান' },
-  'profile.acceptingPatients': { en: 'Accepting New Patients', bn: 'নতুন রোগী গ্রহণ করছেন' },
-  'profile.onlineAvailable': { en: 'Online Consultation Available', bn: 'অনলাইন পরামর্শ সক্রিয়' },
-  'profile.languages': { en: 'Languages', bn: 'ভাষা' },
-  'profile.patientReviews': { en: 'Patient Reviews', bn: 'রোগীদের মতামত' },
-  'profile.noReviews': { en: 'No reviews yet', bn: 'এখনো কোনো রিভিউ নেই' },
-
-  // Doctor Registration
-  'registration.title': { en: 'Doctor Registration', bn: 'ডাক্তার রেজিস্ট্রেশন' },
-  'registration.subtitle': { en: 'Join Nirnoy Care', bn: 'নির্ণয় কেয়ার-এ যোগ দিন' },
-  'registration.step1': { en: 'Personal Info', bn: 'ব্যক্তিগত তথ্য' },
-  'registration.step2': { en: 'Professional Info', bn: 'পেশাগত তথ্য' },
-  'registration.step3': { en: 'Verification', bn: 'যাচাইকরণ' },
-  'registration.step4': { en: 'Review', bn: 'পর্যালোচনা' },
-  'registration.nameEn': { en: 'Full Name (English)', bn: 'পুরো নাম (ইংরেজিতে)' },
-  'registration.nameBn': { en: 'Full Name (Bangla)', bn: 'পুরো নাম (বাংলায়)' },
-  'registration.gender': { en: 'Gender', bn: 'লিঙ্গ' },
-  'registration.male': { en: 'Male', bn: 'পুরুষ' },
-  'registration.female': { en: 'Female', bn: 'মহিলা' },
-  'registration.dateOfBirth': { en: 'Date of Birth', bn: 'জন্ম তারিখ' },
-  'registration.phone': { en: 'Mobile Number', bn: 'মোবাইল নম্বর' },
-  'registration.email': { en: 'Email', bn: 'ইমেইল' },
-  'registration.primarySpecialty': { en: 'Primary Specialty', bn: 'প্রধান বিশেষত্ব' },
-  'registration.primaryDegree': { en: 'Primary Degree', bn: 'প্রাথমিক ডিগ্রি' },
-  'registration.institution': { en: 'Institution', bn: 'প্রতিষ্ঠান' },
-  'registration.yearOfCompletion': { en: 'Year of Completion', bn: 'সমাপ্তির বছর' },
-  'registration.experienceYears': { en: 'Experience (Years)', bn: 'অভিজ্ঞতা (বছর)' },
-  'registration.bmdcNumber': { en: 'BMDC Registration Number', bn: 'BMDC রেজিস্ট্রেশন নম্বর' },
-  'registration.bmdcNote': { en: 'From Bangladesh Medical & Dental Council', bn: 'বাংলাদেশ মেডিকেল ও ডেন্টাল কাউন্সিল থেকে প্রাপ্ত' },
-  'registration.nidNumber': { en: 'National ID Number', bn: 'জাতীয় পরিচয়পত্র নম্বর' },
-  'registration.nidNote': { en: '10 or 17 digit NID', bn: '১০ বা ১৭ সংখ্যার NID' },
-  'registration.profilePhoto': { en: 'Profile Photo', bn: 'প্রোফাইল ছবি' },
-  'registration.uploadPhoto': { en: 'Upload Photo', bn: 'ছবি আপলোড করুন' },
-  'registration.next': { en: 'Next', bn: 'পরবর্তী' },
-  'registration.back': { en: 'Back', bn: 'পিছনে' },
-  'registration.submit': { en: 'Submit Application', bn: 'আবেদন জমা দিন' },
-  'registration.submitting': { en: 'Submitting...', bn: 'জমা হচ্ছে...' },
-  'registration.required': { en: 'Required', bn: 'আবশ্যক' },
-  'registration.optional': { en: 'Optional', bn: 'ঐচ্ছিক' },
-  'registration.reviewTitle': { en: 'Review Your Information', bn: 'আপনার তথ্য পর্যালোচনা করুন' },
-  'registration.termsAgree': { en: 'I agree to Nirnoy Care\'s Terms of Service and Privacy Policy', bn: 'আমি নির্ণয় কেয়ার-এর শর্তাবলী এবং গোপনীয়তা নীতিতে সম্মত' },
-  'registration.verificationNote': { en: 'Your application will be verified by our team. This may take 1-3 business days.', bn: 'আপনার আবেদন আমাদের টিম দ্বারা যাচাই করা হবে। এটি ১-৩ কার্যদিবস সময় নিতে পারে।' },
-  'registration.successTitle': { en: 'Application Submitted!', bn: 'আবেদন জমা হয়েছে!' },
-  'registration.successMessage': { en: 'Your application has been submitted successfully. You will be notified once verification is complete.', bn: 'আপনার আবেদন সফলভাবে জমা হয়েছে। যাচাই সম্পন্ন হলে আপনাকে জানানো হবে।' },
-  'registration.goHome': { en: 'Go to Home', bn: 'হোম পেজে যান' },
-  'registration.whyJoin': { en: 'Why Join Nirnoy Care?', bn: 'কেন নির্ণয় কেয়ারে যোগ দেবেন?' },
-  'registration.benefit1': { en: 'Reach thousands of patients', bn: 'হাজার হাজার রোগীর কাছে পৌঁছান' },
-  'registration.benefit2': { en: 'Digital queue management', bn: 'ডিজিটাল কিউ ম্যানেজমেন্ট' },
-  'registration.benefit3': { en: 'AI-powered clinical assistance', bn: 'AI-চালিত ক্লিনিকাল সহায়তা' },
-  'registration.benefit4': { en: 'Start completely free', bn: 'সম্পূর্ণ বিনামূল্যে শুরু করুন' },
+  'footer.copyright': { en: '© 2025 Nirnoy. All rights reserved.', bn: '© ২০২৫ নির্ণয়। সর্বস্বত্ব সংরক্ষিত।' },
 };
 
 interface LanguageContextType {
   language: Language;
-  setLanguage: (lang: Language) => void;
+  setLanguage: React.Dispatch<React.SetStateAction<Language>>;
   t: (key: string) => string;
   toggleLanguage: () => void;
 }
@@ -191,9 +138,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>(() => {
-    // Check localStorage for saved preference
-    const saved = localStorage.getItem('nirnoy_language');
-    return (saved === 'bn' || saved === 'en') ? saved : 'en';
+    return (localStorage.getItem('nirnoy_language') as Language) || 'bn';
   });
 
   useEffect(() => {
