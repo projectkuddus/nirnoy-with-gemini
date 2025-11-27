@@ -19,6 +19,7 @@ import { Privacy } from './pages/Privacy';
 import { Help } from './pages/Help';
 import { Pricing } from './pages/Pricing';
 import { FreeCare } from './pages/FreeCare';
+import FeedbackWidget from './components/FeedbackWidget';
 
 const App: React.FC = () => {
   const [userRole, setUserRole] = useState<UserRole>(() => {
@@ -52,6 +53,9 @@ const App: React.FC = () => {
   return (
     <LanguageProvider>
       <BrowserRouter>
+        {/* Global Feedback Widget */}
+        <FeedbackWidget />
+        
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing onLogin={handleLogin} userRole={userRole} onLogout={handleLogout} />} />
