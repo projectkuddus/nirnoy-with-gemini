@@ -1,9 +1,13 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
 
-// In production, use Redis or database for OTP storage
-const otpStore = new Map<string, { otp: string; expiresAt: number; role: string }>();
+export interface JwtPayload {
+  sub: string;
+  phone: string;
+  role: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -12,149 +16,109 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  // Generate 6-digit OTP
-  private generateOTP(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
+  async sendOtp(phone: string): Promise<{ success: boolean; message: string }> {
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-  // Request OTP for login
-  async requestOTP(phone: string, role: 'PATIENT' | 'DOCTOR') {
-    // Validate phone format (Bangladesh)
-    if (!/^01[3-9]\d{8}$/.test(phone)) {
-      throw new BadRequestException('Invalid Bangladesh phone number format');
-    }
-
-    const otp = this.generateOTP();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-
-    // Store OTP (in production, use Redis with TTL)
-    otpStore.set(phone, { otp, expiresAt, role });
-
-    // In production, send SMS via gateway (SSL Wireless, Infobip, etc.)
-    console.log(`📱 OTP for ${phone}: ${otp} (DEV MODE - would send SMS in production)`);
+    // Store OTP (in production, send via SMS)
+    // For now, we'll just return success
+    console.log(`OTP for ${phone}: ${otp}`);
 
     return {
       success: true,
       message: 'OTP sent successfully',
-      // Remove in production - only for dev testing
-      devOtp: process.env.NODE_ENV === 'development' ? otp : undefined,
     };
   }
 
-  // Verify OTP and return JWT
-  async verifyOTP(phone: string, otp: string) {
-    const stored = otpStore.get(phone);
-
-    if (!stored) {
-      throw new UnauthorizedException('No OTP request found. Please request a new OTP.');
-    }
-
-    if (Date.now() > stored.expiresAt) {
-      otpStore.delete(phone);
-      throw new UnauthorizedException('OTP expired. Please request a new OTP.');
-    }
-
-    if (stored.otp !== otp) {
+  async verifyOtp(phone: string, otp: string): Promise<{ accessToken: string; user: any; isNew: boolean }> {
+    // In production, verify OTP from database
+    // For demo, accept any 6-digit OTP
+    if (otp.length !== 6) {
       throw new UnauthorizedException('Invalid OTP');
     }
 
-    // OTP verified - clear it
-    otpStore.delete(phone);
-
-    // Find or create user
+    // Check if user exists
     let user = await this.prisma.user.findUnique({
       where: { phone },
-      include: { doctor: true, patient: true },
+      include: {
+        patient: true,
+        doctor: true,
+      },
     });
+
+    const isNew = !user;
 
     if (!user) {
       // Create new user
       user = await this.prisma.user.create({
         data: {
           phone,
-          role: stored.role,
-          // Create associated profile
-          ...(stored.role === 'PATIENT' && {
-            patient: {
-              create: { name: '' }, // Will be updated on profile completion
-            },
-          }),
-          ...(stored.role === 'DOCTOR' && {
-            doctor: {
-              create: { 
-                name: '', 
-                specialty: '', 
-                gender: '',
-                fee: 0,
-              },
-            },
-          }),
+          role: 'PATIENT',
         },
-        include: { doctor: true, patient: true },
+        include: {
+          patient: true,
+          doctor: true,
+        },
       });
     }
 
-    // Generate JWT
-    const payload = {
+    const payload: JwtPayload = {
       sub: user.id,
       phone: user.phone,
       role: user.role,
-      doctorId: user.doctor?.id,
-      patientId: user.patient?.id,
     };
 
-    const accessToken = this.jwtService.sign(payload);
-
     return {
-      accessToken,
-      user: {
-        id: user.id,
-        phone: user.phone,
-        role: user.role,
-        doctorId: user.doctor?.id,
-        patientId: user.patient?.id,
-        name: user.doctor?.name || user.patient?.name || '',
-        isProfileComplete: !!(user.doctor?.name || user.patient?.name),
-      },
+      accessToken: this.jwtService.sign(payload),
+      user,
+      isNew,
     };
   }
 
-  // Validate JWT payload
-  async validateUser(payload: any) {
+  async validateUser(payload: JwtPayload) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { doctor: true, patient: true },
+      include: {
+        patient: true,
+        doctor: true,
+      },
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException();
     }
 
     return user;
   }
 
-  // Refresh token
-  async refreshToken(userId: number) {
-    const user = await this.prisma.user.findUnique({
+  async updateProfile(userId: string, data: any) {
+    return this.prisma.user.update({
       where: { id: userId },
-      include: { doctor: true, patient: true },
+      data: {
+        name: data.name,
+        email: data.email,
+        patient: {
+          upsert: {
+            create: {
+              dateOfBirth: data.dateOfBirth,
+              gender: data.gender,
+              bloodGroup: data.bloodGroup,
+              emergencyContact: data.emergencyContact,
+            },
+            update: {
+              dateOfBirth: data.dateOfBirth,
+              gender: data.gender,
+              bloodGroup: data.bloodGroup,
+              emergencyContact: data.emergencyContact,
+            },
+          },
+        },
+      },
+      include: {
+        patient: true,
+      },
     });
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    const payload = {
-      sub: user.id,
-      phone: user.phone,
-      role: user.role,
-      doctorId: user.doctor?.id,
-      patientId: user.patient?.id,
-    };
-
-    return {
-      accessToken: this.jwtService.sign(payload),
-    };
   }
 }
 

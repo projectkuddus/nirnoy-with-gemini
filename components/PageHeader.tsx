@@ -4,13 +4,17 @@ import { useLanguage } from '../contexts/LanguageContext';
 import LanguageToggle from './LanguageToggle';
 
 interface PageHeaderProps {
+  title?: string;
   showNav?: boolean;
   showGetStarted?: boolean;
+  showBack?: boolean;
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ 
+  title,
   showNav = false, 
-  showGetStarted = false 
+  showGetStarted = false,
+  showBack = false,
 }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
@@ -19,15 +23,27 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <button onClick={() => navigate('/')} className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-            <span className="text-white font-black text-lg">ন</span>
-          </div>
-          <div className="leading-tight">
-            <span className="font-black text-slate-900 text-lg tracking-tight">Nirnoy</span>
-            <span className="text-[10px] text-blue-600 font-semibold block -mt-0.5 tracking-widest uppercase">Health Synchronized</span>
-          </div>
-        </button>
+        <div className="flex items-center gap-4">
+          {showBack && (
+            <button onClick={() => navigate(-1)} className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition">
+              <i className="fas fa-arrow-left text-slate-600"></i>
+            </button>
+          )}
+          <button onClick={() => navigate('/')} className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <span className="text-white font-black text-lg">ন</span>
+            </div>
+            <div className="leading-tight">
+              <span className="font-black text-slate-900 text-lg tracking-tight">Nirnoy</span>
+              <span className="text-[10px] text-blue-600 font-semibold block -mt-0.5 tracking-widest uppercase">Health Synchronized</span>
+            </div>
+          </button>
+          {title && (
+            <div className="hidden md:block pl-4 border-l border-slate-200">
+              <span className="font-bold text-slate-800">{title}</span>
+            </div>
+          )}
+        </div>
         
         {showNav && (
           <nav className="hidden md:flex items-center gap-8">

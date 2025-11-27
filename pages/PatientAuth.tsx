@@ -210,7 +210,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
         <div className="w-full max-w-md">
           {/* Logo & Title */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-teal-500/30">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-blue-500/30">
               <span className="text-white text-3xl font-black">ন</span>
             </div>
             <h1 className="text-2xl font-bold text-slate-800">{t.title}</h1>
@@ -236,7 +236,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       value={phone}
                       onChange={(e) => { setPhone(e.target.value.replace(/\D/g, '').slice(0, 11)); setError(''); }}
                       placeholder={t.phonePlaceholder}
-                      className="w-full pl-24 pr-4 py-4 border-2 border-slate-200 rounded-xl text-lg focus:border-teal-500 focus:ring-4 focus:ring-teal-100 outline-none transition"
+                      className="w-full pl-24 pr-4 py-4 border-2 border-slate-200 rounded-xl text-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition"
                       autoFocus
                     />
                   </div>
@@ -246,7 +246,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                 <button
                   onClick={handlePhoneSubmit}
                   disabled={isLoading || !phone}
-                  className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <><i className="fas fa-spinner fa-spin"></i> {isBn ? 'অপেক্ষা করুন...' : 'Please wait...'}</>
@@ -265,7 +265,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                 <div className="text-center">
                   <h2 className="text-xl font-bold text-slate-800">{t.otpTitle}</h2>
                   <p className="text-sm text-slate-500 mt-1">{t.otpSubtitle}</p>
-                  <p className="text-sm text-teal-600 font-medium mt-2">+880 {phone}</p>
+                  <p className="text-sm text-blue-600 font-medium mt-2">+880 {phone}</p>
                 </div>
 
                 {/* OTP Input */}
@@ -280,7 +280,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       value={digit}
                       onChange={(e) => handleOtpChange(i, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                      className="w-12 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-100 outline-none transition"
+                      className="w-12 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition"
                       autoFocus={i === 0}
                       aria-label={`OTP digit ${i + 1}`}
                       title={`OTP digit ${i + 1}`}
@@ -292,7 +292,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                 <button
                   onClick={handleOtpSubmit}
                   disabled={isLoading || otp.join('').length !== 6}
-                  className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <><i className="fas fa-spinner fa-spin"></i> {isBn ? 'যাচাই করা হচ্ছে...' : 'Verifying...'}</>
@@ -306,7 +306,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                   {countdown > 0 ? (
                     <p className="text-sm text-slate-400">{countdown} {t.resendIn}</p>
                   ) : (
-                    <button onClick={handleResendOtp} disabled={isLoading} className="text-sm text-teal-600 font-medium hover:underline">
+                    <button onClick={handleResendOtp} disabled={isLoading} className="text-sm text-blue-600 font-medium hover:underline">
                       {t.resend}
                     </button>
                   )}
@@ -335,7 +335,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder={t.namePlaceholder}
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition"
                     />
                   </div>
 
@@ -348,7 +348,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                           key={g}
                           onClick={() => setGender(g)}
                           className={`flex-1 py-3 rounded-xl border-2 font-medium transition ${
-                            gender === g ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                            gender === g ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
                           }`}
                         >
                           {g === 'male' ? '👨 ' : '👩 '}{g === 'male' ? t.male : t.female}
@@ -365,7 +365,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       type="date"
                       value={dateOfBirth}
                       onChange={(e) => setDateOfBirth(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition"
                       title="Date of Birth"
                     />
                   </div>
@@ -377,7 +377,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       id="bloodGroup"
                       value={bloodGroup}
                       onChange={(e) => setBloodGroup(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition bg-white"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition bg-white"
                       title="Blood Group"
                     >
                       <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
@@ -395,7 +395,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       value={emergencyContact}
                       onChange={(e) => setEmergencyContact(e.target.value.replace(/\D/g, '').slice(0, 11))}
                       placeholder={t.emergencyPlaceholder}
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition"
                     />
                   </div>
                 </div>
@@ -405,7 +405,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                 <button
                   onClick={handleRegister}
                   disabled={isLoading}
-                  className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <><i className="fas fa-spinner fa-spin"></i> {isBn ? 'তৈরি হচ্ছে...' : 'Creating...'}</>
@@ -434,7 +434,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       if (onLogin) onLogin('PATIENT');
                       navigate('/patient-dashboard');
                     }}
-                    className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2"
                   >
                     <i className="fas fa-heartbeat"></i> {t.goToDashboard}
                   </button>
@@ -443,7 +443,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       if (onLogin) onLogin('PATIENT');
                       navigate('/search');
                     }}
-                    className="w-full py-4 border-2 border-teal-500 text-teal-600 rounded-xl font-bold text-lg hover:bg-teal-50 transition flex items-center justify-center gap-2"
+                    className="w-full py-4 border-2 border-blue-500 text-blue-600 rounded-xl font-bold text-lg hover:bg-blue-50 transition flex items-center justify-center gap-2"
                   >
                     <i className="fas fa-search"></i> {t.findDoctor}
                   </button>
@@ -457,7 +457,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
             <div className="mt-6 text-center">
               <p className="text-sm text-slate-500">
                 {isBn ? 'ডাক্তার?' : 'Are you a Doctor?'}{' '}
-                <button onClick={() => navigate('/doctor-register')} className="text-teal-600 font-medium hover:underline">
+                <button onClick={() => navigate('/doctor-register')} className="text-blue-600 font-medium hover:underline">
                   {isBn ? 'এখানে রেজিস্টার করুন' : 'Register here'}
                 </button>
               </p>

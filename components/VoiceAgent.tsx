@@ -378,8 +378,8 @@ export const VoiceAgent: React.FC = () => {
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans">
       {/* Active call panel */}
       {isActive && (
-        <div className="mb-4 bg-white p-4 rounded-2xl shadow-2xl border border-teal-100 w-80 animate-fade-in-up relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-400 to-teal-600"></div>
+        <div className="mb-4 bg-white p-4 rounded-2xl shadow-2xl border border-blue-100 w-80 animate-fade-in-up relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-indigo-600"></div>
           
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2">
@@ -390,7 +390,7 @@ export const VoiceAgent: React.FC = () => {
               {[...Array(8)].map((_, i) => (
                 <div
                   key={i}
-                  className={`w-1 rounded-full transition-all duration-75 ${status === 'speaking' ? 'bg-blue-500' : 'bg-teal-500'}`}
+                  className={`w-1 rounded-full transition-all duration-75 ${status === 'speaking' ? 'bg-indigo-500' : 'bg-blue-500'}`}
                   style={{ height: `${Math.max(3, (status === 'speaking' ? Math.random() * 20 : volume * 20 * Math.random()))}px` }}
                 ></div>
               ))}
@@ -429,7 +429,7 @@ export const VoiceAgent: React.FC = () => {
             isActive 
               ? 'bg-white border-red-100' 
               : hasValidApiKey 
-                ? 'bg-primary border-teal-400 hover:bg-secondary' 
+                ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-blue-400 hover:from-blue-600 hover:to-indigo-700' 
                 : 'bg-slate-400 border-slate-300 cursor-not-allowed'
           }`}
           aria-label={isActive ? 'End call' : 'Start voice call'}

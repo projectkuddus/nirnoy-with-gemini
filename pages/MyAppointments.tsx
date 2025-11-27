@@ -404,7 +404,7 @@ export const MyAppointments: React.FC = () => {
                   <i className="fas fa-calendar-alt text-2xl text-slate-400"></i>
                 </div>
                 <p className="text-slate-500 mb-4">{t.noUpcoming}</p>
-                <button onClick={() => navigate('/search')} className="px-6 py-2.5 bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition">
+                <button onClick={() => navigate('/search')} className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition">
                   {t.findDoctor}
                 </button>
               </div>
@@ -433,10 +433,10 @@ export const MyAppointments: React.FC = () => {
 
                   {apt.status === 'completed' && (
                     <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
-                      <button onClick={() => navigate(`/doctors/${apt.doctorId}`)} className="flex-1 py-2 border border-teal-500 text-teal-600 rounded-lg text-sm font-medium hover:bg-teal-50 transition">
+                      <button onClick={() => navigate(`/doctors/${apt.doctorId}`)} className="flex-1 py-2 border border-blue-500 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50 transition">
                         {t.bookAgain}
                       </button>
-                      <button className="flex-1 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition">
+                      <button className="flex-1 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg text-sm font-medium hover:from-blue-600 hover:to-indigo-600 transition">
                         {t.viewPrescription}
                       </button>
                     </div>
@@ -454,7 +454,7 @@ export const MyAppointments: React.FC = () => {
         {/* Find Doctor CTA */}
         <button
           onClick={() => navigate('/search')}
-          className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-2"
+          className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-bold shadow-lg flex items-center justify-center gap-2"
         >
           <i className="fas fa-plus"></i> {isBn ? 'নতুন অ্যাপয়েন্টমেন্ট নিন' : 'Book New Appointment'}
         </button>
@@ -515,7 +515,7 @@ export const MyAppointments: React.FC = () => {
                 <div key={item.key} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                      <i className={`fas ${item.icon} text-teal-500`}></i>
+                      <i className={`fas ${item.icon} text-blue-500`}></i>
                     </div>
                     <div>
                       <p className="font-medium text-slate-800 text-sm">{item.label}</p>
@@ -524,7 +524,7 @@ export const MyAppointments: React.FC = () => {
                   </div>
                   <button
                     onClick={() => setNotificationSettings(prev => ({ ...prev, [item.key]: !prev[item.key as keyof typeof prev] }))}
-                    className={`w-12 h-6 rounded-full transition relative ${notificationSettings[item.key as keyof typeof notificationSettings] ? 'bg-teal-500' : 'bg-slate-300'}`}
+                    className={`w-12 h-6 rounded-full transition relative ${notificationSettings[item.key as keyof typeof notificationSettings] ? 'bg-blue-500' : 'bg-slate-300'}`}
                   >
                     <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${notificationSettings[item.key as keyof typeof notificationSettings] ? 'right-1' : 'left-1'}`}></span>
                   </button>
@@ -534,7 +534,7 @@ export const MyAppointments: React.FC = () => {
 
             <button
               onClick={() => setShowNotificationModal(false)}
-              className="w-full mt-6 py-3 bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600 transition"
+              className="w-full mt-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-600 transition"
             >
               {t.save}
             </button>

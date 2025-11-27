@@ -175,7 +175,11 @@ const ModernBodyMap: React.FC<{
 };
 
 // ============ MAIN COMPONENT ============
-export const PatientDashboard: React.FC = () => {
+interface PatientDashboardProps {
+  onLogout?: () => void;
+}
+
+export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = true;
@@ -371,7 +375,7 @@ export const PatientDashboard: React.FC = () => {
           ))}
         </nav>
         <div className="p-4 border-t border-slate-100">
-          <button onClick={() => navigate('/')} className="w-full text-left px-4 py-2 text-sm text-slate-500 hover:text-slate-700 flex items-center gap-2"><i className="fas fa-sign-out-alt"></i>লগআউট</button>
+          <button onClick={() => { onLogout?.(); navigate('/'); }} className="w-full text-left px-4 py-2 text-sm text-slate-500 hover:text-slate-700 flex items-center gap-2"><i className="fas fa-sign-out-alt"></i>লগআউট</button>
         </div>
       </div>
 

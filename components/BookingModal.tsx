@@ -189,7 +189,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-scale-in">
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-8 text-center text-white">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-8 text-center text-white">
             <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="fas fa-check text-4xl"></i>
             </div>
@@ -209,9 +209,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
 
             {/* Booking Details */}
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-teal-50 rounded-xl p-4 text-center">
-                <p className="text-xs text-teal-600 uppercase font-bold mb-1">{t.serialNo}</p>
-                <p className="text-3xl font-bold text-teal-700">{selectedSlot?.serial || 1}</p>
+              <div className="bg-blue-50 rounded-xl p-4 text-center">
+                <p className="text-xs text-blue-600 uppercase font-bold mb-1">{t.serialNo}</p>
+                <p className="text-3xl font-bold text-blue-700">{selectedSlot?.serial || 1}</p>
               </div>
               <div className="bg-slate-50 rounded-xl p-4 text-center">
                 <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t.estTime}</p>
@@ -232,13 +232,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">{t.total}</span>
-                <span className="font-bold text-teal-600">৳{fee}</span>
+                <span className="font-bold text-blue-600">৳{fee}</span>
               </div>
             </div>
 
-            <div className="bg-emerald-50 rounded-xl p-3 flex items-center gap-3 mb-6">
-              <i className="fas fa-sms text-emerald-600"></i>
-              <p className="text-sm text-emerald-700">{t.smsSent} <span className="font-bold">{patientPhone}</span></p>
+            <div className="bg-green-50 rounded-xl p-3 flex items-center gap-3 mb-6">
+              <i className="fas fa-sms text-green-600"></i>
+              <p className="text-sm text-green-700">{t.smsSent} <span className="font-bold">{patientPhone}</span></p>
             </div>
 
             <button
@@ -258,7 +258,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
       <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-slide-up sm:animate-scale-in">
         
         {/* Header - Fixed */}
-        <div className="flex-shrink-0 bg-gradient-to-r from-teal-600 to-teal-500 p-4 text-white rounded-t-3xl sm:rounded-t-2xl">
+        <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold">{t.title}</h2>
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition" title="Close" aria-label="Close modal">
@@ -285,11 +285,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           {[1, 2, 3].map((s) => (
             <React.Fragment key={s}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition ${
-                step >= s ? 'bg-teal-500 text-white' : 'bg-slate-200 text-slate-500'
+                step >= s ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-500'
               }`}>
                 {step > s ? <i className="fas fa-check text-xs"></i> : s}
               </div>
-              {s < 3 && <div className={`w-8 h-0.5 ${step > s ? 'bg-teal-500' : 'bg-slate-200'}`}></div>}
+              {s < 3 && <div className={`w-8 h-0.5 ${step > s ? 'bg-blue-500' : 'bg-slate-200'}`}></div>}
             </React.Fragment>
           ))}
         </div>
@@ -303,7 +303,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               <p className="text-sm font-bold text-slate-500 uppercase">{t.step1}</p>
               
               {[
-                { type: 'NEW' as VisitType, icon: 'fa-user-plus', title: t.newConsult, desc: t.newDesc, color: 'teal' },
+                { type: 'NEW' as VisitType, icon: 'fa-user-plus', title: t.newConsult, desc: t.newDesc, color: 'blue' },
                 { type: 'FOLLOW_UP' as VisitType, icon: 'fa-redo', title: t.followUp, desc: t.followUpDesc, color: 'blue', badge: '50% ছাড়' },
                 { type: 'REPORT' as VisitType, icon: 'fa-file-medical', title: t.report, desc: t.reportDesc, color: 'purple', badge: '70% ছাড়' },
               ].map((item) => (
@@ -333,7 +333,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                     <p className="text-sm text-slate-500">{item.desc}</p>
                   </div>
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    visitType === item.type ? 'border-teal-500 bg-teal-500' : 'border-slate-300'
+                    visitType === item.type ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
                   }`}>
                     {visitType === item.type && <i className="fas fa-check text-white text-xs"></i>}
                   </div>
@@ -366,7 +366,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                       onClick={() => setSelectedDate(d.value)}
                       className={`flex-shrink-0 w-16 py-3 rounded-xl text-center transition ${
                         selectedDate === d.value
-                          ? 'bg-teal-500 text-white'
+                          ? 'bg-blue-500 text-white'
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                     >
@@ -397,9 +397,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
-                              ? 'bg-teal-500 text-white'
+                              ? 'bg-blue-500 text-white'
                               : slot.available
-                                ? 'bg-slate-100 text-slate-700 hover:bg-teal-50 hover:text-teal-700'
+                                ? 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
                                 : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
                           }`}
                         >
@@ -423,9 +423,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
-                              ? 'bg-teal-500 text-white'
+                              ? 'bg-blue-500 text-white'
                               : slot.available
-                                ? 'bg-slate-100 text-slate-700 hover:bg-teal-50 hover:text-teal-700'
+                                ? 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
                                 : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
                           }`}
                         >
@@ -449,9 +449,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
-                              ? 'bg-teal-500 text-white'
+                              ? 'bg-blue-500 text-white'
                               : slot.available
-                                ? 'bg-slate-100 text-slate-700 hover:bg-teal-50 hover:text-teal-700'
+                                ? 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
                                 : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
                           }`}
                         >
@@ -464,17 +464,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
 
                   {/* Selected Summary */}
                   {selectedSlot && (
-                    <div className="mt-4 bg-teal-50 rounded-xl p-3 flex items-center justify-between">
+                    <div className="mt-4 bg-blue-50 rounded-xl p-3 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center text-white font-bold">
+                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
                           #{selectedSlot.serial}
                         </div>
                  <div>
-                          <p className="text-sm font-bold text-teal-800">{t.serial} #{selectedSlot.serial}</p>
-                          <p className="text-xs text-teal-600">{selectedSlot.display}</p>
+                          <p className="text-sm font-bold text-blue-800">{t.serial} #{selectedSlot.serial}</p>
+                          <p className="text-xs text-blue-600">{selectedSlot.display}</p>
                         </div>
                       </div>
-                      <i className="fas fa-check-circle text-teal-500 text-xl"></i>
+                      <i className="fas fa-check-circle text-blue-500 text-xl"></i>
                     </div>
                   )}
                 </div>
@@ -495,7 +495,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                        type="text" 
                     value={patientName}
                     onChange={(e) => setPatientName(e.target.value)}
-                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition"
+                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition"
                     placeholder={isBn ? 'রোগীর পুরো নাম' : 'Full name of patient'}
                     />
                  </div>
@@ -509,7 +509,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                       value={patientPhone}
                       onChange={(e) => setPatientPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
                       className={`w-full p-3 pl-14 border-2 rounded-xl outline-none transition ${
-                        patientPhone && !isValidPhone(patientPhone) ? 'border-red-300' : 'border-slate-200 focus:border-teal-500'
+                        patientPhone && !isValidPhone(patientPhone) ? 'border-red-300' : 'border-slate-200 focus:border-blue-500'
                       }`}
                       placeholder="01712345678"
                     />
@@ -638,7 +638,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                   {isBn ? 'অতিরিক্ত মন্তব্য' : 'Additional Notes'}
                 </label>
                 <textarea
-                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-teal-500 outline-none transition resize-none"
+                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition resize-none"
                   rows={2}
                   placeholder={t.symptomsPlaceholder}
                 />
@@ -664,11 +664,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">{t.serial}</span>
-                  <span className="font-bold text-teal-600">#{selectedSlot?.serial}</span>
+                  <span className="font-bold text-blue-600">#{selectedSlot?.serial}</span>
                  </div>
                 <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
                   <span className="font-bold text-slate-700">{t.total}</span>
-                  <span className="font-bold text-teal-600 text-lg">৳{fee}</span>
+                  <span className="font-bold text-blue-600 text-lg">৳{fee}</span>
                  </div>
               </div>
               </div>
@@ -691,7 +691,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               else handleBooking();
             }}
             disabled={!canProceed() || isSubmitting}
-            className="flex-1 bg-gradient-to-r from-teal-600 to-teal-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <><i className="fas fa-spinner fa-spin mr-2"></i>{t.confirming}</>

@@ -1,12 +1,16 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import PageHeader from '../components/PageHeader';
 
 export const Privacy: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50">
+      <PageHeader showNav={true} showGetStarted={true} />
+      
+      <div className="pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-8 sm:p-10 border-b border-slate-100 flex justify-between items-center">
           <div>
@@ -72,7 +76,7 @@ export const Privacy: React.FC = () => {
             <h2 className="text-xl font-bold text-slate-800 mb-4">6. Contact Us</h2>
             <p>
               If you have questions about this policy or your data, please contact our Data Protection Officer at 
-              <a href="mailto:privacy@nirnoy.com" className="text-teal-600 hover:underline ml-1">privacy@nirnoy.com</a>.
+              <a href="mailto:privacy@nirnoy.com" className="text-blue-600 hover:underline ml-1">privacy@nirnoy.com</a>.
             </p>
           </section>
         </div>
@@ -85,6 +89,7 @@ export const Privacy: React.FC = () => {
              I Understand
            </button>
         </div>
+      </div>
       </div>
     </div>
   );
