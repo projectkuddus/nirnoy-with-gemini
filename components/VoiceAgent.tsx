@@ -23,21 +23,31 @@ function playBeep(freq = 440, dur = 0.2): void {
   } catch (e) {}
 }
 
-// TTS
-function speak(text: string, onEnd?: () => void): void {
+// TTS with gender support
+function speak(text: string, gender: 'male' | 'female', onEnd?: () => void): void {
   window.speechSynthesis.cancel();
   if (!text) { onEnd?.(); return; }
   
-  const clean = text.replace(/[^\u0980-\u09FF\u0020-\u007E।,?!.\s]/g, '').trim();
+  const clean = text.replace(/[^\u0980-\u09FF\s।,?!.-]/g, '').replace(/\s+/g, ' ').trim();
   if (!clean) { onEnd?.(); return; }
   
   const utt = new SpeechSynthesisUtterance(clean);
   utt.lang = 'bn-BD';
-  utt.rate = 0.85;
+  
+  // Gender differentiation through pitch
+  if (gender === 'male') {
+    utt.pitch = 0.75;  // Lower pitch for male
+    utt.rate = 0.85;
+  } else {
+    utt.pitch = 1.3;   // Higher pitch for female
+    utt.rate = 0.95;
+  }
+  
+  utt.volume = 1.0;
   utt.onend = () => onEnd?.();
   utt.onerror = () => { playBeep(600, 0.3); setTimeout(() => onEnd?.(), 500); };
   
-  setTimeout(() => window.speechSynthesis.speak(utt), 100);
+  setTimeout(() => window.speechSynthesis.speak(utt), 50);
 }
 
 // Recognition
@@ -58,7 +68,7 @@ async function ask(client: GoogleGenAI, q: string, name: string): Promise<string
   try {
     const r = await client.models.generateContent({
       model: 'gemini-2.0-flash',
-      contents: [{ role: 'user', parts: [{ text: `তুমি ${name}, নির্ণয় হেলথ এর AI। বাংলায় ছোট উত্তর দাও। ডাক্তার: ${docs}\n\nপ্রশ্ন: ${q}` }] }],
+      contents: [{ role: 'user', parts: [{ text: `তুমি ${name}, নির্ণয় হেলথ এর বাংলাদেশি AI। বাংলায় ছোট উত্তর দাও। "আপনি", "জ্বী" ব্যবহার করো। ডাক্তার: ${docs}\n\nপ্রশ্ন: ${q}` }] }],
     });
     return (r.text || 'দুঃখিত').replace(/[*#_~`]/g, '').trim();
   } catch (e) { return 'দুঃখিত, উত্তর দিতে পারছি না।'; }
@@ -93,14 +103,14 @@ const VoiceAgent: React.FC<Props> = ({ onClose, voiceGender = 'female', compact 
     if (!activeRef.current) return;
     setTranscript(`${name}: ${resp}`);
     setStatus('speaking');
-    speak(resp, () => {
+    speak(resp, voiceGender, () => {
       if (activeRef.current) {
         setStatus('listening');
         setTranscript('');
         listen(process, () => setStatus('error'));
       }
     });
-  }, [name]);
+  }, [name, voiceGender]);
 
   const start = () => {
     if (!hasValidApiKey) return;
@@ -111,11 +121,11 @@ const VoiceAgent: React.FC<Props> = ({ onClose, voiceGender = 'female', compact 
     setTranscript('');
     activeRef.current = true;
     
-    const greet = `আসসালামু আলাইকুম। আমি ${name}। কীভাবে সাহায্য করতে পারি?`;
+    const greet = `আসসালামু আলাইকুম। আমি ${name}। আপনার স্বাস্থ্য বিষয়ে কীভাবে সাহায্য করতে পারি?`;
     setTranscript(`${name}: ${greet}`);
     playBeep(600, 0.15);
     
-    speak(greet, () => {
+    speak(greet, voiceGender, () => {
       if (activeRef.current) {
         setStatus('listening');
         setTranscript('');
@@ -145,7 +155,7 @@ const VoiceAgent: React.FC<Props> = ({ onClose, voiceGender = 'female', compact 
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <span className="text-xl font-bold">{name.charAt(0)}</span>
+              <span className="text-lg font-bold">{voiceGender === 'male' ? 'স্বা' : 'সে'}</span>
             </div>
             <div>
               <h4 className="font-bold">{name}</h4>
@@ -174,7 +184,7 @@ const VoiceAgent: React.FC<Props> = ({ onClose, voiceGender = 'female', compact 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
-                <span className="text-2xl font-bold">{name.charAt(0)}</span>
+                <span className="text-xl font-bold">{voiceGender === 'male' ? 'স্বা' : 'সে'}</span>
               </div>
               <div>
                 <h3 className="text-xl font-bold">{name}</h3>

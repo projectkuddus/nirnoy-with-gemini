@@ -17,87 +17,86 @@ function playBeep(frequency: number = 440, duration: number = 0.2): void {
     if (!audioContext) {
       audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
-    
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
-    
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
-    
     oscillator.frequency.value = frequency;
     oscillator.type = 'sine';
-    
     gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-    
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + duration);
-    
-    log('Beep played');
   } catch (e) {
     log('Beep error:', e);
   }
 }
 
-// ============ TEXT-TO-SPEECH WITH FALLBACK ============
+// ============ TEXT-TO-SPEECH WITH GENDER SUPPORT ============
 class TextToSpeech {
   private synth: SpeechSynthesis;
   private voices: SpeechSynthesisVoice[] = [];
-  private isReady = false;
 
   constructor() {
     this.synth = window.speechSynthesis;
     this.loadVoices();
     
-    // Chrome loads voices asynchronously
     if (speechSynthesis.onvoiceschanged !== undefined) {
       speechSynthesis.onvoiceschanged = () => this.loadVoices();
     }
     
-    // Force load after delay
     setTimeout(() => this.loadVoices(), 100);
     setTimeout(() => this.loadVoices(), 500);
+    setTimeout(() => this.loadVoices(), 1000);
   }
 
   private loadVoices(): void {
     this.voices = this.synth.getVoices();
-    this.isReady = this.voices.length > 0;
     log('Voices loaded:', this.voices.length);
     
-    // Log available voices for debugging
-    if (this.voices.length > 0) {
-      const voiceNames = this.voices.slice(0, 5).map(v => `${v.name} (${v.lang})`);
-      log('Sample voices:', voiceNames.join(', '));
+    // Log Bengali voices specifically
+    const bengaliVoices = this.voices.filter(v => v.lang.includes('bn') || v.lang.includes('hi'));
+    if (bengaliVoices.length > 0) {
+      log('Bengali/Hindi voices:', bengaliVoices.map(v => `${v.name} (${v.lang})`).join(', '));
     }
   }
 
-  private getBestVoice(): SpeechSynthesisVoice | null {
-    if (this.voices.length === 0) {
-      this.loadVoices();
-    }
+  private getBengaliVoice(): SpeechSynthesisVoice | null {
+    if (this.voices.length === 0) this.loadVoices();
     
-    // Priority: Bengali > Hindi > English
-    const priorities = ['bn', 'hi', 'en-IN', 'en-GB', 'en-US', 'en'];
+    // Priority order for Bangladeshi Bengali
+    const priorities = [
+      'bn-BD',  // Bangladeshi Bengali (best)
+      'bn-IN',  // Indian Bengali
+      'bn',     // Generic Bengali
+      'hi-IN',  // Hindi (similar sound)
+      'hi',     // Generic Hindi
+    ];
     
     for (const lang of priorities) {
-      const voice = this.voices.find(v => v.lang.toLowerCase().includes(lang.toLowerCase()));
+      const voice = this.voices.find(v => v.lang === lang || v.lang.startsWith(lang));
       if (voice) {
-        log('Selected voice:', voice.name, voice.lang);
+        log('Found voice:', voice.name, voice.lang);
         return voice;
       }
     }
     
-    // Fallback to first available
-    if (this.voices.length > 0) {
-      log('Using fallback voice:', this.voices[0].name);
-      return this.voices[0];
-    }
+    // Try to find any voice with 'bengali' or 'bangla' in name
+    const bengaliByName = this.voices.find(v => 
+      v.name.toLowerCase().includes('bengali') || 
+      v.name.toLowerCase().includes('bangla') ||
+      v.name.toLowerCase().includes('bangladesh')
+    );
+    if (bengaliByName) return bengaliByName;
     
-    return null;
+    // Fallback to Google voice if available (usually better quality)
+    const googleVoice = this.voices.find(v => v.name.includes('Google'));
+    if (googleVoice) return googleVoice;
+    
+    return this.voices[0] || null;
   }
 
-  speak(text: string, onEnd?: () => void): boolean {
-    // Cancel any ongoing speech
+  speak(text: string, gender: 'male' | 'female', onEnd?: () => void): boolean {
     this.synth.cancel();
     
     if (!text) {
@@ -105,22 +104,23 @@ class TextToSpeech {
       return false;
     }
 
-    // Clean text
+    // Clean text - keep only Bengali characters and basic punctuation
     const cleanText = text
-      .replace(/[^\u0980-\u09FF\u0020-\u007E।,?!.\s]/g, '') // Keep Bengali + basic ASCII
+      .replace(/[^\u0980-\u09FF\s।,?!.।॥-]/g, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
     if (!cleanText) {
-      log('No text to speak after cleaning');
+      log('No text after cleaning');
       onEnd?.();
       return false;
     }
 
-    log('Speaking:', cleanText);
+    log(`Speaking (${gender}):`, cleanText.substring(0, 50));
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     
-    const voice = this.getBestVoice();
+    const voice = this.getBengaliVoice();
     if (voice) {
       utterance.voice = voice;
       utterance.lang = voice.lang;
@@ -128,8 +128,17 @@ class TextToSpeech {
       utterance.lang = 'bn-BD';
     }
     
-    utterance.rate = 0.85;
-    utterance.pitch = 1.0;
+    // Gender differentiation through pitch and rate
+    // Male: Lower pitch (0.8), slightly slower
+    // Female: Higher pitch (1.2), slightly faster
+    if (gender === 'male') {
+      utterance.pitch = 0.75;  // Lower pitch for male
+      utterance.rate = 0.85;   // Slightly slower
+    } else {
+      utterance.pitch = 1.3;   // Higher pitch for female
+      utterance.rate = 0.95;   // Slightly faster
+    }
+    
     utterance.volume = 1.0;
 
     utterance.onstart = () => log('Speech started');
@@ -139,16 +148,14 @@ class TextToSpeech {
     };
     utterance.onerror = (e) => {
       log('Speech error:', e.error);
-      // Play beep as fallback
       playBeep(600, 0.3);
       setTimeout(() => onEnd?.(), 500);
     };
 
-    // Chrome bug workaround: speech sometimes doesn't start
-    // Solution: use setTimeout
+    // Chrome workaround
     setTimeout(() => {
       this.synth.speak(utterance);
-    }, 100);
+    }, 50);
 
     return true;
   }
@@ -157,24 +164,19 @@ class TextToSpeech {
     this.synth.cancel();
   }
 
-  testSpeak(): void {
-    // Test with simple English first
-    const test = new SpeechSynthesisUtterance('Hello, testing voice');
-    test.volume = 1.0;
-    test.onstart = () => log('Test speech started');
-    test.onend = () => log('Test speech ended');
-    test.onerror = (e) => log('Test speech error:', e);
-    this.synth.speak(test);
+  // Test function
+  test(gender: 'male' | 'female'): void {
+    const text = gender === 'male' 
+      ? 'আমি স্বাস্থ্য। আমি পুরুষ সহকারী।'
+      : 'আমি সেবা। আমি মহিলা সহকারী।';
+    this.speak(text, gender, () => log('Test complete'));
   }
 }
 
 // Global TTS instance
 let tts: TextToSpeech | null = null;
-
 function getTTS(): TextToSpeech {
-  if (!tts) {
-    tts = new TextToSpeech();
-  }
+  if (!tts) tts = new TextToSpeech();
   return tts;
 }
 
@@ -188,7 +190,7 @@ function initRecognition(): boolean {
   recognition = new SR();
   recognition.continuous = false;
   recognition.interimResults = false;
-  recognition.lang = 'bn-BD';
+  recognition.lang = 'bn-BD'; // Bangladeshi Bengali
   return true;
 }
 
@@ -214,7 +216,6 @@ function startListening(onResult: (text: string) => void, onError?: () => void):
   try {
     recognition.start();
     log('Listening...');
-    // Play start beep
     playBeep(800, 0.1);
   } catch (e) {
     onError?.();
@@ -231,18 +232,20 @@ function stopListening(): void {
 async function askGemini(client: GoogleGenAI, question: string, agentName: string): Promise<string> {
   const doctors = MOCK_DOCTORS.slice(0, 3).map(d => `${d.name} (${d.specialties[0]})`).join(', ');
   
-  const prompt = `তুমি ${agentName}, নির্ণয় হেলথ এর বাংলা AI সহকারী।
+  // Prompt in pure Bangladeshi Bengali style
+  const prompt = `তুমি ${agentName}, নির্ণয় হেলথ এর বাংলাদেশি AI স্বাস্থ্য সহকারী।
 
-নিয়ম:
-- শুধু বাংলায় উত্তর দাও
-- ছোট উত্তর দাও, ১-২ বাক্যে
-- বিনয়ী হও
+গুরুত্বপূর্ণ নিয়ম:
+- শুধুমাত্র বাংলায় উত্তর দাও
+- সংক্ষিপ্ত উত্তর দাও (১-২ বাক্য)
+- বিনয়ী ও সম্মানজনক ভাষা ব্যবহার করো
+- "আপনি", "জ্বী", "আচ্ছা" এই শব্দগুলো ব্যবহার করো
 
-ডাক্তার: ${doctors}
+উপলব্ধ ডাক্তার: ${doctors}
 
-প্রশ্ন: ${question}
+রোগীর প্রশ্ন: ${question}
 
-উত্তর:`;
+তোমার উত্তর:`;
 
   try {
     const result = await client.models.generateContent({
@@ -251,6 +254,7 @@ async function askGemini(client: GoogleGenAI, question: string, agentName: strin
     });
     
     let response = result.text || 'দুঃখিত, বুঝতে পারিনি।';
+    // Clean markdown and special chars
     response = response.replace(/[*#_~`]/g, '').trim();
     
     log('Gemini:', response);
@@ -288,6 +292,7 @@ const VoiceCard: React.FC<{
   };
 
   const bgColor = gender === 'male' ? 'from-blue-500 to-indigo-600' : 'from-pink-500 to-rose-600';
+  const iconLetter = gender === 'male' ? 'স্বা' : 'সে';
 
   return (
     <div className={`bg-white rounded-2xl p-6 border-2 transition-all ${
@@ -295,12 +300,12 @@ const VoiceCard: React.FC<{
     }`}>
       <div className="flex items-center gap-4 mb-4">
         <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${bgColor} flex items-center justify-center`}>
-          <span className="text-white text-2xl font-bold">{name.charAt(0)}</span>
+          <span className="text-white text-lg font-bold">{iconLetter}</span>
         </div>
         <div>
           <h3 className="font-bold text-lg text-slate-800">{name}</h3>
           <p className="text-sm text-slate-500">
-            {gender === 'male' ? (isBn ? 'পুরুষ' : 'Male') : (isBn ? 'মহিলা' : 'Female')}
+            {gender === 'male' ? (isBn ? 'পুরুষ সহকারী' : 'Male') : (isBn ? 'মহিলা সহকারী' : 'Female')}
           </p>
         </div>
       </div>
@@ -350,7 +355,7 @@ const VoiceCard: React.FC<{
         <button onClick={onStop}
           className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl flex items-center justify-center gap-2">
           <i className="fas fa-stop"></i>
-          {isBn ? 'শেষ' : 'End'}
+          {isBn ? 'শেষ করুন' : 'End'}
         </button>
       ) : (
         <button onClick={onStart} disabled={!hasValidApiKey}
@@ -377,15 +382,14 @@ const HomeVoiceSection: React.FC = () => {
 
   const clientRef = useRef<GoogleGenAI | null>(null);
   const isActiveRef = useRef(false);
+  const currentGenderRef = useRef<'male' | 'female'>('male');
 
   useEffect(() => {
     if (hasValidApiKey) {
       clientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
       log('Gemini ready');
     }
-    
-    // Initialize TTS
-    getTTS();
+    getTTS(); // Initialize TTS
     
     return () => {
       getTTS().stop();
@@ -406,7 +410,7 @@ const HomeVoiceSection: React.FC = () => {
     setTranscript(`${agentName}: ${response}`);
     setStatus('speaking');
 
-    const spoken = getTTS().speak(response, () => {
+    const spoken = getTTS().speak(response, currentGenderRef.current, () => {
       if (isActiveRef.current) {
         setStatus('listening');
         setTranscript('');
@@ -423,14 +427,10 @@ const HomeVoiceSection: React.FC = () => {
     });
 
     if (!spoken) {
-      // If TTS failed, still continue to listening
       setTimeout(() => {
         if (isActiveRef.current) {
           setStatus('listening');
-          startListening(
-            (newText) => processUserInput(newText, agentName),
-            () => {}
-          );
+          startListening((newText) => processUserInput(newText, agentName), () => {});
         }
       }, 2000);
     }
@@ -447,21 +447,19 @@ const HomeVoiceSection: React.FC = () => {
     setError(null);
     setTranscript('');
     isActiveRef.current = true;
+    currentGenderRef.current = gender;
 
     const agentName = gender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
-    const greeting = `আসসালামু আলাইকুম। আমি ${agentName}। কীভাবে সাহায্য করতে পারি?`;
+    const greeting = `আসসালামু আলাইকুম। আমি ${agentName}। আপনার স্বাস্থ্য বিষয়ে কীভাবে সাহায্য করতে পারি?`;
 
     setTranscript(`${agentName}: ${greeting}`);
-
-    // Play a beep to confirm audio is working
     playBeep(600, 0.15);
 
-    // Try to speak the greeting
-    const spoken = getTTS().speak(greeting, () => {
+    const spoken = getTTS().speak(greeting, gender, () => {
       if (isActiveRef.current) {
         setStatus('listening');
         setTranscript('');
-        playBeep(800, 0.1); // Beep to indicate listening started
+        playBeep(800, 0.1);
         startListening(
           (text) => processUserInput(text, agentName),
           () => {
@@ -474,18 +472,13 @@ const HomeVoiceSection: React.FC = () => {
       }
     });
 
-    // If speech fails, still start listening after delay
     if (!spoken) {
-      log('TTS not available, using beeps');
       setTimeout(() => {
         if (isActiveRef.current) {
           playBeep(800, 0.1);
           setStatus('listening');
           setTranscript('');
-          startListening(
-            (text) => processUserInput(text, agentName),
-            () => {}
-          );
+          startListening((text) => processUserInput(text, gender === 'male' ? 'স্বাস্থ্য' : 'সেবা'), () => {});
         }
       }, 1500);
     }
@@ -499,16 +492,13 @@ const HomeVoiceSection: React.FC = () => {
     setStatus('idle');
     setTranscript('');
     setError(null);
-    playBeep(400, 0.2); // End beep
+    playBeep(400, 0.2);
   };
 
-  // Test button for debugging
-  const handleTestAudio = () => {
-    log('Testing audio...');
-    playBeep(600, 0.3);
-    setTimeout(() => {
-      getTTS().speak('হ্যালো, আমি কাজ করছি', () => log('Test complete'));
-    }, 500);
+  const handleTestAudio = (gender: 'male' | 'female') => {
+    log(`Testing ${gender} voice...`);
+    playBeep(600, 0.2);
+    setTimeout(() => getTTS().test(gender), 300);
   };
 
   return (
@@ -526,7 +516,7 @@ const HomeVoiceSection: React.FC = () => {
           {isBn ? 'AI স্বাস্থ্য সহকারী' : 'AI Health Assistant'}
         </h3>
         <p className="text-slate-400 text-sm">
-          {isBn ? 'বাংলায় কথা বলুন' : 'Speak in Bangla'}
+          {isBn ? 'বাংলায় কথা বলুন, স্বাস্থ্য পরামর্শ নিন' : 'Speak in Bangla'}
         </p>
 
         {!hasValidApiKey && (
@@ -559,12 +549,12 @@ const HomeVoiceSection: React.FC = () => {
         />
       </div>
 
-      <div className="mt-6 text-center">
-        <button 
-          onClick={handleTestAudio}
-          className="text-slate-500 text-xs hover:text-slate-300 underline"
-        >
-          🔊 {isBn ? 'অডিও টেস্ট করুন' : 'Test Audio'}
+      <div className="mt-6 flex justify-center gap-4">
+        <button onClick={() => handleTestAudio('male')} className="text-slate-500 text-xs hover:text-blue-400">
+          🔊 {isBn ? 'পুরুষ কণ্ঠ টেস্ট' : 'Test Male'}
+        </button>
+        <button onClick={() => handleTestAudio('female')} className="text-slate-500 text-xs hover:text-pink-400">
+          🔊 {isBn ? 'মহিলা কণ্ঠ টেস্ট' : 'Test Female'}
         </button>
       </div>
 
