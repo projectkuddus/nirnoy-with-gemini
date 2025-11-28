@@ -9,49 +9,176 @@ const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
 
 const log = (...args: any[]) => console.log('[Voice]', ...args);
 
-// ============ SIMPLE TEXT-TO-SPEECH ============
-function speak(text: string, onEnd?: () => void): void {
-  // Clean the text - remove emojis and special characters
-  const cleanText = text
-    .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // emoticons
-    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // symbols
-    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // transport
-    .replace(/[\u{2600}-\u{26FF}]/gu, '')   // misc
-    .replace(/[\u{2700}-\u{27BF}]/gu, '')   // dingbats
-    .replace(/[📢📋👨‍⚕️🚨💬🎭]/g, '')        // specific emojis
-    .replace(/[!?।]+/g, '।')               // normalize punctuation
-    .trim();
+// ============ AUDIO CONTEXT FOR BEEP ============
+let audioContext: AudioContext | null = null;
 
-  if (!cleanText) {
-    onEnd?.();
-    return;
+function playBeep(frequency: number = 440, duration: number = 0.2): void {
+  try {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = frequency;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+    
+    log('Beep played');
+  } catch (e) {
+    log('Beep error:', e);
+  }
+}
+
+// ============ TEXT-TO-SPEECH WITH FALLBACK ============
+class TextToSpeech {
+  private synth: SpeechSynthesis;
+  private voices: SpeechSynthesisVoice[] = [];
+  private isReady = false;
+
+  constructor() {
+    this.synth = window.speechSynthesis;
+    this.loadVoices();
+    
+    // Chrome loads voices asynchronously
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = () => this.loadVoices();
+    }
+    
+    // Force load after delay
+    setTimeout(() => this.loadVoices(), 100);
+    setTimeout(() => this.loadVoices(), 500);
   }
 
-  window.speechSynthesis.cancel();
-  
-  const utterance = new SpeechSynthesisUtterance(cleanText);
-  utterance.lang = 'bn-BD';
-  utterance.rate = 0.9;
-  utterance.pitch = 1.0;
-  utterance.volume = 1.0;
-  
-  // Try to find a good voice
-  const voices = window.speechSynthesis.getVoices();
-  const bengaliVoice = voices.find(v => v.lang.includes('bn') || v.lang.includes('hi'));
-  if (bengaliVoice) utterance.voice = bengaliVoice;
-  
-  utterance.onend = () => onEnd?.();
-  utterance.onerror = () => onEnd?.();
-  
-  log('Speaking:', cleanText.substring(0, 50));
-  window.speechSynthesis.speak(utterance);
+  private loadVoices(): void {
+    this.voices = this.synth.getVoices();
+    this.isReady = this.voices.length > 0;
+    log('Voices loaded:', this.voices.length);
+    
+    // Log available voices for debugging
+    if (this.voices.length > 0) {
+      const voiceNames = this.voices.slice(0, 5).map(v => `${v.name} (${v.lang})`);
+      log('Sample voices:', voiceNames.join(', '));
+    }
+  }
+
+  private getBestVoice(): SpeechSynthesisVoice | null {
+    if (this.voices.length === 0) {
+      this.loadVoices();
+    }
+    
+    // Priority: Bengali > Hindi > English
+    const priorities = ['bn', 'hi', 'en-IN', 'en-GB', 'en-US', 'en'];
+    
+    for (const lang of priorities) {
+      const voice = this.voices.find(v => v.lang.toLowerCase().includes(lang.toLowerCase()));
+      if (voice) {
+        log('Selected voice:', voice.name, voice.lang);
+        return voice;
+      }
+    }
+    
+    // Fallback to first available
+    if (this.voices.length > 0) {
+      log('Using fallback voice:', this.voices[0].name);
+      return this.voices[0];
+    }
+    
+    return null;
+  }
+
+  speak(text: string, onEnd?: () => void): boolean {
+    // Cancel any ongoing speech
+    this.synth.cancel();
+    
+    if (!text) {
+      onEnd?.();
+      return false;
+    }
+
+    // Clean text
+    const cleanText = text
+      .replace(/[^\u0980-\u09FF\u0020-\u007E।,?!.\s]/g, '') // Keep Bengali + basic ASCII
+      .trim();
+
+    if (!cleanText) {
+      log('No text to speak after cleaning');
+      onEnd?.();
+      return false;
+    }
+
+    log('Speaking:', cleanText);
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    const voice = this.getBestVoice();
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    } else {
+      utterance.lang = 'bn-BD';
+    }
+    
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => log('Speech started');
+    utterance.onend = () => {
+      log('Speech ended');
+      onEnd?.();
+    };
+    utterance.onerror = (e) => {
+      log('Speech error:', e.error);
+      // Play beep as fallback
+      playBeep(600, 0.3);
+      setTimeout(() => onEnd?.(), 500);
+    };
+
+    // Chrome bug workaround: speech sometimes doesn't start
+    // Solution: use setTimeout
+    setTimeout(() => {
+      this.synth.speak(utterance);
+    }, 100);
+
+    return true;
+  }
+
+  stop(): void {
+    this.synth.cancel();
+  }
+
+  testSpeak(): void {
+    // Test with simple English first
+    const test = new SpeechSynthesisUtterance('Hello, testing voice');
+    test.volume = 1.0;
+    test.onstart = () => log('Test speech started');
+    test.onend = () => log('Test speech ended');
+    test.onerror = (e) => log('Test speech error:', e);
+    this.synth.speak(test);
+  }
 }
 
-function stopSpeaking(): void {
-  window.speechSynthesis.cancel();
+// Global TTS instance
+let tts: TextToSpeech | null = null;
+
+function getTTS(): TextToSpeech {
+  if (!tts) {
+    tts = new TextToSpeech();
+  }
+  return tts;
 }
 
-// ============ SIMPLE SPEECH RECOGNITION ============
+// ============ SPEECH RECOGNITION ============
 let recognition: any = null;
 
 function initRecognition(): boolean {
@@ -66,11 +193,9 @@ function initRecognition(): boolean {
 }
 
 function startListening(onResult: (text: string) => void, onError?: () => void): void {
-  if (!recognition) {
-    if (!initRecognition()) {
-      onError?.();
-      return;
-    }
+  if (!recognition && !initRecognition()) {
+    onError?.();
+    return;
   }
   
   recognition.onresult = (e: any) => {
@@ -81,18 +206,17 @@ function startListening(onResult: (text: string) => void, onError?: () => void):
   
   recognition.onerror = (e: any) => {
     log('Recognition error:', e.error);
-    onError?.();
-  };
-  
-  recognition.onend = () => {
-    log('Recognition ended');
+    if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      onError?.();
+    }
   };
   
   try {
     recognition.start();
-    log('Listening started');
+    log('Listening...');
+    // Play start beep
+    playBeep(800, 0.1);
   } catch (e) {
-    log('Failed to start listening');
     onError?.();
   }
 }
@@ -113,7 +237,6 @@ async function askGemini(client: GoogleGenAI, question: string, agentName: strin
 - শুধু বাংলায় উত্তর দাও
 - ছোট উত্তর দাও, ১-২ বাক্যে
 - বিনয়ী হও
-- ইমোজি ব্যবহার করো না
 
 ডাক্তার: ${doctors}
 
@@ -128,19 +251,13 @@ async function askGemini(client: GoogleGenAI, question: string, agentName: strin
     });
     
     let response = result.text || 'দুঃখিত, বুঝতে পারিনি।';
+    response = response.replace(/[*#_~`]/g, '').trim();
     
-    // Clean response
-    response = response
-      .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
-      .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
-      .replace(/[*#_~`]/g, '')
-      .trim();
-    
-    log('Gemini response:', response);
+    log('Gemini:', response);
     return response;
   } catch (e: any) {
     log('Gemini error:', e.message);
-    return 'দুঃখিত, এই মুহূর্তে উত্তর দিতে পারছি না। একটু পরে চেষ্টা করুন।';
+    return 'দুঃখিত, এই মুহূর্তে উত্তর দিতে পারছি না।';
   }
 }
 
@@ -163,11 +280,11 @@ const VoiceCard: React.FC<{
   
   const statusText: Record<Status, string> = {
     idle: isBn ? 'প্রস্তুত' : 'Ready',
-    greeting: isBn ? 'শুভেচ্ছা জানাচ্ছে...' : 'Greeting...',
-    listening: isBn ? 'শুনছি... বলুন' : 'Listening...',
+    greeting: isBn ? 'শুভেচ্ছা...' : 'Greeting...',
+    listening: isBn ? 'বলুন...' : 'Speak...',
     thinking: isBn ? 'চিন্তা করছি...' : 'Thinking...',
     speaking: isBn ? 'বলছে...' : 'Speaking...',
-    error: error || (isBn ? 'সমস্যা হয়েছে' : 'Error'),
+    error: error || (isBn ? 'সমস্যা' : 'Error'),
   };
 
   const bgColor = gender === 'male' ? 'from-blue-500 to-indigo-600' : 'from-pink-500 to-rose-600';
@@ -183,7 +300,7 @@ const VoiceCard: React.FC<{
         <div>
           <h3 className="font-bold text-lg text-slate-800">{name}</h3>
           <p className="text-sm text-slate-500">
-            {gender === 'male' ? (isBn ? 'পুরুষ সহকারী' : 'Male') : (isBn ? 'মহিলা সহকারী' : 'Female')}
+            {gender === 'male' ? (isBn ? 'পুরুষ' : 'Male') : (isBn ? 'মহিলা' : 'Female')}
           </p>
         </div>
       </div>
@@ -205,15 +322,9 @@ const VoiceCard: React.FC<{
           {(status === 'listening' || status === 'speaking' || status === 'greeting') && (
             <div className="flex justify-center gap-1 h-12 items-center bg-slate-50 rounded-xl">
               {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-1.5 rounded-full ${
-                    status === 'listening' ? 'bg-green-500' : 'bg-purple-500'
-                  }`}
-                  style={{
-                    height: `${15 + Math.random() * 20}px`,
-                    animation: `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate`
-                  }}
+                <div key={i}
+                  className={`w-1.5 rounded-full ${status === 'listening' ? 'bg-green-500' : 'bg-purple-500'}`}
+                  style={{ height: `${15 + Math.random() * 20}px`, animation: `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate` }}
                 />
               ))}
             </div>
@@ -222,8 +333,7 @@ const VoiceCard: React.FC<{
           {status === 'thinking' && (
             <div className="flex justify-center gap-2 h-12 items-center bg-slate-50 rounded-xl">
               {[0, 1, 2].map(i => (
-                <div key={i} className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce"
-                  style={{ animationDelay: `${i * 0.15}s` }} />
+                <div key={i} className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
               ))}
             </div>
           )}
@@ -240,14 +350,12 @@ const VoiceCard: React.FC<{
         <button onClick={onStop}
           className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl flex items-center justify-center gap-2">
           <i className="fas fa-stop"></i>
-          {isBn ? 'শেষ করুন' : 'End'}
+          {isBn ? 'শেষ' : 'End'}
         </button>
       ) : (
         <button onClick={onStart} disabled={!hasValidApiKey}
           className={`w-full py-3 font-bold rounded-xl flex items-center justify-center gap-2 ${
-            hasValidApiKey
-              ? `bg-gradient-to-r ${bgColor} text-white hover:opacity-90`
-              : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+            hasValidApiKey ? `bg-gradient-to-r ${bgColor} text-white hover:opacity-90` : 'bg-slate-300 text-slate-500'
           }`}>
           <i className="fas fa-microphone"></i>
           {isBn ? 'কথা বলুন' : 'Talk'}
@@ -270,23 +378,21 @@ const HomeVoiceSection: React.FC = () => {
   const clientRef = useRef<GoogleGenAI | null>(null);
   const isActiveRef = useRef(false);
 
-  // Initialize Gemini client
   useEffect(() => {
     if (hasValidApiKey) {
       clientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-      log('Gemini client ready');
+      log('Gemini ready');
     }
     
-    // Load voices
-    window.speechSynthesis.getVoices();
+    // Initialize TTS
+    getTTS();
     
     return () => {
-      stopSpeaking();
+      getTTS().stop();
       stopListening();
     };
   }, []);
 
-  // Handle conversation flow
   const processUserInput = useCallback(async (text: string, agentName: string) => {
     if (!clientRef.current || !isActiveRef.current) return;
 
@@ -300,7 +406,7 @@ const HomeVoiceSection: React.FC = () => {
     setTranscript(`${agentName}: ${response}`);
     setStatus('speaking');
 
-    speak(response, () => {
+    const spoken = getTTS().speak(response, () => {
       if (isActiveRef.current) {
         setStatus('listening');
         setTranscript('');
@@ -308,21 +414,32 @@ const HomeVoiceSection: React.FC = () => {
           (newText) => processUserInput(newText, agentName),
           () => {
             if (isActiveRef.current) {
-              setError('মাইক সমস্যা। আবার চেষ্টা করুন।');
+              setError('মাইক সমস্যা');
               setStatus('error');
             }
           }
         );
       }
     });
+
+    if (!spoken) {
+      // If TTS failed, still continue to listening
+      setTimeout(() => {
+        if (isActiveRef.current) {
+          setStatus('listening');
+          startListening(
+            (newText) => processUserInput(newText, agentName),
+            () => {}
+          );
+        }
+      }, 2000);
+    }
   }, []);
 
-  // Start conversation
   const handleStart = (gender: 'male' | 'female') => {
     if (!hasValidApiKey) return;
 
-    // Reset state
-    stopSpeaking();
+    getTTS().stop();
     stopListening();
     
     setActiveAgent(gender);
@@ -332,14 +449,19 @@ const HomeVoiceSection: React.FC = () => {
     isActiveRef.current = true;
 
     const agentName = gender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
-    const greeting = `আসসালামু আলাইকুম। আমি ${agentName}। আপনার স্বাস্থ্য বিষয়ে কীভাবে সাহায্য করতে পারি?`;
+    const greeting = `আসসালামু আলাইকুম। আমি ${agentName}। কীভাবে সাহায্য করতে পারি?`;
 
     setTranscript(`${agentName}: ${greeting}`);
 
-    speak(greeting, () => {
+    // Play a beep to confirm audio is working
+    playBeep(600, 0.15);
+
+    // Try to speak the greeting
+    const spoken = getTTS().speak(greeting, () => {
       if (isActiveRef.current) {
         setStatus('listening');
         setTranscript('');
+        playBeep(800, 0.1); // Beep to indicate listening started
         startListening(
           (text) => processUserInput(text, agentName),
           () => {
@@ -351,17 +473,42 @@ const HomeVoiceSection: React.FC = () => {
         );
       }
     });
+
+    // If speech fails, still start listening after delay
+    if (!spoken) {
+      log('TTS not available, using beeps');
+      setTimeout(() => {
+        if (isActiveRef.current) {
+          playBeep(800, 0.1);
+          setStatus('listening');
+          setTranscript('');
+          startListening(
+            (text) => processUserInput(text, agentName),
+            () => {}
+          );
+        }
+      }, 1500);
+    }
   };
 
-  // Stop conversation
   const handleStop = () => {
     isActiveRef.current = false;
-    stopSpeaking();
+    getTTS().stop();
     stopListening();
     setActiveAgent(null);
     setStatus('idle');
     setTranscript('');
     setError(null);
+    playBeep(400, 0.2); // End beep
+  };
+
+  // Test button for debugging
+  const handleTestAudio = () => {
+    log('Testing audio...');
+    playBeep(600, 0.3);
+    setTimeout(() => {
+      getTTS().speak('হ্যালো, আমি কাজ করছি', () => log('Test complete'));
+    }, 500);
   };
 
   return (
@@ -379,12 +526,11 @@ const HomeVoiceSection: React.FC = () => {
           {isBn ? 'AI স্বাস্থ্য সহকারী' : 'AI Health Assistant'}
         </h3>
         <p className="text-slate-400 text-sm">
-          {isBn ? 'বাংলায় কথা বলুন, স্বাস্থ্য পরামর্শ নিন' : 'Speak in Bangla, get health advice'}
+          {isBn ? 'বাংলায় কথা বলুন' : 'Speak in Bangla'}
         </p>
 
         {!hasValidApiKey && (
           <div className="mt-4 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-lg text-sm">
-            <i className="fas fa-exclamation-triangle mr-2"></i>
             API Key প্রয়োজন
           </div>
         )}
@@ -413,9 +559,18 @@ const HomeVoiceSection: React.FC = () => {
         />
       </div>
 
-      <p className="text-center text-slate-500 text-xs mt-6">
-        <i className="fas fa-shield-alt mr-1"></i>
-        {isBn ? 'Chrome/Edge ব্রাউজারে ভালো কাজ করে' : 'Works best in Chrome/Edge'}
+      <div className="mt-6 text-center">
+        <button 
+          onClick={handleTestAudio}
+          className="text-slate-500 text-xs hover:text-slate-300 underline"
+        >
+          🔊 {isBn ? 'অডিও টেস্ট করুন' : 'Test Audio'}
+        </button>
+      </div>
+
+      <p className="text-center text-slate-500 text-xs mt-4">
+        <i className="fas fa-info-circle mr-1"></i>
+        {isBn ? 'Chrome/Edge এ সবচেয়ে ভালো কাজ করে' : 'Works best in Chrome/Edge'}
       </p>
     </div>
   );
