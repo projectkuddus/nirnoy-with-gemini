@@ -7,12 +7,12 @@ import { MOCK_DOCTORS } from '../data/mockData';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
 
-// Debug mode - set to true to see console logs
+// Debug mode
 const DEBUG = true;
 const log = (...args: any[]) => { if (DEBUG) console.log('[VoiceAgent]', ...args); };
 const logError = (...args: any[]) => console.error('[VoiceAgent ERROR]', ...args);
 
-// ============ AUDIO CONTEXT MANAGER ============
+// ============ AUDIO PLAYER CLASS ============
 class AudioPlayer {
   private audioContext: AudioContext | null = null;
   private gainNode: GainNode | null = null;
@@ -29,19 +29,17 @@ class AudioPlayer {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioContextClass({ sampleRate: 24000 });
       
-      // Create gain node for volume control
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.gain.value = 2.5; // Boost volume
+      this.gainNode.gain.value = 2.5;
       this.gainNode.connect(this.audioContext.destination);
       
-      // Resume if suspended
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
       }
       
       this.isInitialized = true;
       this.nextPlayTime = 0;
-      log('AudioContext initialized:', this.audioContext.state, 'sampleRate:', this.audioContext.sampleRate);
+      log('AudioContext initialized:', this.audioContext.state);
       return true;
     } catch (e) {
       logError('Failed to init AudioContext:', e);
@@ -52,7 +50,6 @@ class AudioPlayer {
   async resume(): Promise<void> {
     if (this.audioContext && this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
-      log('AudioContext resumed');
     }
   }
 
@@ -63,25 +60,21 @@ class AudioPlayer {
     }
 
     try {
-      // Decode base64 to bytes
       const binaryString = atob(base64Data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Convert PCM16 to Float32
       const int16Data = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
       const float32Data = new Float32Array(int16Data.length);
       for (let i = 0; i < int16Data.length; i++) {
         float32Data[i] = int16Data[i] / 32768.0;
       }
 
-      // Create audio buffer
       const audioBuffer = this.audioContext.createBuffer(1, float32Data.length, sampleRate);
       audioBuffer.getChannelData(0).set(float32Data);
 
-      // Create source and play
       const source = this.audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(this.gainNode);
@@ -92,12 +85,7 @@ class AudioPlayer {
       source.start(startTime);
       this.nextPlayTime = startTime + audioBuffer.duration;
       
-      log('Playing audio:', {
-        duration: audioBuffer.duration.toFixed(3) + 's',
-        samples: float32Data.length,
-        startTime: startTime.toFixed(3)
-      });
-
+      log('🔊 Playing audio:', audioBuffer.duration.toFixed(2) + 's');
     } catch (e) {
       logError('Failed to play audio:', e);
     }
@@ -106,9 +94,7 @@ class AudioPlayer {
   stop(): void {
     this.nextPlayTime = 0;
     if (this.audioContext && this.audioContext.state !== 'closed') {
-      try {
-        this.audioContext.close();
-      } catch (e) {}
+      try { this.audioContext.close(); } catch (e) {}
     }
     this.audioContext = null;
     this.gainNode = null;
@@ -116,7 +102,7 @@ class AudioPlayer {
   }
 }
 
-// ============ MICROPHONE MANAGER ============
+// ============ MICROPHONE MANAGER CLASS ============
 class MicrophoneManager {
   private stream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
@@ -130,8 +116,7 @@ class MicrophoneManager {
     try {
       this.onAudioData = onAudioData;
       
-      // Get microphone access with better error handling
-      log('Requesting microphone access...');
+      log('Requesting microphone...');
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -140,13 +125,11 @@ class MicrophoneManager {
         }
       });
       
-      log('Microphone access granted, tracks:', this.stream.getAudioTracks().length);
+      log('Microphone granted');
 
-      // Create audio context for processing
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioContextClass();
       
-      // Resume if suspended
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
       }
@@ -162,7 +145,6 @@ class MicrophoneManager {
 
         const inputData = event.inputBuffer.getChannelData(0);
         
-        // Downsample to 16kHz
         const inputSampleRate = this.audioContext!.sampleRate;
         const outputSampleRate = 16000;
         const ratio = inputSampleRate / outputSampleRate;
@@ -176,7 +158,6 @@ class MicrophoneManager {
         
         audioBuffer.push(downsampled);
 
-        // Send every 100ms
         const now = Date.now();
         if (now - lastSendTime >= 100 && audioBuffer.length > 0) {
           const totalLength = audioBuffer.reduce((acc, buf) => acc + buf.length, 0);
@@ -187,7 +168,6 @@ class MicrophoneManager {
             offset += buf.length;
           }
 
-          // Convert to PCM16 base64
           const int16 = new Int16Array(combined.length);
           for (let i = 0; i < combined.length; i++) {
             const s = Math.max(-1, Math.min(1, combined[i]));
@@ -214,17 +194,16 @@ class MicrophoneManager {
       this.processor.connect(this.audioContext.destination);
       
       this.isRunning = true;
-      log('Microphone processing started, sampleRate:', this.audioContext.sampleRate);
+      log('Microphone started');
       return true;
     } catch (e: any) {
-      logError('Failed to start microphone:', e.name, e.message);
+      logError('Microphone error:', e.name, e.message);
       return false;
     }
   }
 
   stop(): void {
     this.isRunning = false;
-    
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
@@ -242,8 +221,8 @@ class MicrophoneManager {
   }
 }
 
-// ============ SYSTEM PROMPT ============
-function buildSystemPrompt(voiceGender: 'male' | 'female'): string {
+// ============ SYSTEM PROMPT FOR VOICE AGENTS ============
+function buildSystemPrompt(agentName: string, gender: 'male' | 'female'): string {
   const hour = new Date().getHours();
   let greeting = 'শুভ সন্ধ্যা';
   if (hour >= 5 && hour < 12) greeting = 'সুপ্রভাত';
@@ -254,25 +233,42 @@ function buildSystemPrompt(voiceGender: 'male' | 'female'): string {
     `- ${d.name}: ${d.specialties[0]}, ফি ৳${d.chambers[0]?.fee || 500}`
   ).join('\n');
 
-  return `আপনি "Nree" - নির্ণয় হেলথ এর ${voiceGender === 'male' ? 'পুরুষ' : 'মহিলা'} AI সহকারী।
+  const personality = gender === 'male' 
+    ? 'বিশ্বস্ত, জ্ঞানী এবং সহানুভূতিশীল বড় ভাইয়ের মতো'
+    : 'যত্নশীল, উষ্ণ এবং সহানুভূতিশীল বড় বোনের মতো';
 
-প্রথমেই বলুন: "আসসালামু আলাইকুম! ${greeting}! আমি Nree। কীভাবে সাহায্য করতে পারি?"
+  return `আপনি "${agentName}" - নির্ণয় হেলথ এর ${gender === 'male' ? 'পুরুষ' : 'মহিলা'} AI স্বাস্থ্য সহকারী।
 
-নিয়ম:
-- শুধু বাংলায় কথা বলুন
-- ছোট উত্তর দিন (১-২ বাক্য)
-- বিনয়ী হোন
+🎭 ব্যক্তিত্ব: ${personality}
 
-ডাক্তার তালিকা:
+📢 প্রথম কথা (এটি অবশ্যই বলুন):
+"আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। নির্ণয় হেলথ থেকে বলছি। আপনার স্বাস্থ্য বিষয়ে কীভাবে সাহায্য করতে পারি?"
+
+📋 নিয়মাবলী:
+1. শুধুমাত্র বাংলায় কথা বলুন - মিষ্টি এবং স্পষ্ট উচ্চারণে
+2. ছোট এবং সহজ বাক্য ব্যবহার করুন (১-২ বাক্য)
+3. রোগীর কথা মনোযোগ দিয়ে শুনুন
+4. প্রয়োজনে সঠিক ডাক্তার সাজেস্ট করুন
+5. সবসময় বিনয়ী এবং সম্মানজনক থাকুন
+6. "জ্বী", "আচ্ছা", "বুঝেছি" এই শব্দগুলো ব্যবহার করুন
+
+👨‍⚕️ ডাক্তার তালিকা:
 ${doctorList}
 
-জরুরি: বুকে ব্যথা/শ্বাসকষ্ট = "999 এ কল করুন!"`;
+🚨 জরুরি অবস্থা:
+- বুকে ব্যথা, শ্বাসকষ্ট, অজ্ঞান = "এখনই 999 এ কল করুন!"
+- রক্তক্ষরণ, দুর্ঘটনা = "জরুরি বিভাগে যান!"
+
+💬 কথা বলার ধরন:
+- উষ্ণ এবং বন্ধুত্বপূর্ণ
+- ধীরে এবং স্পষ্ট করে
+- সহানুভূতিশীল`;
 }
 
 // ============ TYPES ============
 type AgentStatus = 'idle' | 'connecting' | 'connected' | 'speaking' | 'listening' | 'error';
 
-// ============ VOICE AGENT CARD ============
+// ============ VOICE AGENT CARD COMPONENT ============
 interface VoiceAgentCardProps {
   name: string;
   gender: 'male' | 'female';
@@ -301,68 +297,89 @@ const VoiceAgentCard: React.FC<VoiceAgentCardProps> = ({
     }
   };
 
+  const bgGradient = gender === 'male' 
+    ? 'from-blue-500 to-indigo-600' 
+    : 'from-pink-500 to-rose-600';
+
   return (
-    <div className={`bg-white rounded-2xl p-6 border-2 transition-all ${
-      isActive ? 'border-blue-500 shadow-xl shadow-blue-500/20' : 'border-slate-200 hover:border-slate-300'
+    <div className={`bg-white rounded-2xl p-6 border-2 transition-all duration-300 ${
+      isActive 
+        ? `border-${gender === 'male' ? 'blue' : 'pink'}-500 shadow-xl shadow-${gender === 'male' ? 'blue' : 'pink'}-500/20` 
+        : 'border-slate-200 hover:border-slate-300 hover:shadow-lg'
     }`}>
+      {/* Avatar & Name */}
       <div className="flex items-center gap-4 mb-4">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-          gender === 'male' ? 'bg-blue-100' : 'bg-pink-100'
-        }`}>
-          <i className={`fas ${gender === 'male' ? 'fa-mars text-blue-600' : 'fa-venus text-pink-600'} text-2xl`}></i>
+        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${bgGradient} flex items-center justify-center shadow-lg`}>
+          <span className="text-white text-2xl font-bold">
+            {name.charAt(0)}
+          </span>
         </div>
         <div>
-          <h3 className="font-bold text-slate-800">{name}</h3>
+          <h3 className="font-bold text-lg text-slate-800">{name}</h3>
           <p className="text-sm text-slate-500">
-            {gender === 'male' ? (isBn ? 'পুরুষ কণ্ঠ' : 'Male Voice') : (isBn ? 'মহিলা কণ্ঠ' : 'Female Voice')}
+            {gender === 'male' ? (isBn ? 'পুরুষ সহকারী' : 'Male Assistant') : (isBn ? 'মহিলা সহকারী' : 'Female Assistant')}
           </p>
         </div>
       </div>
 
+      {/* Status & Visualization */}
       {isActive && (
         <div className="mb-4">
-          <div className="flex items-center gap-2 text-sm">
-            <div className={`w-2 h-2 rounded-full ${
+          <div className="flex items-center gap-2 text-sm mb-3">
+            <div className={`w-2.5 h-2.5 rounded-full ${
               status === 'speaking' ? 'bg-purple-500 animate-pulse' :
               status === 'listening' ? 'bg-green-500 animate-pulse' : 
+              status === 'connecting' ? 'bg-yellow-500 animate-pulse' :
               status === 'error' ? 'bg-red-500' : 'bg-blue-500'
             }`}></div>
-            <span className={status === 'error' ? 'text-red-500' : 'text-slate-600'}>
+            <span className={`font-medium ${status === 'error' ? 'text-red-500' : 'text-slate-600'}`}>
               {getStatusText()}
             </span>
           </div>
           
+          {/* Audio Visualization */}
           {(status === 'speaking' || status === 'listening') && (
-            <div className="flex items-center justify-center gap-1 h-12 mt-3">
-              {[...Array(5)].map((_, i) => (
+            <div className="flex items-center justify-center gap-1 h-14 bg-slate-50 rounded-xl">
+              {[...Array(7)].map((_, i) => (
                 <div
                   key={i}
-                  className={`w-1.5 rounded-full transition-all duration-150 ${
+                  className={`w-1.5 rounded-full transition-all duration-100 ${
                     status === 'speaking' 
-                      ? 'bg-gradient-to-t from-purple-500 to-pink-500' 
-                      : 'bg-gradient-to-t from-blue-500 to-cyan-500'
+                      ? 'bg-gradient-to-t from-purple-500 to-pink-400' 
+                      : 'bg-gradient-to-t from-blue-500 to-cyan-400'
                   }`}
                   style={{ 
-                    height: `${15 + Math.random() * 25}px`,
-                    animation: `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate`
+                    height: `${12 + Math.random() * 30}px`,
+                    animation: `pulse ${0.3 + i * 0.08}s ease-in-out infinite alternate`
                   }}
                 ></div>
               ))}
             </div>
           )}
 
+          {/* Connecting Animation */}
+          {status === 'connecting' && (
+            <div className="flex items-center justify-center gap-2 h-14 bg-slate-50 rounded-xl">
+              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          )}
+
+          {/* Debug Info */}
           {DEBUG && debugInfo && (
-            <div className="mt-2 text-xs text-slate-400 bg-slate-50 p-2 rounded">
+            <div className="mt-2 text-xs text-slate-400 bg-slate-100 p-2 rounded font-mono">
               {debugInfo}
             </div>
           )}
         </div>
       )}
 
+      {/* Action Button */}
       {isActive ? (
         <button 
           onClick={onDisconnect} 
-          className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition flex items-center justify-center gap-2"
+          className="w-full py-3.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
         >
           <i className="fas fa-phone-slash"></i>
           {isBn ? 'শেষ করুন' : 'End Call'}
@@ -371,14 +388,14 @@ const VoiceAgentCard: React.FC<VoiceAgentCardProps> = ({
         <button 
           onClick={onConnect} 
           disabled={!hasValidApiKey}
-          className={`w-full py-3 font-bold rounded-xl transition flex items-center justify-center gap-2 ${
+          className={`w-full py-3.5 font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 ${
             hasValidApiKey 
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg shadow-blue-500/25' 
+              ? `bg-gradient-to-r ${bgGradient} hover:opacity-90 text-white shadow-lg` 
               : 'bg-slate-300 text-slate-500 cursor-not-allowed'
           }`}
         >
           <i className="fas fa-phone"></i>
-          {isBn ? 'কথা বলুন' : 'Connect'}
+          {isBn ? 'কথা বলুন' : 'Talk Now'}
         </button>
       )}
     </div>
@@ -406,13 +423,11 @@ const HomeVoiceSection: React.FC = () => {
   useEffect(() => {
     if (hasValidApiKey) {
       aiClientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-      log('GoogleGenAI client initialized');
-    } else {
-      log('No valid API key found');
+      log('GoogleGenAI initialized');
     }
   }, []);
 
-  // Cleanup
+  // Cleanup function
   const cleanup = useCallback(() => {
     log('Cleaning up...');
     isConnectedRef.current = false;
@@ -443,7 +458,7 @@ const HomeVoiceSection: React.FC = () => {
   // Connect handler
   const handleConnect = async (gender: 'male' | 'female') => {
     if (!hasValidApiKey || !aiClientRef.current) {
-      setError('API Key কনফিগার করা হয়নি');
+      setError('API Key নেই');
       return;
     }
 
@@ -452,24 +467,30 @@ const HomeVoiceSection: React.FC = () => {
       setActiveAgent(gender);
       setStatus('connecting');
       setError(null);
-      setDebugInfo('Initializing...');
+      setDebugInfo('শুরু হচ্ছে...');
 
-      // Step 1: Initialize audio player (MUST be after user click)
-      log('Step 1: Initializing audio player...');
+      // Agent names
+      const agentName = gender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
+      
+      // Step 1: Initialize audio
+      log('Step 1: Audio init...');
       audioPlayerRef.current = new AudioPlayer();
       const audioReady = await audioPlayerRef.current.init();
-      if (!audioReady) throw new Error('Failed to initialize audio');
-      setDebugInfo('Audio ready');
+      if (!audioReady) throw new Error('Audio init failed');
+      setDebugInfo('অডিও প্রস্তুত');
 
-      // Step 2: Initialize microphone manager (but don't start yet)
-      log('Step 2: Preparing microphone...');
+      // Step 2: Prepare microphone
+      log('Step 2: Mic init...');
       micManagerRef.current = new MicrophoneManager();
       
-      // Step 3: Connect to Gemini Live API
-      log('Step 3: Connecting to Gemini Live API...');
-      setDebugInfo('Connecting to Gemini...');
+      // Step 3: Connect to Gemini Live
+      log('Step 3: Connecting to Gemini...');
+      setDebugInfo('জেমিনি সংযোগ...');
       
-      const systemPrompt = buildSystemPrompt(gender);
+      const systemPrompt = buildSystemPrompt(agentName, gender);
+      
+      // Use Gemini's built-in voices
+      // Aoede = deeper male voice, Kore = female voice
       const voiceName = gender === 'male' ? 'Aoede' : 'Kore';
 
       const session = await aiClientRef.current.live.connect({
@@ -485,18 +506,18 @@ const HomeVoiceSection: React.FC = () => {
         },
         callbacks: {
           onopen: async () => {
-            log('✅ WebSocket connected!');
+            log('✅ Connected!');
             isConnectedRef.current = true;
             setStatus('connected');
-            setDebugInfo('Connected! Starting mic...');
+            setDebugInfo('মাইক শুরু...');
 
-            // Start microphone capture
+            // Start microphone
             const micStarted = await micManagerRef.current!.start((audioData) => {
               if (sessionRef.current && isConnectedRef.current) {
                 try {
                   sessionRef.current.sendRealtimeInput({ media: audioData });
                 } catch (e) {
-                  logError('Failed to send audio:', e);
+                  logError('Send audio error:', e);
                 }
               }
             });
@@ -504,52 +525,45 @@ const HomeVoiceSection: React.FC = () => {
             if (!micStarted) {
               setError('মাইক্রোফোন পারমিশন দিন');
               setStatus('error');
-              setDebugInfo('Microphone permission denied');
               return;
             }
 
-            setDebugInfo('Mic ready, waiting for greeting...');
+            setDebugInfo('শুনছি...');
             setStatus('listening');
 
             // Trigger greeting
             setTimeout(() => {
               if (sessionRef.current && isConnectedRef.current) {
-                log('Sending greeting trigger...');
+                log('Triggering greeting...');
                 sessionRef.current.sendClientContent({
                   turns: [{ role: 'user', parts: [{ text: 'হ্যালো' }] }],
                   turnComplete: true
                 });
               }
-            }, 1000);
+            }, 800);
           },
 
           onmessage: (message: any) => {
-            log('Received message:', JSON.stringify(message).substring(0, 200));
+            log('Message:', JSON.stringify(message).substring(0, 150));
 
-            // Check for audio data
             const parts = message.serverContent?.modelTurn?.parts || [];
             for (const part of parts) {
               if (part.inlineData?.mimeType?.startsWith('audio/') && part.inlineData?.data) {
-                log('🔊 Received audio data, length:', part.inlineData.data.length);
+                log('🔊 Audio received');
                 setStatus('speaking');
-                setDebugInfo('Playing audio...');
+                setDebugInfo('বলছে...');
                 
-                // Resume audio context if needed
                 audioPlayerRef.current?.resume();
-                
-                // Play the audio
                 audioPlayerRef.current?.playPCM16(part.inlineData.data, 24000);
               }
             }
 
-            // Check for turn complete
             if (message.serverContent?.turnComplete) {
               log('Turn complete');
               setStatus('listening');
-              setDebugInfo('Listening...');
+              setDebugInfo('শুনছি...');
             }
 
-            // Check for interruption
             if (message.serverContent?.interrupted) {
               log('Interrupted');
               audioPlayerRef.current?.stop();
@@ -558,35 +572,28 @@ const HomeVoiceSection: React.FC = () => {
           },
 
           onclose: (e: CloseEvent) => {
-            log('WebSocket closed:', e.code, e.reason);
+            log('Closed:', e.code, e.reason);
             isConnectedRef.current = false;
             
-            // Handle specific close codes
             if (e.code === 1011) {
-              // Check if it's a quota error
               if (e.reason?.toLowerCase().includes('quota')) {
-                setError('API কোটা শেষ - পরে চেষ্টা করুন');
+                setError('API কোটা শেষ');
               } else {
-                setError('সার্ভার ত্রুটি');
+                setError('সার্ভার সমস্যা');
               }
               setStatus('error');
             } else if (e.code !== 1000) {
-              setError('সংযোগ বিচ্ছিন্ন হয়েছে');
+              setError('সংযোগ বিচ্ছিন্ন');
               setStatus('error');
             }
             
-            // Cleanup resources
-            if (micManagerRef.current) {
-              micManagerRef.current.stop();
-            }
-            if (audioPlayerRef.current) {
-              audioPlayerRef.current.stop();
-            }
+            micManagerRef.current?.stop();
+            audioPlayerRef.current?.stop();
           },
 
           onerror: (e: ErrorEvent) => {
             logError('WebSocket error:', e);
-            setError('সংযোগে সমস্যা হয়েছে');
+            setError('সংযোগ ত্রুটি');
             setStatus('error');
           },
         },
@@ -597,52 +604,53 @@ const HomeVoiceSection: React.FC = () => {
 
     } catch (err: any) {
       logError('Connection failed:', err);
-      let errorMsg = 'সংযোগ করা যাচ্ছে না';
+      let errorMsg = 'সংযোগ ব্যর্থ';
       
       if (err.name === 'NotAllowedError') {
         errorMsg = 'মাইক্রোফোন পারমিশন দিন';
-      } else if (err.message?.includes('quota') || err.message?.includes('exceeded')) {
+      } else if (err.message?.includes('quota')) {
         errorMsg = 'API কোটা শেষ';
-      } else if (err.message?.includes('API')) {
-        errorMsg = 'API ত্রুটি';
-      } else if (err.message?.includes('network') || err.message?.includes('Network')) {
-        errorMsg = 'নেটওয়ার্ক সমস্যা';
       }
       
       setError(errorMsg);
       setStatus('error');
-      setDebugInfo(err.message || 'Unknown error');
+      setDebugInfo(err.message || '');
     }
   };
 
   return (
-    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 border border-slate-700">
+    <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-8 border border-slate-700/50 shadow-2xl">
+      {/* Header */}
       <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-full text-sm font-semibold mb-4">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-full text-sm font-semibold mb-4 border border-green-500/30">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
           </span>
           24/7 {isBn ? 'সক্রিয়' : 'Active'}
         </div>
-        <h3 className="text-2xl font-black text-white mb-2">
-          {isBn ? 'Nree-এর সাথে কথা বলুন' : 'Talk to Nree'}
+        
+        <h3 className="text-2xl md:text-3xl font-black text-white mb-3">
+          {isBn ? 'AI স্বাস্থ্য সহকারী' : 'AI Health Assistant'}
         </h3>
-        <p className="text-slate-400 text-sm">
-          {isBn ? 'বাংলায় কথা বলে ডাক্তার খুঁজুন, প্রশ্ন করুন' : 'Speak in Bangla to find doctors, ask questions'}
+        <p className="text-slate-400 text-sm max-w-md mx-auto">
+          {isBn 
+            ? 'বাংলায় কথা বলে স্বাস্থ্য পরামর্শ নিন, ডাক্তার খুঁজুন' 
+            : 'Speak in Bangla to get health advice, find doctors'}
         </p>
         
         {!hasValidApiKey && (
-          <div className="mt-4 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-lg text-sm inline-block">
-            <i className="fas fa-exclamation-triangle mr-2"></i>
+          <div className="mt-4 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-lg text-sm inline-flex items-center gap-2 border border-amber-500/30">
+            <i className="fas fa-exclamation-triangle"></i>
             {isBn ? 'API Key প্রয়োজন' : 'API Key required'}
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      {/* Voice Agent Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <VoiceAgentCard
-          name="Nree"
+          name="স্বাস্থ্য"
           gender="male"
           onConnect={() => handleConnect('male')}
           onDisconnect={cleanup}
@@ -652,7 +660,7 @@ const HomeVoiceSection: React.FC = () => {
           debugInfo={activeAgent === 'male' ? debugInfo : undefined}
         />
         <VoiceAgentCard
-          name="Nree"
+          name="সেবা"
           gender="female"
           onConnect={() => handleConnect('female')}
           onDisconnect={cleanup}
@@ -663,16 +671,19 @@ const HomeVoiceSection: React.FC = () => {
         />
       </div>
 
-      <p className="text-center text-slate-500 text-xs mt-6">
-        <i className="fas fa-shield-alt mr-1"></i>
-        {isBn ? 'নিরাপদ ও গোপনীয় • বিনামূল্যে' : 'Safe & Private • Free'}
-      </p>
+      {/* Footer */}
+      <div className="mt-6 text-center">
+        <p className="text-slate-500 text-xs flex items-center justify-center gap-2">
+          <i className="fas fa-shield-alt"></i>
+          {isBn ? 'নিরাপদ ও গোপনীয় • সম্পূর্ণ বিনামূল্যে' : 'Safe & Private • Completely Free'}
+        </p>
+      </div>
 
+      {/* Debug Panel */}
       {DEBUG && (
         <div className="mt-4 text-center">
           <p className="text-xs text-slate-600">
-            API Key: {hasValidApiKey ? '✅ Set' : '❌ Missing'} | 
-            Open browser console (F12) for debug logs
+            API: {hasValidApiKey ? '✅' : '❌'} | Console: F12
           </p>
         </div>
       )}

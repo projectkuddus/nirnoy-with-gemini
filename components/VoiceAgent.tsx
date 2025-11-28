@@ -6,12 +6,11 @@ import { MOCK_DOCTORS } from '../data/mockData';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
 
-// Debug mode - set to true to see console logs
 const DEBUG = true;
 const log = (...args: any[]) => { if (DEBUG) console.log('[VoiceAgent]', ...args); };
 const logError = (...args: any[]) => console.error('[VoiceAgent ERROR]', ...args);
 
-// ============ AUDIO CONTEXT MANAGER ============
+// ============ AUDIO PLAYER CLASS ============
 class AudioPlayer {
   private audioContext: AudioContext | null = null;
   private gainNode: GainNode | null = null;
@@ -28,22 +27,20 @@ class AudioPlayer {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioContextClass({ sampleRate: 24000 });
       
-      // Create gain node for volume control
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.gain.value = 2.5; // Boost volume
+      this.gainNode.gain.value = 2.5;
       this.gainNode.connect(this.audioContext.destination);
       
-      // Resume if suspended
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
       }
       
       this.isInitialized = true;
       this.nextPlayTime = 0;
-      log('AudioContext initialized:', this.audioContext.state, 'sampleRate:', this.audioContext.sampleRate);
+      log('AudioContext initialized');
       return true;
     } catch (e) {
-      logError('Failed to init AudioContext:', e);
+      logError('AudioContext init failed:', e);
       return false;
     }
   }
@@ -51,36 +48,28 @@ class AudioPlayer {
   async resume(): Promise<void> {
     if (this.audioContext && this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
-      log('AudioContext resumed');
     }
   }
 
   playPCM16(base64Data: string, sampleRate: number = 24000): void {
-    if (!this.audioContext || !this.gainNode) {
-      logError('AudioContext not initialized');
-      return;
-    }
+    if (!this.audioContext || !this.gainNode) return;
 
     try {
-      // Decode base64 to bytes
       const binaryString = atob(base64Data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Convert PCM16 to Float32
       const int16Data = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
       const float32Data = new Float32Array(int16Data.length);
       for (let i = 0; i < int16Data.length; i++) {
         float32Data[i] = int16Data[i] / 32768.0;
       }
 
-      // Create audio buffer
       const audioBuffer = this.audioContext.createBuffer(1, float32Data.length, sampleRate);
       audioBuffer.getChannelData(0).set(float32Data);
 
-      // Create source and play
       const source = this.audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(this.gainNode);
@@ -91,23 +80,16 @@ class AudioPlayer {
       source.start(startTime);
       this.nextPlayTime = startTime + audioBuffer.duration;
       
-      log('Playing audio:', {
-        duration: audioBuffer.duration.toFixed(3) + 's',
-        samples: float32Data.length,
-        startTime: startTime.toFixed(3)
-      });
-
+      log('🔊 Playing:', audioBuffer.duration.toFixed(2) + 's');
     } catch (e) {
-      logError('Failed to play audio:', e);
+      logError('Play failed:', e);
     }
   }
 
   stop(): void {
     this.nextPlayTime = 0;
     if (this.audioContext && this.audioContext.state !== 'closed') {
-      try {
-        this.audioContext.close();
-      } catch (e) {}
+      try { this.audioContext.close(); } catch (e) {}
     }
     this.audioContext = null;
     this.gainNode = null;
@@ -115,7 +97,7 @@ class AudioPlayer {
   }
 }
 
-// ============ MICROPHONE MANAGER ============
+// ============ MICROPHONE MANAGER CLASS ============
 class MicrophoneManager {
   private stream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
@@ -129,21 +111,16 @@ class MicrophoneManager {
     try {
       this.onAudioData = onAudioData;
       
-      // Get microphone access
       this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000
-        }
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       });
-      
-      log('Microphone access granted');
 
-      // Create audio context for processing
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AudioContextClass();
+      
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
       
       const source = this.audioContext.createMediaStreamSource(this.stream);
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
@@ -155,22 +132,16 @@ class MicrophoneManager {
         if (!this.onAudioData || !this.isRunning) return;
 
         const inputData = event.inputBuffer.getChannelData(0);
-        
-        // Downsample to 16kHz
-        const inputSampleRate = this.audioContext!.sampleRate;
-        const outputSampleRate = 16000;
-        const ratio = inputSampleRate / outputSampleRate;
+        const ratio = this.audioContext!.sampleRate / 16000;
         const newLength = Math.round(inputData.length / ratio);
         const downsampled = new Float32Array(newLength);
         
         for (let i = 0; i < newLength; i++) {
-          const index = Math.round(i * ratio);
-          downsampled[i] = inputData[Math.min(index, inputData.length - 1)];
+          downsampled[i] = inputData[Math.min(Math.round(i * ratio), inputData.length - 1)];
         }
         
         audioBuffer.push(downsampled);
 
-        // Send every 100ms
         const now = Date.now();
         if (now - lastSendTime >= 100 && audioBuffer.length > 0) {
           const totalLength = audioBuffer.reduce((acc, buf) => acc + buf.length, 0);
@@ -181,7 +152,6 @@ class MicrophoneManager {
             offset += buf.length;
           }
 
-          // Convert to PCM16 base64
           const int16 = new Int16Array(combined.length);
           for (let i = 0; i < combined.length; i++) {
             const s = Math.max(-1, Math.min(1, combined[i]));
@@ -194,11 +164,7 @@ class MicrophoneManager {
             binary += String.fromCharCode(bytes[i]);
           }
           
-          this.onAudioData({
-            data: btoa(binary),
-            mimeType: 'audio/pcm;rate=16000'
-          });
-
+          this.onAudioData({ data: btoa(binary), mimeType: 'audio/pcm;rate=16000' });
           audioBuffer = [];
           lastSendTime = now;
         }
@@ -208,17 +174,16 @@ class MicrophoneManager {
       this.processor.connect(this.audioContext.destination);
       
       this.isRunning = true;
-      log('Microphone processing started');
+      log('Microphone started');
       return true;
-    } catch (e) {
-      logError('Failed to start microphone:', e);
+    } catch (e: any) {
+      logError('Mic error:', e.name, e.message);
       return false;
     }
   }
 
   stop(): void {
     this.isRunning = false;
-    
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
@@ -232,12 +197,11 @@ class MicrophoneManager {
       this.audioContext = null;
     }
     this.onAudioData = null;
-    log('Microphone stopped');
   }
 }
 
 // ============ SYSTEM PROMPT ============
-function buildSystemPrompt(voiceGender: 'male' | 'female', context?: string): string {
+function buildSystemPrompt(agentName: string, gender: 'male' | 'female', context?: string): string {
   const hour = new Date().getHours();
   let greeting = 'শুভ সন্ধ্যা';
   if (hour >= 5 && hour < 12) greeting = 'সুপ্রভাত';
@@ -248,21 +212,29 @@ function buildSystemPrompt(voiceGender: 'male' | 'female', context?: string): st
     `- ${d.name}: ${d.specialties[0]}, ফি ৳${d.chambers[0]?.fee || 500}`
   ).join('\n');
 
-  return `আপনি "Nree" - নির্ণয় হেলথ এর ${voiceGender === 'male' ? 'পুরুষ' : 'মহিলা'} AI সহকারী।
+  const personality = gender === 'male' 
+    ? 'বিশ্বস্ত এবং জ্ঞানী বড় ভাইয়ের মতো'
+    : 'যত্নশীল এবং উষ্ণ বড় বোনের মতো';
 
-প্রথমেই বলুন: "আসসালামু আলাইকুম! ${greeting}! আমি Nree। কীভাবে সাহায্য করতে পারি?"
+  return `আপনি "${agentName}" - নির্ণয় হেলথ এর AI স্বাস্থ্য সহকারী।
 
-${context ? `প্রসঙ্গ: ${context}\n` : ''}
+🎭 ব্যক্তিত্ব: ${personality}
 
-নিয়ম:
+📢 প্রথম কথা:
+"আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। কীভাবে সাহায্য করতে পারি?"
+
+${context ? `📋 প্রসঙ্গ: ${context}\n` : ''}
+
+📋 নিয়ম:
 - শুধু বাংলায় কথা বলুন
-- ছোট উত্তর দিন (১-২ বাক্য)
-- বিনয়ী হোন
+- ছোট বাক্য (১-২ বাক্য)
+- "জ্বী", "আচ্ছা", "বুঝেছি" ব্যবহার করুন
+- উষ্ণ এবং বন্ধুত্বপূর্ণ
 
-ডাক্তার তালিকা:
+👨‍⚕️ ডাক্তার:
 ${doctorList}
 
-জরুরি: বুকে ব্যথা/শ্বাসকষ্ট = "999 এ কল করুন!"`;
+🚨 জরুরি = "999 এ কল করুন!"`;
 }
 
 // ============ TYPES ============
@@ -287,43 +259,23 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [transcript, setTranscript] = useState<string[]>([]);
 
-  // Refs
   const aiClientRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
   const micManagerRef = useRef<MicrophoneManager | null>(null);
   const isConnectedRef = useRef(false);
 
-  // Initialize AI client
   useEffect(() => {
     if (hasValidApiKey) {
       aiClientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-      log('GoogleGenAI client initialized');
-    } else {
-      log('No valid API key found');
     }
   }, []);
 
-  // Cleanup
   const cleanup = useCallback(() => {
-    log('Cleaning up...');
     isConnectedRef.current = false;
-    
-    if (sessionRef.current) {
-      try { sessionRef.current.close(); } catch (e) {}
-      sessionRef.current = null;
-    }
-    
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.stop();
-      audioPlayerRef.current = null;
-    }
-    
-    if (micManagerRef.current) {
-      micManagerRef.current.stop();
-      micManagerRef.current = null;
-    }
-    
+    if (sessionRef.current) { try { sessionRef.current.close(); } catch (e) {} sessionRef.current = null; }
+    if (audioPlayerRef.current) { audioPlayerRef.current.stop(); audioPlayerRef.current = null; }
+    if (micManagerRef.current) { micManagerRef.current.stop(); micManagerRef.current = null; }
     setStatus('idle');
     setError(null);
     setDebugInfo('');
@@ -331,36 +283,25 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
 
   useEffect(() => { return () => cleanup(); }, [cleanup]);
 
-  // Connect handler
   const handleConnect = async () => {
     if (!hasValidApiKey || !aiClientRef.current) {
-      setError('API Key কনফিগার করা হয়নি');
+      setError('API Key নেই');
       return;
     }
 
     try {
       cleanup();
       setStatus('connecting');
-      setError(null);
-      setDebugInfo('Initializing...');
       setTranscript([]);
 
-      // Step 1: Initialize audio player (MUST be after user click)
-      log('Step 1: Initializing audio player...');
-      audioPlayerRef.current = new AudioPlayer();
-      const audioReady = await audioPlayerRef.current.init();
-      if (!audioReady) throw new Error('Failed to initialize audio');
-      setDebugInfo('Audio ready');
+      const agentName = voiceGender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
 
-      // Step 2: Initialize microphone
-      log('Step 2: Initializing microphone...');
+      audioPlayerRef.current = new AudioPlayer();
+      await audioPlayerRef.current.init();
+
       micManagerRef.current = new MicrophoneManager();
       
-      // Step 3: Connect to Gemini Live API
-      log('Step 3: Connecting to Gemini Live API...');
-      setDebugInfo('Connecting to Gemini...');
-      
-      const systemPrompt = buildSystemPrompt(voiceGender, context);
+      const systemPrompt = buildSystemPrompt(agentName, voiceGender, context);
       const voiceName = voiceGender === 'male' ? 'Aoede' : 'Kore';
 
       const session = await aiClientRef.current.live.connect({
@@ -368,136 +309,95 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: systemPrompt,
-          speechConfig: {
-            voiceConfig: { 
-              prebuiltVoiceConfig: { voiceName } 
-            },
-          },
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
         },
         callbacks: {
           onopen: async () => {
-            log('✅ WebSocket connected!');
             isConnectedRef.current = true;
             setStatus('connected');
-            setDebugInfo('Connected! Starting mic...');
 
-            // Start microphone capture
             const micStarted = await micManagerRef.current!.start((audioData) => {
               if (sessionRef.current && isConnectedRef.current) {
-                try {
-                  sessionRef.current.sendRealtimeInput({ media: audioData });
-                } catch (e) {
-                  logError('Failed to send audio:', e);
-                }
+                try { sessionRef.current.sendRealtimeInput({ media: audioData }); } catch (e) {}
               }
             });
 
             if (!micStarted) {
-              setError('মাইক্রোফোন শুরু করা যায়নি');
+              setError('মাইক পারমিশন দিন');
+              setStatus('error');
               return;
             }
 
-            setDebugInfo('Mic ready, waiting for greeting...');
             setStatus('listening');
 
-            // Trigger greeting
             setTimeout(() => {
               if (sessionRef.current && isConnectedRef.current) {
-                log('Sending greeting trigger...');
                 sessionRef.current.sendClientContent({
                   turns: [{ role: 'user', parts: [{ text: 'হ্যালো' }] }],
                   turnComplete: true
                 });
               }
-            }, 1000);
+            }, 800);
           },
 
           onmessage: (message: any) => {
-            log('Received message:', JSON.stringify(message).substring(0, 200));
-
-            // Check for audio data
             const parts = message.serverContent?.modelTurn?.parts || [];
             for (const part of parts) {
               if (part.inlineData?.mimeType?.startsWith('audio/') && part.inlineData?.data) {
-                log('🔊 Received audio data, length:', part.inlineData.data.length);
                 setStatus('speaking');
-                setDebugInfo('Playing audio...');
-                
-                // Resume audio context if needed
                 audioPlayerRef.current?.resume();
-                
-                // Play the audio
                 audioPlayerRef.current?.playPCM16(part.inlineData.data, 24000);
               }
-              
-              // Check for text parts
               if (part.text) {
                 setTranscript(prev => [...prev, `AI: ${part.text}`]);
               }
             }
 
-            // Check for input transcription
             if (message.serverContent?.inputTranscription) {
               setTranscript(prev => [...prev, `You: ${message.serverContent.inputTranscription}`]);
             }
 
-            // Check for turn complete
             if (message.serverContent?.turnComplete) {
-              log('Turn complete');
               setStatus('listening');
-              setDebugInfo('Listening...');
             }
 
-            // Check for interruption
             if (message.serverContent?.interrupted) {
-              log('Interrupted');
               audioPlayerRef.current?.stop();
               audioPlayerRef.current?.init();
             }
           },
 
           onclose: (e: CloseEvent) => {
-            log('WebSocket closed:', e.code, e.reason);
             isConnectedRef.current = false;
             if (e.code !== 1000) {
-              setError('সংযোগ বিচ্ছিন্ন হয়েছে');
+              setError(e.reason?.includes('quota') ? 'API কোটা শেষ' : 'সংযোগ বিচ্ছিন্ন');
+              setStatus('error');
             }
-            cleanup();
+            micManagerRef.current?.stop();
+            audioPlayerRef.current?.stop();
           },
 
-          onerror: (e: ErrorEvent) => {
-            logError('WebSocket error:', e);
-            setError('সংযোগে সমস্যা হয়েছে');
+          onerror: () => {
+            setError('সংযোগ ত্রুটি');
             setStatus('error');
           },
         },
       });
 
       sessionRef.current = session;
-      log('Session created');
-
     } catch (err: any) {
-      logError('Connection failed:', err);
-      let errorMsg = 'সংযোগ করা যাচ্ছে না';
-      if (err.name === 'NotAllowedError') errorMsg = 'মাইক্রোফোন পারমিশন দিন';
-      else if (err.message?.includes('API')) errorMsg = 'API ত্রুটি';
-      setError(errorMsg);
+      setError(err.name === 'NotAllowedError' ? 'মাইক পারমিশন দিন' : 'সংযোগ ব্যর্থ');
       setStatus('error');
-      setDebugInfo(err.message || 'Unknown error');
     }
   };
 
-  // Handle disconnect
   const handleDisconnect = () => {
     cleanup();
     onClose?.();
   };
 
-  // Auto-connect on mount if not compact
   useEffect(() => {
-    if (!compact && hasValidApiKey) {
-      handleConnect();
-    }
+    if (!compact && hasValidApiKey) handleConnect();
   }, [compact]);
 
   const getStatusText = () => {
@@ -511,36 +411,31 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
     }
   };
 
+  const agentName = voiceGender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
+
   if (compact) {
     return (
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <i className="fas fa-microphone text-xl"></i>
+              <span className="text-xl font-bold">{agentName.charAt(0)}</span>
             </div>
             <div>
-              <h4 className="font-bold">Nree AI</h4>
+              <h4 className="font-bold">{agentName}</h4>
               <p className="text-sm text-white/70">{getStatusText()}</p>
             </div>
           </div>
           
           {status === 'idle' ? (
-            <button
-              onClick={handleConnect}
-              disabled={!hasValidApiKey}
-              className="px-4 py-2 bg-white text-blue-600 font-bold rounded-lg hover:bg-white/90 transition"
-            >
-              <i className="fas fa-phone mr-2"></i>
-              কথা বলুন
+            <button onClick={handleConnect} disabled={!hasValidApiKey}
+              className="px-4 py-2 bg-white text-blue-600 font-bold rounded-lg hover:bg-white/90 transition">
+              <i className="fas fa-phone mr-2"></i>কথা বলুন
             </button>
           ) : (
-            <button
-              onClick={handleDisconnect}
-              className="px-4 py-2 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition"
-            >
-              <i className="fas fa-phone-slash mr-2"></i>
-              শেষ
+            <button onClick={handleDisconnect}
+              className="px-4 py-2 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition">
+              <i className="fas fa-phone-slash mr-2"></i>শেষ
             </button>
           )}
         </div>
@@ -548,23 +443,10 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
         {(status === 'speaking' || status === 'listening') && (
           <div className="flex items-center justify-center gap-1 h-8">
             {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className={`w-1 rounded-full bg-white transition-all duration-150`}
-                style={{ 
-                  height: `${10 + Math.random() * 20}px`,
-                  animation: `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate`
-                }}
-              ></div>
+              <div key={i} className="w-1 rounded-full bg-white transition-all"
+                style={{ height: `${10 + Math.random() * 20}px`, animation: `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate` }}></div>
             ))}
           </div>
-        )}
-
-        {!hasValidApiKey && (
-          <p className="text-xs text-white/60 mt-2">
-            <i className="fas fa-exclamation-triangle mr-1"></i>
-            API Key প্রয়োজন
-          </p>
         )}
       </div>
     );
@@ -575,21 +457,19 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
+        <div className={`p-6 text-white ${voiceGender === 'male' ? 'bg-gradient-to-r from-blue-600 to-indigo-600' : 'bg-gradient-to-r from-pink-600 to-rose-600'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
-                <i className={`fas ${voiceGender === 'male' ? 'fa-mars' : 'fa-venus'} text-2xl`}></i>
+                <span className="text-2xl font-bold">{agentName.charAt(0)}</span>
               </div>
               <div>
-                <h3 className="text-xl font-bold">Nree AI</h3>
+                <h3 className="text-xl font-bold">{agentName}</h3>
                 <p className="text-sm text-white/80">{getStatusText()}</p>
               </div>
             </div>
-            <button
-              onClick={handleDisconnect}
-              className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition"
-            >
+            <button onClick={handleDisconnect}
+              className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition">
               <i className="fas fa-times"></i>
             </button>
           </div>
@@ -600,24 +480,15 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
           <div className="flex items-center justify-center gap-2 h-24">
             {status === 'connecting' ? (
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>
+                ))}
               </div>
             ) : (status === 'speaking' || status === 'listening') ? (
               [...Array(7)].map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-2 rounded-full transition-all duration-150 ${
-                    status === 'speaking' 
-                      ? 'bg-gradient-to-t from-purple-500 to-pink-500' 
-                      : 'bg-gradient-to-t from-blue-500 to-cyan-500'
-                  }`}
-                  style={{ 
-                    height: `${20 + Math.random() * 50}px`,
-                    animation: `pulse ${0.3 + i * 0.1}s ease-in-out infinite alternate`
-                  }}
-                ></div>
+                <div key={i}
+                  className={`w-2 rounded-full transition-all ${status === 'speaking' ? 'bg-gradient-to-t from-purple-500 to-pink-500' : 'bg-gradient-to-t from-blue-500 to-cyan-500'}`}
+                  style={{ height: `${20 + Math.random() * 50}px`, animation: `pulse ${0.3 + i * 0.1}s ease-in-out infinite alternate` }}></div>
               ))
             ) : (
               <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center">
@@ -631,9 +502,7 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
         {transcript.length > 0 && (
           <div className="max-h-40 overflow-y-auto p-4 bg-slate-100 border-t">
             {transcript.slice(-5).map((line, i) => (
-              <p key={i} className={`text-sm mb-1 ${line.startsWith('You:') ? 'text-blue-600' : 'text-slate-700'}`}>
-                {line}
-              </p>
+              <p key={i} className={`text-sm mb-1 ${line.startsWith('You:') ? 'text-blue-600' : 'text-slate-700'}`}>{line}</p>
             ))}
           </div>
         )}
@@ -641,42 +510,23 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({
         {/* Error */}
         {error && (
           <div className="p-4 bg-red-50 border-t border-red-100">
-            <p className="text-red-600 text-sm">
-              <i className="fas fa-exclamation-circle mr-2"></i>
-              {error}
-            </p>
-          </div>
-        )}
-
-        {/* Debug Info */}
-        {DEBUG && debugInfo && (
-          <div className="p-2 bg-slate-100 border-t">
-            <p className="text-xs text-slate-500">{debugInfo}</p>
+            <p className="text-red-600 text-sm"><i className="fas fa-exclamation-circle mr-2"></i>{error}</p>
           </div>
         )}
 
         {/* Actions */}
         <div className="p-4 border-t">
           {status === 'idle' ? (
-            <button
-              onClick={handleConnect}
-              disabled={!hasValidApiKey}
+            <button onClick={handleConnect} disabled={!hasValidApiKey}
               className={`w-full py-4 font-bold rounded-xl transition flex items-center justify-center gap-2 ${
-                hasValidApiKey 
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white' 
-                  : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-              }`}
-            >
-              <i className="fas fa-phone"></i>
-              কথা বলুন
+                hasValidApiKey ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white' : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+              }`}>
+              <i className="fas fa-phone"></i>কথা বলুন
             </button>
           ) : (
-            <button
-              onClick={handleDisconnect}
-              className="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition flex items-center justify-center gap-2"
-            >
-              <i className="fas fa-phone-slash"></i>
-              শেষ করুন
+            <button onClick={handleDisconnect}
+              className="w-full py-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition flex items-center justify-center gap-2">
+              <i className="fas fa-phone-slash"></i>শেষ করুন
             </button>
           )}
         </div>
