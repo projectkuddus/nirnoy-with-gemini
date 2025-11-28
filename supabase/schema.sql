@@ -349,3 +349,5 @@ COMMENT ON TABLE public.doctors IS 'Doctor professional profiles';
 COMMENT ON TABLE public.appointments IS 'Patient appointments with doctors';
 COMMENT ON TABLE public.feedback IS 'User feedback and bug reports';
 
+
+
