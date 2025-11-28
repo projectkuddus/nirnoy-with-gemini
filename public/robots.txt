@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /patient-dashboard
+Disallow: /doctor-dashboard
+Sitemap: https://www.nirnoy.ai/sitemap.xml
