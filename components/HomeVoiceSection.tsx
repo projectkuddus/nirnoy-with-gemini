@@ -7,268 +7,220 @@ import { MOCK_DOCTORS } from '../data/mockData';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
 
-// Debug mode
 const DEBUG = true;
 const log = (...args: any[]) => { if (DEBUG) console.log('[VoiceAgent]', ...args); };
 const logError = (...args: any[]) => console.error('[VoiceAgent ERROR]', ...args);
 
-// ============ AUDIO PLAYER CLASS ============
-class AudioPlayer {
-  private audioContext: AudioContext | null = null;
-  private gainNode: GainNode | null = null;
-  private nextPlayTime = 0;
-  private isInitialized = false;
+// ============ BROWSER SPEECH SYNTHESIS (FALLBACK) ============
+class BrowserSpeaker {
+  private synth: SpeechSynthesis;
+  private voices: SpeechSynthesisVoice[] = [];
+  private isSpeaking = false;
+  private onSpeakStart?: () => void;
+  private onSpeakEnd?: () => void;
 
-  async init(): Promise<boolean> {
-    if (this.isInitialized && this.audioContext?.state !== 'closed') {
-      await this.resume();
-      return true;
-    }
-
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      this.audioContext = new AudioContextClass({ sampleRate: 24000 });
-      
-      this.gainNode = this.audioContext.createGain();
-      this.gainNode.gain.value = 2.5;
-      this.gainNode.connect(this.audioContext.destination);
-      
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-      
-      this.isInitialized = true;
-      this.nextPlayTime = 0;
-      log('AudioContext initialized:', this.audioContext.state);
-      return true;
-    } catch (e) {
-      logError('Failed to init AudioContext:', e);
-      return false;
+  constructor() {
+    this.synth = window.speechSynthesis;
+    this.loadVoices();
+    
+    // Voices may load asynchronously
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = () => this.loadVoices();
     }
   }
 
-  async resume(): Promise<void> {
-    if (this.audioContext && this.audioContext.state === 'suspended') {
-      await this.audioContext.resume();
-    }
+  private loadVoices() {
+    this.voices = this.synth.getVoices();
+    log('Loaded', this.voices.length, 'voices');
   }
 
-  playPCM16(base64Data: string, sampleRate: number = 24000): void {
-    if (!this.audioContext || !this.gainNode) {
-      logError('AudioContext not initialized');
-      return;
+  private getBengaliVoice(): SpeechSynthesisVoice | null {
+    // Try to find Bengali voice
+    const bengaliVoice = this.voices.find(v => 
+      v.lang.includes('bn') || v.lang.includes('hi') || v.name.toLowerCase().includes('bengali')
+    );
+    if (bengaliVoice) return bengaliVoice;
+    
+    // Fallback to any available voice
+    return this.voices.find(v => v.lang.includes('en')) || this.voices[0] || null;
+  }
+
+  speak(text: string, onStart?: () => void, onEnd?: () => void): void {
+    if (!text || this.isSpeaking) return;
+    
+    // Cancel any ongoing speech
+    this.synth.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = this.getBengaliVoice();
+    
+    if (voice) {
+      utterance.voice = voice;
     }
-
-    try {
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      const int16Data = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
-      const float32Data = new Float32Array(int16Data.length);
-      for (let i = 0; i < int16Data.length; i++) {
-        float32Data[i] = int16Data[i] / 32768.0;
-      }
-
-      const audioBuffer = this.audioContext.createBuffer(1, float32Data.length, sampleRate);
-      audioBuffer.getChannelData(0).set(float32Data);
-
-      const source = this.audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(this.gainNode);
-
-      const currentTime = this.audioContext.currentTime;
-      const startTime = Math.max(currentTime + 0.05, this.nextPlayTime);
-      
-      source.start(startTime);
-      this.nextPlayTime = startTime + audioBuffer.duration;
-      
-      log('🔊 Playing audio:', audioBuffer.duration.toFixed(2) + 's');
-    } catch (e) {
-      logError('Failed to play audio:', e);
-    }
+    
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    utterance.onstart = () => {
+      this.isSpeaking = true;
+      onStart?.();
+      log('Speaking:', text.substring(0, 50) + '...');
+    };
+    
+    utterance.onend = () => {
+      this.isSpeaking = false;
+      onEnd?.();
+      log('Finished speaking');
+    };
+    
+    utterance.onerror = (e) => {
+      this.isSpeaking = false;
+      logError('Speech error:', e);
+      onEnd?.();
+    };
+    
+    this.synth.speak(utterance);
   }
 
   stop(): void {
-    this.nextPlayTime = 0;
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      try { this.audioContext.close(); } catch (e) {}
-    }
-    this.audioContext = null;
-    this.gainNode = null;
-    this.isInitialized = false;
+    this.synth.cancel();
+    this.isSpeaking = false;
+  }
+
+  isCurrentlySpeaking(): boolean {
+    return this.isSpeaking;
   }
 }
 
-// ============ MICROPHONE MANAGER CLASS ============
-class MicrophoneManager {
-  private stream: MediaStream | null = null;
-  private audioContext: AudioContext | null = null;
-  private processor: ScriptProcessorNode | null = null;
-  private onAudioData: ((data: { data: string; mimeType: string }) => void) | null = null;
-  private isRunning = false;
+// ============ SPEECH RECOGNITION ============
+class SpeechRecognizer {
+  private recognition: any = null;
+  private isListening = false;
+  private onResult?: (text: string) => void;
+  private onListeningChange?: (isListening: boolean) => void;
 
-  async start(onAudioData: (data: { data: string; mimeType: string }) => void): Promise<boolean> {
-    if (this.isRunning) return true;
-
-    try {
-      this.onAudioData = onAudioData;
+  constructor() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = true;
+      this.recognition.interimResults = false;
+      this.recognition.lang = 'bn-BD'; // Bengali
       
-      log('Requesting microphone...');
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        }
-      });
+      this.recognition.onresult = (event: any) => {
+        const last = event.results.length - 1;
+        const text = event.results[last][0].transcript;
+        log('Recognized:', text);
+        this.onResult?.(text);
+      };
       
-      log('Microphone granted');
-
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      this.audioContext = new AudioContextClass();
-      
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-      
-      const source = this.audioContext.createMediaStreamSource(this.stream);
-      this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-      
-      let audioBuffer: Float32Array[] = [];
-      let lastSendTime = Date.now();
-
-      this.processor.onaudioprocess = (event) => {
-        if (!this.onAudioData || !this.isRunning) return;
-
-        const inputData = event.inputBuffer.getChannelData(0);
-        
-        const inputSampleRate = this.audioContext!.sampleRate;
-        const outputSampleRate = 16000;
-        const ratio = inputSampleRate / outputSampleRate;
-        const newLength = Math.round(inputData.length / ratio);
-        const downsampled = new Float32Array(newLength);
-        
-        for (let i = 0; i < newLength; i++) {
-          const index = Math.round(i * ratio);
-          downsampled[i] = inputData[Math.min(index, inputData.length - 1)];
-        }
-        
-        audioBuffer.push(downsampled);
-
-        const now = Date.now();
-        if (now - lastSendTime >= 100 && audioBuffer.length > 0) {
-          const totalLength = audioBuffer.reduce((acc, buf) => acc + buf.length, 0);
-          const combined = new Float32Array(totalLength);
-          let offset = 0;
-          for (const buf of audioBuffer) {
-            combined.set(buf, offset);
-            offset += buf.length;
-          }
-
-          const int16 = new Int16Array(combined.length);
-          for (let i = 0; i < combined.length; i++) {
-            const s = Math.max(-1, Math.min(1, combined[i]));
-            int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-          }
-          
-          const bytes = new Uint8Array(int16.buffer);
-          let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-          
-          this.onAudioData({
-            data: btoa(binary),
-            mimeType: 'audio/pcm;rate=16000'
-          });
-
-          audioBuffer = [];
-          lastSendTime = now;
+      this.recognition.onerror = (event: any) => {
+        logError('Recognition error:', event.error);
+        if (event.error !== 'no-speech') {
+          this.isListening = false;
+          this.onListeningChange?.(false);
         }
       };
-
-      source.connect(this.processor);
-      this.processor.connect(this.audioContext.destination);
       
-      this.isRunning = true;
-      log('Microphone started');
+      this.recognition.onend = () => {
+        // Auto-restart if still supposed to be listening
+        if (this.isListening) {
+          try {
+            this.recognition.start();
+          } catch (e) {}
+        }
+      };
+    }
+  }
+
+  isSupported(): boolean {
+    return this.recognition !== null;
+  }
+
+  start(onResult: (text: string) => void, onListeningChange?: (isListening: boolean) => void): boolean {
+    if (!this.recognition) return false;
+    
+    this.onResult = onResult;
+    this.onListeningChange = onListeningChange;
+    
+    try {
+      this.recognition.start();
+      this.isListening = true;
+      this.onListeningChange?.(true);
+      log('Speech recognition started');
       return true;
-    } catch (e: any) {
-      logError('Microphone error:', e.name, e.message);
+    } catch (e) {
+      logError('Failed to start recognition:', e);
       return false;
     }
   }
 
   stop(): void {
-    this.isRunning = false;
-    if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
-      this.stream = null;
+    if (this.recognition) {
+      this.isListening = false;
+      this.recognition.stop();
+      this.onListeningChange?.(false);
+      log('Speech recognition stopped');
     }
-    if (this.processor) {
-      this.processor.disconnect();
-      this.processor = null;
-    }
-    if (this.audioContext) {
-      try { this.audioContext.close(); } catch (e) {}
-      this.audioContext = null;
-    }
-    this.onAudioData = null;
-    log('Microphone stopped');
   }
 }
 
-// ============ SYSTEM PROMPT FOR VOICE AGENTS ============
-function buildSystemPrompt(agentName: string, gender: 'male' | 'female'): string {
-  const hour = new Date().getHours();
-  let greeting = 'শুভ সন্ধ্যা';
-  if (hour >= 5 && hour < 12) greeting = 'সুপ্রভাত';
-  else if (hour >= 12 && hour < 17) greeting = 'শুভ দুপুর';
-  else if (hour >= 20) greeting = 'শুভ রাত্রি';
+// ============ GEMINI TEXT CHAT (WORKS WITH FREE API) ============
+async function chatWithGemini(
+  client: GoogleGenAI,
+  message: string,
+  agentName: string,
+  conversationHistory: { role: string; content: string }[]
+): Promise<string> {
+  try {
+    const hour = new Date().getHours();
+    let greeting = 'শুভ সন্ধ্যা';
+    if (hour >= 5 && hour < 12) greeting = 'সুপ্রভাত';
+    else if (hour >= 12 && hour < 17) greeting = 'শুভ দুপুর';
+    else if (hour >= 20) greeting = 'শুভ রাত্রি';
 
-  const doctorList = MOCK_DOCTORS.slice(0, 5).map(d => 
-    `- ${d.name}: ${d.specialties[0]}, ফি ৳${d.chambers[0]?.fee || 500}`
-  ).join('\n');
+    const doctorList = MOCK_DOCTORS.slice(0, 5).map(d => 
+      `- ${d.name}: ${d.specialties[0]}, ফি ৳${d.chambers[0]?.fee || 500}`
+    ).join('\n');
 
-  const personality = gender === 'male' 
-    ? 'বিশ্বস্ত, জ্ঞানী এবং সহানুভূতিশীল বড় ভাইয়ের মতো'
-    : 'যত্নশীল, উষ্ণ এবং সহানুভূতিশীল বড় বোনের মতো';
+    const systemPrompt = `আপনি "${agentName}" - নির্ণয় হেলথ এর AI স্বাস্থ্য সহকারী।
 
-  return `আপনি "${agentName}" - নির্ণয় হেলথ এর ${gender === 'male' ? 'পুরুষ' : 'মহিলা'} AI স্বাস্থ্য সহকারী।
+📢 যদি এটি প্রথম বার্তা হয়, বলুন: "আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। কীভাবে সাহায্য করতে পারি?"
 
-🎭 ব্যক্তিত্ব: ${personality}
+📋 নিয়ম:
+- শুধু বাংলায় উত্তর দিন
+- ছোট উত্তর দিন (১-২ বাক্য)
+- বিনয়ী হোন
+- "জ্বী", "আচ্ছা", "বুঝেছি" ব্যবহার করুন
 
-📢 প্রথম কথা (এটি অবশ্যই বলুন):
-"আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। নির্ণয় হেলথ থেকে বলছি। আপনার স্বাস্থ্য বিষয়ে কীভাবে সাহায্য করতে পারি?"
-
-📋 নিয়মাবলী:
-1. শুধুমাত্র বাংলায় কথা বলুন - মিষ্টি এবং স্পষ্ট উচ্চারণে
-2. ছোট এবং সহজ বাক্য ব্যবহার করুন (১-২ বাক্য)
-3. রোগীর কথা মনোযোগ দিয়ে শুনুন
-4. প্রয়োজনে সঠিক ডাক্তার সাজেস্ট করুন
-5. সবসময় বিনয়ী এবং সম্মানজনক থাকুন
-6. "জ্বী", "আচ্ছা", "বুঝেছি" এই শব্দগুলো ব্যবহার করুন
-
-👨‍⚕️ ডাক্তার তালিকা:
+👨‍⚕️ ডাক্তার:
 ${doctorList}
 
-🚨 জরুরি অবস্থা:
-- বুকে ব্যথা, শ্বাসকষ্ট, অজ্ঞান = "এখনই 999 এ কল করুন!"
-- রক্তক্ষরণ, দুর্ঘটনা = "জরুরি বিভাগে যান!"
+🚨 জরুরি = "999 এ কল করুন!"`;
 
-💬 কথা বলার ধরন:
-- উষ্ণ এবং বন্ধুত্বপূর্ণ
-- ধীরে এবং স্পষ্ট করে
-- সহানুভূতিশীল`;
+    // Build conversation
+    const messages = [
+      { role: 'user', parts: [{ text: systemPrompt + '\n\nUser: ' + message }] }
+    ];
+
+    const response = await client.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: messages,
+    });
+
+    return response.text || 'দুঃখিত, উত্তর দিতে পারছি না।';
+  } catch (e: any) {
+    logError('Gemini chat error:', e);
+    throw e;
+  }
 }
 
 // ============ TYPES ============
-type AgentStatus = 'idle' | 'connecting' | 'connected' | 'speaking' | 'listening' | 'error';
+type AgentStatus = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 
-// ============ VOICE AGENT CARD COMPONENT ============
+// ============ VOICE AGENT CARD ============
 interface VoiceAgentCardProps {
   name: string;
   gender: 'male' | 'female';
@@ -277,21 +229,21 @@ interface VoiceAgentCardProps {
   onConnect: () => void;
   onDisconnect: () => void;
   error?: string | null;
-  debugInfo?: string;
+  transcript?: string;
 }
 
 const VoiceAgentCard: React.FC<VoiceAgentCardProps> = ({ 
-  name, gender, status, isActive, onConnect, onDisconnect, error, debugInfo 
+  name, gender, status, isActive, onConnect, onDisconnect, error, transcript 
 }) => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
   const getStatusText = () => {
     switch (status) {
-      case 'connecting': return isBn ? 'কানেক্ট হচ্ছে...' : 'Connecting...';
-      case 'connected': return isBn ? 'সংযুক্ত' : 'Connected';
+      case 'connecting': return isBn ? 'শুরু হচ্ছে...' : 'Starting...';
+      case 'listening': return isBn ? 'শুনছি... বলুন' : 'Listening... Speak';
+      case 'thinking': return isBn ? 'চিন্তা করছি...' : 'Thinking...';
       case 'speaking': return isBn ? 'বলছে...' : 'Speaking...';
-      case 'listening': return isBn ? 'শুনছে...' : 'Listening...';
       case 'error': return error || (isBn ? 'ত্রুটি' : 'Error');
       default: return isBn ? 'প্রস্তুত' : 'Ready';
     }
@@ -304,7 +256,7 @@ const VoiceAgentCard: React.FC<VoiceAgentCardProps> = ({
   return (
     <div className={`bg-white rounded-2xl p-6 border-2 transition-all duration-300 ${
       isActive 
-        ? `border-${gender === 'male' ? 'blue' : 'pink'}-500 shadow-xl shadow-${gender === 'male' ? 'blue' : 'pink'}-500/20` 
+        ? 'border-blue-500 shadow-xl shadow-blue-500/20' 
         : 'border-slate-200 hover:border-slate-300 hover:shadow-lg'
     }`}>
       {/* Avatar & Name */}
@@ -329,8 +281,9 @@ const VoiceAgentCard: React.FC<VoiceAgentCardProps> = ({
             <div className={`w-2.5 h-2.5 rounded-full ${
               status === 'speaking' ? 'bg-purple-500 animate-pulse' :
               status === 'listening' ? 'bg-green-500 animate-pulse' : 
-              status === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-              status === 'error' ? 'bg-red-500' : 'bg-blue-500'
+              status === 'thinking' ? 'bg-yellow-500 animate-pulse' :
+              status === 'connecting' ? 'bg-blue-500 animate-pulse' :
+              status === 'error' ? 'bg-red-500' : 'bg-slate-400'
             }`}></div>
             <span className={`font-medium ${status === 'error' ? 'text-red-500' : 'text-slate-600'}`}>
               {getStatusText()}
@@ -346,7 +299,7 @@ const VoiceAgentCard: React.FC<VoiceAgentCardProps> = ({
                   className={`w-1.5 rounded-full transition-all duration-100 ${
                     status === 'speaking' 
                       ? 'bg-gradient-to-t from-purple-500 to-pink-400' 
-                      : 'bg-gradient-to-t from-blue-500 to-cyan-400'
+                      : 'bg-gradient-to-t from-green-500 to-emerald-400'
                   }`}
                   style={{ 
                     height: `${12 + Math.random() * 30}px`,
@@ -357,19 +310,19 @@ const VoiceAgentCard: React.FC<VoiceAgentCardProps> = ({
             </div>
           )}
 
-          {/* Connecting Animation */}
-          {status === 'connecting' && (
+          {/* Thinking Animation */}
+          {status === 'thinking' && (
             <div className="flex items-center justify-center gap-2 h-14 bg-slate-50 rounded-xl">
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+              <div className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
             </div>
           )}
 
-          {/* Debug Info */}
-          {DEBUG && debugInfo && (
-            <div className="mt-2 text-xs text-slate-400 bg-slate-100 p-2 rounded font-mono">
-              {debugInfo}
+          {/* Transcript */}
+          {transcript && (
+            <div className="mt-3 p-3 bg-slate-100 rounded-xl text-sm text-slate-700 max-h-20 overflow-y-auto">
+              {transcript}
             </div>
           )}
         </div>
@@ -394,7 +347,7 @@ const VoiceAgentCard: React.FC<VoiceAgentCardProps> = ({
               : 'bg-slate-300 text-slate-500 cursor-not-allowed'
           }`}
         >
-          <i className="fas fa-phone"></i>
+          <i className="fas fa-microphone"></i>
           {isBn ? 'কথা বলুন' : 'Talk Now'}
         </button>
       )}
@@ -410,50 +363,101 @@ const HomeVoiceSection: React.FC = () => {
   const [activeAgent, setActiveAgent] = useState<'male' | 'female' | null>(null);
   const [status, setStatus] = useState<AgentStatus>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string>('');
+  const [transcript, setTranscript] = useState<string>('');
+  const [conversationHistory, setConversationHistory] = useState<{ role: string; content: string }[]>([]);
 
   // Refs
   const aiClientRef = useRef<GoogleGenAI | null>(null);
-  const sessionRef = useRef<any>(null);
-  const audioPlayerRef = useRef<AudioPlayer | null>(null);
-  const micManagerRef = useRef<MicrophoneManager | null>(null);
-  const isConnectedRef = useRef(false);
+  const speakerRef = useRef<BrowserSpeaker | null>(null);
+  const recognizerRef = useRef<SpeechRecognizer | null>(null);
+  const isActiveRef = useRef(false);
 
-  // Initialize AI client
+  // Initialize
   useEffect(() => {
     if (hasValidApiKey) {
       aiClientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
       log('GoogleGenAI initialized');
     }
+    speakerRef.current = new BrowserSpeaker();
+    recognizerRef.current = new SpeechRecognizer();
+    
+    return () => {
+      speakerRef.current?.stop();
+      recognizerRef.current?.stop();
+    };
   }, []);
 
-  // Cleanup function
+  // Cleanup
   const cleanup = useCallback(() => {
     log('Cleaning up...');
-    isConnectedRef.current = false;
-    
-    if (sessionRef.current) {
-      try { sessionRef.current.close(); } catch (e) {}
-      sessionRef.current = null;
-    }
-    
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.stop();
-      audioPlayerRef.current = null;
-    }
-    
-    if (micManagerRef.current) {
-      micManagerRef.current.stop();
-      micManagerRef.current = null;
-    }
-    
+    isActiveRef.current = false;
+    speakerRef.current?.stop();
+    recognizerRef.current?.stop();
     setActiveAgent(null);
     setStatus('idle');
     setError(null);
-    setDebugInfo('');
+    setTranscript('');
+    setConversationHistory([]);
   }, []);
 
-  useEffect(() => { return () => cleanup(); }, [cleanup]);
+  // Handle user speech
+  const handleUserSpeech = useCallback(async (text: string, agentName: string) => {
+    if (!aiClientRef.current || !isActiveRef.current) return;
+    
+    log('User said:', text);
+    setTranscript(`আপনি: ${text}`);
+    setStatus('thinking');
+    
+    // Stop listening while processing
+    recognizerRef.current?.stop();
+    
+    try {
+      // Get response from Gemini
+      const response = await chatWithGemini(
+        aiClientRef.current,
+        text,
+        agentName,
+        conversationHistory
+      );
+      
+      log('AI response:', response);
+      
+      // Update conversation history
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', content: text },
+        { role: 'assistant', content: response }
+      ]);
+      
+      // Speak the response
+      setTranscript(`${agentName}: ${response}`);
+      setStatus('speaking');
+      
+      speakerRef.current?.speak(
+        response,
+        () => setStatus('speaking'),
+        () => {
+          if (isActiveRef.current) {
+            setStatus('listening');
+            // Resume listening
+            recognizerRef.current?.start(
+              (newText) => handleUserSpeech(newText, agentName),
+              (isListening) => {
+                if (!isListening && isActiveRef.current) {
+                  setStatus('error');
+                  setError('মাইক বন্ধ হয়ে গেছে');
+                }
+              }
+            );
+          }
+        }
+      );
+    } catch (e: any) {
+      logError('Chat error:', e);
+      setError('উত্তর দিতে সমস্যা হচ্ছে');
+      setStatus('error');
+    }
+  }, [conversationHistory]);
 
   // Connect handler
   const handleConnect = async (gender: 'male' | 'female') => {
@@ -462,160 +466,55 @@ const HomeVoiceSection: React.FC = () => {
       return;
     }
 
-    try {
-      cleanup();
-      setActiveAgent(gender);
-      setStatus('connecting');
-      setError(null);
-      setDebugInfo('শুরু হচ্ছে...');
-
-      // Agent names
-      const agentName = gender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
-      
-      // Step 1: Initialize audio
-      log('Step 1: Audio init...');
-      audioPlayerRef.current = new AudioPlayer();
-      const audioReady = await audioPlayerRef.current.init();
-      if (!audioReady) throw new Error('Audio init failed');
-      setDebugInfo('অডিও প্রস্তুত');
-
-      // Step 2: Prepare microphone
-      log('Step 2: Mic init...');
-      micManagerRef.current = new MicrophoneManager();
-      
-      // Step 3: Connect to Gemini Live
-      log('Step 3: Connecting to Gemini...');
-      setDebugInfo('জেমিনি সংযোগ...');
-      
-      const systemPrompt = buildSystemPrompt(agentName, gender);
-      
-      // Use Gemini's built-in voices
-      // Aoede = deeper male voice, Kore = female voice
-      const voiceName = gender === 'male' ? 'Aoede' : 'Kore';
-
-      const session = await aiClientRef.current.live.connect({
-        model: 'gemini-2.0-flash-exp',
-        config: {
-          responseModalities: [Modality.AUDIO],
-          systemInstruction: systemPrompt,
-          speechConfig: {
-            voiceConfig: { 
-              prebuiltVoiceConfig: { voiceName } 
-            },
-          },
-        },
-        callbacks: {
-          onopen: async () => {
-            log('✅ Connected!');
-            isConnectedRef.current = true;
-            setStatus('connected');
-            setDebugInfo('মাইক শুরু...');
-
-            // Start microphone
-            const micStarted = await micManagerRef.current!.start((audioData) => {
-              if (sessionRef.current && isConnectedRef.current) {
-                try {
-                  sessionRef.current.sendRealtimeInput({ media: audioData });
-                } catch (e) {
-                  logError('Send audio error:', e);
-                }
-              }
-            });
-
-            if (!micStarted) {
-              setError('মাইক্রোফোন পারমিশন দিন');
-              setStatus('error');
-              return;
-            }
-
-            setDebugInfo('শুনছি...');
-            setStatus('listening');
-
-            // Trigger greeting
-            setTimeout(() => {
-              if (sessionRef.current && isConnectedRef.current) {
-                log('Triggering greeting...');
-                sessionRef.current.sendClientContent({
-                  turns: [{ role: 'user', parts: [{ text: 'হ্যালো' }] }],
-                  turnComplete: true
-                });
-              }
-            }, 800);
-          },
-
-          onmessage: (message: any) => {
-            log('Message:', JSON.stringify(message).substring(0, 150));
-
-            const parts = message.serverContent?.modelTurn?.parts || [];
-            for (const part of parts) {
-              if (part.inlineData?.mimeType?.startsWith('audio/') && part.inlineData?.data) {
-                log('🔊 Audio received');
-                setStatus('speaking');
-                setDebugInfo('বলছে...');
-                
-                audioPlayerRef.current?.resume();
-                audioPlayerRef.current?.playPCM16(part.inlineData.data, 24000);
-              }
-            }
-
-            if (message.serverContent?.turnComplete) {
-              log('Turn complete');
-              setStatus('listening');
-              setDebugInfo('শুনছি...');
-            }
-
-            if (message.serverContent?.interrupted) {
-              log('Interrupted');
-              audioPlayerRef.current?.stop();
-              audioPlayerRef.current?.init();
-            }
-          },
-
-          onclose: (e: CloseEvent) => {
-            log('Closed:', e.code, e.reason);
-            isConnectedRef.current = false;
-            
-            if (e.code === 1011) {
-              if (e.reason?.toLowerCase().includes('quota')) {
-                setError('API কোটা শেষ');
-              } else {
-                setError('সার্ভার সমস্যা');
-              }
-              setStatus('error');
-            } else if (e.code !== 1000) {
-              setError('সংযোগ বিচ্ছিন্ন');
-              setStatus('error');
-            }
-            
-            micManagerRef.current?.stop();
-            audioPlayerRef.current?.stop();
-          },
-
-          onerror: (e: ErrorEvent) => {
-            logError('WebSocket error:', e);
-            setError('সংযোগ ত্রুটি');
-            setStatus('error');
-          },
-        },
-      });
-
-      sessionRef.current = session;
-      log('Session created');
-
-    } catch (err: any) {
-      logError('Connection failed:', err);
-      let errorMsg = 'সংযোগ ব্যর্থ';
-      
-      if (err.name === 'NotAllowedError') {
-        errorMsg = 'মাইক্রোফোন পারমিশন দিন';
-      } else if (err.message?.includes('quota')) {
-        errorMsg = 'API কোটা শেষ';
-      }
-      
-      setError(errorMsg);
-      setStatus('error');
-      setDebugInfo(err.message || '');
+    if (!recognizerRef.current?.isSupported()) {
+      setError('ব্রাউজার সাপোর্ট করে না');
+      return;
     }
+
+    cleanup();
+    setActiveAgent(gender);
+    setStatus('connecting');
+    isActiveRef.current = true;
+    
+    const agentName = gender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
+    
+    // Initial greeting
+    const greeting = `আসসালামু আলাইকুম! আমি ${agentName}। আপনার স্বাস্থ্য বিষয়ে কীভাবে সাহায্য করতে পারি?`;
+    
+    setTranscript(`${agentName}: ${greeting}`);
+    setStatus('speaking');
+    
+    speakerRef.current?.speak(
+      greeting,
+      () => setStatus('speaking'),
+      () => {
+        if (isActiveRef.current) {
+          setStatus('listening');
+          // Start listening
+          const started = recognizerRef.current?.start(
+            (text) => handleUserSpeech(text, agentName),
+            (isListening) => {
+              if (!isListening && isActiveRef.current) {
+                // Try to restart
+                setTimeout(() => {
+                  if (isActiveRef.current) {
+                    recognizerRef.current?.start(
+                      (text) => handleUserSpeech(text, agentName),
+                      () => {}
+                    );
+                  }
+                }, 500);
+              }
+            }
+          );
+          
+          if (!started) {
+            setError('মাইক্রোফোন পারমিশন দিন');
+            setStatus('error');
+          }
+        }
+      }
+    );
   };
 
   return (
@@ -657,7 +556,7 @@ const HomeVoiceSection: React.FC = () => {
           status={activeAgent === 'male' ? status : 'idle'}
           isActive={activeAgent === 'male'}
           error={activeAgent === 'male' ? error : null}
-          debugInfo={activeAgent === 'male' ? debugInfo : undefined}
+          transcript={activeAgent === 'male' ? transcript : undefined}
         />
         <VoiceAgentCard
           name="সেবা"
@@ -667,7 +566,7 @@ const HomeVoiceSection: React.FC = () => {
           status={activeAgent === 'female' ? status : 'idle'}
           isActive={activeAgent === 'female'}
           error={activeAgent === 'female' ? error : null}
-          debugInfo={activeAgent === 'female' ? debugInfo : undefined}
+          transcript={activeAgent === 'female' ? transcript : undefined}
         />
       </div>
 
@@ -677,13 +576,17 @@ const HomeVoiceSection: React.FC = () => {
           <i className="fas fa-shield-alt"></i>
           {isBn ? 'নিরাপদ ও গোপনীয় • সম্পূর্ণ বিনামূল্যে' : 'Safe & Private • Completely Free'}
         </p>
+        <p className="text-slate-600 text-xs mt-2">
+          {isBn ? '🎤 Chrome/Edge ব্রাউজারে সবচেয়ে ভালো কাজ করে' : '🎤 Works best in Chrome/Edge browser'}
+        </p>
       </div>
 
-      {/* Debug Panel */}
+      {/* Debug */}
       {DEBUG && (
         <div className="mt-4 text-center">
           <p className="text-xs text-slate-600">
-            API: {hasValidApiKey ? '✅' : '❌'} | Console: F12
+            API: {hasValidApiKey ? '✅' : '❌'} | 
+            Speech: {recognizerRef.current?.isSupported() ? '✅' : '❌'}
           </p>
         </div>
       )}
