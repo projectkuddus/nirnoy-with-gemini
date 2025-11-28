@@ -2,257 +2,186 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { MOCK_DOCTORS } from '../data/mockData';
 
-// ============ CONFIGURATION ============
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
+const log = (...args: any[]) => console.log('[Voice]', ...args);
 
-const DEBUG = true;
-const log = (...args: any[]) => { if (DEBUG) console.log('[VoiceAgent]', ...args); };
-const logError = (...args: any[]) => console.error('[VoiceAgent ERROR]', ...args);
-
-// ============ BROWSER SPEECH SYNTHESIS ============
-class BrowserSpeaker {
-  private synth: SpeechSynthesis;
-  private isSpeaking = false;
-
-  constructor() {
-    this.synth = window.speechSynthesis;
-  }
-
-  speak(text: string, onStart?: () => void, onEnd?: () => void): void {
-    if (!text || this.isSpeaking) return;
-    this.synth.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    
-    utterance.onstart = () => { this.isSpeaking = true; onStart?.(); };
-    utterance.onend = () => { this.isSpeaking = false; onEnd?.(); };
-    utterance.onerror = () => { this.isSpeaking = false; onEnd?.(); };
-    
-    this.synth.speak(utterance);
-  }
-
-  stop(): void {
-    this.synth.cancel();
-    this.isSpeaking = false;
-  }
+// Audio beep
+let audioCtx: AudioContext | null = null;
+function playBeep(freq = 440, dur = 0.2): void {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  } catch (e) {}
 }
 
-// ============ SPEECH RECOGNITION ============
-class SpeechRecognizer {
-  private recognition: any = null;
-  private isListening = false;
-
-  constructor() {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SR) {
-      this.recognition = new SR();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = false;
-      this.recognition.lang = 'bn-BD';
-    }
-  }
-
-  isSupported(): boolean { return this.recognition !== null; }
-
-  start(onResult: (text: string) => void, onError?: () => void): boolean {
-    if (!this.recognition) return false;
-    
-    this.recognition.onresult = (e: any) => {
-      const text = e.results[e.results.length - 1][0].transcript;
-      onResult(text);
-    };
-    this.recognition.onerror = () => onError?.();
-    this.recognition.onend = () => { if (this.isListening) try { this.recognition.start(); } catch(e){} };
-    
-    try {
-      this.recognition.start();
-      this.isListening = true;
-      return true;
-    } catch (e) { return false; }
-  }
-
-  stop(): void {
-    this.isListening = false;
-    this.recognition?.stop();
-  }
-}
-
-// ============ GEMINI TEXT CHAT ============
-async function chatWithGemini(client: GoogleGenAI, message: string, agentName: string): Promise<string> {
-  const doctorList = MOCK_DOCTORS.slice(0, 5).map(d => `- ${d.name}: ${d.specialties[0]}`).join('\n');
+// TTS
+function speak(text: string, onEnd?: () => void): void {
+  window.speechSynthesis.cancel();
+  if (!text) { onEnd?.(); return; }
   
-  const prompt = `আপনি "${agentName}" - নির্ণয় হেলথ এর AI সহকারী।
-নিয়ম: বাংলায় ছোট উত্তর দিন (১-২ বাক্য)।
-ডাক্তার: ${doctorList}
-জরুরি = "999 এ কল করুন!"
-
-User: ${message}`;
-
-  const response = await client.models.generateContent({
-    model: 'gemini-2.0-flash',
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-  });
+  const clean = text.replace(/[^\u0980-\u09FF\u0020-\u007E।,?!.\s]/g, '').trim();
+  if (!clean) { onEnd?.(); return; }
   
-  return response.text || 'দুঃখিত, উত্তর দিতে পারছি না।';
+  const utt = new SpeechSynthesisUtterance(clean);
+  utt.lang = 'bn-BD';
+  utt.rate = 0.85;
+  utt.onend = () => onEnd?.();
+  utt.onerror = () => { playBeep(600, 0.3); setTimeout(() => onEnd?.(), 500); };
+  
+  setTimeout(() => window.speechSynthesis.speak(utt), 100);
 }
 
-// ============ TYPES ============
-type Status = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
+// Recognition
+let recog: any = null;
+function listen(onResult: (t: string) => void, onErr?: () => void): void {
+  const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SR) { onErr?.(); return; }
+  if (!recog) { recog = new SR(); recog.lang = 'bn-BD'; }
+  recog.onresult = (e: any) => onResult(e.results[0][0].transcript);
+  recog.onerror = () => onErr?.();
+  try { recog.start(); playBeep(800, 0.1); } catch (e) { onErr?.(); }
+}
+function stopListen(): void { try { recog?.stop(); } catch (e) {} }
 
-interface VoiceAgentProps {
+// Gemini
+async function ask(client: GoogleGenAI, q: string, name: string): Promise<string> {
+  const docs = MOCK_DOCTORS.slice(0, 3).map(d => `${d.name} (${d.specialties[0]})`).join(', ');
+  try {
+    const r = await client.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [{ role: 'user', parts: [{ text: `তুমি ${name}, নির্ণয় হেলথ এর AI। বাংলায় ছোট উত্তর দাও। ডাক্তার: ${docs}\n\nপ্রশ্ন: ${q}` }] }],
+    });
+    return (r.text || 'দুঃখিত').replace(/[*#_~`]/g, '').trim();
+  } catch (e) { return 'দুঃখিত, উত্তর দিতে পারছি না।'; }
+}
+
+type Status = 'idle' | 'greeting' | 'listening' | 'thinking' | 'speaking' | 'error';
+
+interface Props {
   onClose?: () => void;
   voiceGender?: 'male' | 'female';
-  context?: string;
   compact?: boolean;
 }
 
-// ============ MAIN COMPONENT ============
-const VoiceAgent: React.FC<VoiceAgentProps> = ({ onClose, voiceGender = 'female', compact = false }) => {
+const VoiceAgent: React.FC<Props> = ({ onClose, voiceGender = 'female', compact = false }) => {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState<string>('');
-
-  const aiClientRef = useRef<GoogleGenAI | null>(null);
-  const speakerRef = useRef<BrowserSpeaker | null>(null);
-  const recognizerRef = useRef<SpeechRecognizer | null>(null);
-  const isActiveRef = useRef(false);
-
-  const agentName = voiceGender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
+  const [transcript, setTranscript] = useState('');
+  const clientRef = useRef<GoogleGenAI | null>(null);
+  const activeRef = useRef(false);
+  const name = voiceGender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
 
   useEffect(() => {
-    if (hasValidApiKey) aiClientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-    speakerRef.current = new BrowserSpeaker();
-    recognizerRef.current = new SpeechRecognizer();
-    return () => { speakerRef.current?.stop(); recognizerRef.current?.stop(); };
+    if (hasValidApiKey) clientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    return () => { window.speechSynthesis.cancel(); stopListen(); };
   }, []);
 
-  const cleanup = useCallback(() => {
-    isActiveRef.current = false;
-    speakerRef.current?.stop();
-    recognizerRef.current?.stop();
-    setStatus('idle');
-    setError(null);
-    setTranscript('');
-  }, []);
-
-  const handleUserSpeech = useCallback(async (text: string) => {
-    if (!aiClientRef.current || !isActiveRef.current) return;
-    
+  const process = useCallback(async (text: string) => {
+    if (!clientRef.current || !activeRef.current) return;
     setTranscript(`আপনি: ${text}`);
     setStatus('thinking');
-    recognizerRef.current?.stop();
-    
-    try {
-      const response = await chatWithGemini(aiClientRef.current, text, agentName);
-      setTranscript(`${agentName}: ${response}`);
-      setStatus('speaking');
-      
-      speakerRef.current?.speak(response, undefined, () => {
-        if (isActiveRef.current) {
-          setStatus('listening');
-          recognizerRef.current?.start((t) => handleUserSpeech(t));
-        }
-      });
-    } catch (e) {
-      setError('উত্তর দিতে সমস্যা');
-      setStatus('error');
-    }
-  }, [agentName]);
-
-  const handleConnect = async () => {
-    if (!hasValidApiKey) { setError('API Key নেই'); return; }
-    if (!recognizerRef.current?.isSupported()) { setError('ব্রাউজার সাপোর্ট করে না'); return; }
-
-    cleanup();
-    setStatus('connecting');
-    isActiveRef.current = true;
-    
-    const greeting = `আসসালামু আলাইকুম! আমি ${agentName}। কীভাবে সাহায্য করতে পারি?`;
-    setTranscript(`${agentName}: ${greeting}`);
+    const resp = await ask(clientRef.current, text, name);
+    if (!activeRef.current) return;
+    setTranscript(`${name}: ${resp}`);
     setStatus('speaking');
-    
-    speakerRef.current?.speak(greeting, undefined, () => {
-      if (isActiveRef.current) {
+    speak(resp, () => {
+      if (activeRef.current) {
         setStatus('listening');
-        if (!recognizerRef.current?.start((t) => handleUserSpeech(t))) {
-          setError('মাইক পারমিশন দিন');
-          setStatus('error');
-        }
+        setTranscript('');
+        listen(process, () => setStatus('error'));
+      }
+    });
+  }, [name]);
+
+  const start = () => {
+    if (!hasValidApiKey) return;
+    window.speechSynthesis.cancel();
+    stopListen();
+    setStatus('greeting');
+    setError(null);
+    setTranscript('');
+    activeRef.current = true;
+    
+    const greet = `আসসালামু আলাইকুম। আমি ${name}। কীভাবে সাহায্য করতে পারি?`;
+    setTranscript(`${name}: ${greet}`);
+    playBeep(600, 0.15);
+    
+    speak(greet, () => {
+      if (activeRef.current) {
+        setStatus('listening');
+        setTranscript('');
+        listen(process, () => setError('মাইক সমস্যা'));
       }
     });
   };
 
-  const handleDisconnect = () => { cleanup(); onClose?.(); };
-
-  useEffect(() => { if (!compact && hasValidApiKey) handleConnect(); }, [compact]);
-
-  const getStatusText = () => {
-    switch (status) {
-      case 'connecting': return 'শুরু হচ্ছে...';
-      case 'listening': return 'শুনছি... বলুন';
-      case 'thinking': return 'চিন্তা করছি...';
-      case 'speaking': return 'বলছে...';
-      case 'error': return error || 'ত্রুটি';
-      default: return 'প্রস্তুত';
-    }
+  const stop = () => {
+    activeRef.current = false;
+    window.speechSynthesis.cancel();
+    stopListen();
+    setStatus('idle');
+    setTranscript('');
+    playBeep(400, 0.2);
+    onClose?.();
   };
+
+  useEffect(() => { if (!compact && hasValidApiKey) start(); }, [compact]);
+
+  const statusTxt = { idle: 'প্রস্তুত', greeting: 'শুভেচ্ছা...', listening: 'বলুন...', thinking: 'চিন্তা...', speaking: 'বলছে...', error: error || 'সমস্যা' };
+  const bg = voiceGender === 'male' ? 'from-blue-600 to-indigo-600' : 'from-pink-600 to-rose-600';
 
   if (compact) {
     return (
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
+      <div className={`bg-gradient-to-r ${bg} rounded-2xl p-6 text-white`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <span className="text-xl font-bold">{agentName.charAt(0)}</span>
+              <span className="text-xl font-bold">{name.charAt(0)}</span>
             </div>
             <div>
-              <h4 className="font-bold">{agentName}</h4>
-              <p className="text-sm text-white/70">{getStatusText()}</p>
+              <h4 className="font-bold">{name}</h4>
+              <p className="text-sm text-white/70">{statusTxt[status]}</p>
             </div>
           </div>
-          
           {status === 'idle' ? (
-            <button onClick={handleConnect} disabled={!hasValidApiKey}
-              className="px-4 py-2 bg-white text-blue-600 font-bold rounded-lg hover:bg-white/90 transition">
+            <button onClick={start} disabled={!hasValidApiKey} className="px-4 py-2 bg-white text-blue-600 font-bold rounded-lg">
               <i className="fas fa-microphone mr-2"></i>কথা বলুন
             </button>
           ) : (
-            <button onClick={handleDisconnect}
-              className="px-4 py-2 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition">
+            <button onClick={stop} className="px-4 py-2 bg-red-500 text-white font-bold rounded-lg">
               <i className="fas fa-stop mr-2"></i>শেষ
             </button>
           )}
         </div>
-
-        {transcript && (
-          <div className="p-3 bg-white/10 rounded-xl text-sm max-h-20 overflow-y-auto">
-            {transcript}
-          </div>
-        )}
+        {transcript && <div className="p-3 bg-white/10 rounded-xl text-sm">{transcript}</div>}
       </div>
     );
   }
 
-  // Full modal
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-        <div className={`p-6 text-white ${voiceGender === 'male' ? 'bg-gradient-to-r from-blue-600 to-indigo-600' : 'bg-gradient-to-r from-pink-600 to-rose-600'}`}>
+        <div className={`p-6 text-white bg-gradient-to-r ${bg}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center">
-                <span className="text-2xl font-bold">{agentName.charAt(0)}</span>
+                <span className="text-2xl font-bold">{name.charAt(0)}</span>
               </div>
               <div>
-                <h3 className="text-xl font-bold">{agentName}</h3>
-                <p className="text-sm text-white/80">{getStatusText()}</p>
+                <h3 className="text-xl font-bold">{name}</h3>
+                <p className="text-sm text-white/80">{statusTxt[status]}</p>
               </div>
             </div>
-            <button onClick={handleDisconnect} className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center">
+            <button onClick={stop} className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
               <i className="fas fa-times"></i>
             </button>
           </div>
@@ -260,14 +189,13 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({ onClose, voiceGender = 'female'
 
         <div className="p-8 bg-slate-50">
           <div className="flex items-center justify-center gap-2 h-24">
-            {(status === 'speaking' || status === 'listening') ? (
+            {(status === 'speaking' || status === 'listening' || status === 'greeting') ? (
               [...Array(7)].map((_, i) => (
-                <div key={i}
-                  className={`w-2 rounded-full ${status === 'speaking' ? 'bg-purple-500' : 'bg-green-500'}`}
-                  style={{ height: `${20 + Math.random() * 50}px`, animation: `pulse ${0.3 + i * 0.1}s ease-in-out infinite alternate` }}></div>
+                <div key={i} className={`w-2 rounded-full ${status === 'listening' ? 'bg-green-500' : 'bg-purple-500'}`}
+                  style={{ height: `${20 + Math.random() * 50}px`, animation: `pulse ${0.3 + i * 0.1}s ease-in-out infinite alternate` }} />
               ))
             ) : status === 'thinking' ? (
-              [0,1,2].map(i => <div key={i} className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>)
+              [0,1,2].map(i => <div key={i} className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />)
             ) : (
               <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center">
                 <i className="fas fa-microphone text-3xl text-slate-400"></i>
@@ -276,26 +204,17 @@ const VoiceAgent: React.FC<VoiceAgentProps> = ({ onClose, voiceGender = 'female'
           </div>
         </div>
 
-        {transcript && (
-          <div className="p-4 bg-slate-100 border-t max-h-32 overflow-y-auto">
-            <p className="text-sm text-slate-700">{transcript}</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="p-4 bg-red-50 border-t">
-            <p className="text-red-600 text-sm"><i className="fas fa-exclamation-circle mr-2"></i>{error}</p>
-          </div>
-        )}
+        {transcript && <div className="p-4 bg-slate-100 border-t"><p className="text-sm text-slate-700">{transcript}</p></div>}
+        {error && <div className="p-4 bg-red-50 border-t"><p className="text-red-600 text-sm"><i className="fas fa-exclamation-circle mr-2"></i>{error}</p></div>}
 
         <div className="p-4 border-t">
           {status === 'idle' ? (
-            <button onClick={handleConnect} disabled={!hasValidApiKey}
-              className={`w-full py-4 font-bold rounded-xl flex items-center justify-center gap-2 ${hasValidApiKey ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white' : 'bg-slate-300 text-slate-500'}`}>
+            <button onClick={start} disabled={!hasValidApiKey}
+              className={`w-full py-4 font-bold rounded-xl flex items-center justify-center gap-2 ${hasValidApiKey ? `bg-gradient-to-r ${bg} text-white` : 'bg-slate-300 text-slate-500'}`}>
               <i className="fas fa-microphone"></i>কথা বলুন
             </button>
           ) : (
-            <button onClick={handleDisconnect} className="w-full py-4 bg-red-500 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+            <button onClick={stop} className="w-full py-4 bg-red-500 text-white font-bold rounded-xl flex items-center justify-center gap-2">
               <i className="fas fa-stop"></i>শেষ করুন
             </button>
           )}
