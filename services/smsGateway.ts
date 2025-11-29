@@ -1,12 +1,17 @@
 /**
- * SMS Gateway Service
- * Supports: SSL Wireless, BulkSMS BD, Twilio
- * For OTP verification and notifications
+ * SMS Gateway Service for Nirnoy Health
+ * Primary: Twilio (International + Bangladesh)
+ * 
+ * HOW TO GET TWILIO CREDENTIALS:
+ * 1. Go to https://console.twilio.com
+ * 2. On the Dashboard, find "Account SID" and "Auth Token"
+ * 3. Go to Phone Numbers > Manage > Buy a number (or use trial number)
+ * 4. Add credentials to Vercel Environment Variables
  */
 
 // ============ TYPES ============
 export interface SMSRequest {
-  to: string; // Phone number with country code
+  to: string;
   message: string;
   type?: 'otp' | 'notification' | 'promotional';
 }
@@ -27,63 +32,46 @@ export interface OTPVerification {
   otp: string;
 }
 
-// ============ CONFIG ============
-const SMS_CONFIG = {
-  // SSL Wireless (Bangladesh)
-  sslWireless: {
-    apiUrl: 'https://smsplus.sslwireless.com/api/v3/send-sms',
-    apiToken: import.meta.env.VITE_SSL_WIRELESS_API_TOKEN || '',
-    sid: import.meta.env.VITE_SSL_WIRELESS_SID || '',
-  },
-  // BulkSMS BD (Alternative)
-  bulksmsBD: {
-    apiUrl: 'https://bulksmsbd.net/api/smsapi',
-    apiKey: import.meta.env.VITE_BULKSMS_API_KEY || '',
-    senderId: import.meta.env.VITE_BULKSMS_SENDER_ID || 'NIRNOY',
-  },
-  // Twilio (International)
-  twilio: {
-    accountSid: import.meta.env.VITE_TWILIO_ACCOUNT_SID || '',
-    authToken: import.meta.env.VITE_TWILIO_AUTH_TOKEN || '',
-    phoneNumber: import.meta.env.VITE_TWILIO_PHONE_NUMBER || '',
-  },
+// ============ TWILIO CONFIG ============
+const TWILIO_CONFIG = {
+  accountSid: import.meta.env.VITE_TWILIO_ACCOUNT_SID || '',
+  authToken: import.meta.env.VITE_TWILIO_AUTH_TOKEN || '',
+  phoneNumber: import.meta.env.VITE_TWILIO_PHONE_NUMBER || '',
+  // Twilio Verify Service (for OTP) - more reliable than SMS
+  verifyServiceSid: import.meta.env.VITE_TWILIO_VERIFY_SID || '',
 };
 
-// OTP Storage (in production, use Redis or database)
+// OTP Storage
 const OTP_STORAGE_KEY = 'nirnoy_otp_';
 const OTP_EXPIRY_MINUTES = 5;
 
 // ============ SMS GATEWAY SERVICE ============
 class SMSGatewayService {
-  private provider: 'ssl' | 'bulksms' | 'twilio' | 'mock' = 'mock';
+  private isConfigured: boolean;
 
   constructor() {
-    // Determine which provider to use based on available config
-    if (SMS_CONFIG.sslWireless.apiToken) {
-      this.provider = 'ssl';
-    } else if (SMS_CONFIG.bulksmsBD.apiKey) {
-      this.provider = 'bulksms';
-    } else if (SMS_CONFIG.twilio.accountSid) {
-      this.provider = 'twilio';
+    this.isConfigured = !!(TWILIO_CONFIG.accountSid && TWILIO_CONFIG.authToken);
+    if (!this.isConfigured) {
+      console.log('📱 SMS Gateway: Running in DEMO mode (no Twilio credentials)');
+      console.log('   To enable real SMS, add VITE_TWILIO_ACCOUNT_SID and VITE_TWILIO_AUTH_TOKEN');
     } else {
-      this.provider = 'mock';
-      console.log('SMS Gateway: Using mock mode (no credentials configured)');
+      console.log('📱 SMS Gateway: Twilio configured');
     }
   }
 
   /**
-   * Format Bangladesh phone number
+   * Format Bangladesh phone number to E.164 format
    */
   private formatBDPhone(phone: string): string {
-    // Remove all non-digits
     let cleaned = phone.replace(/\D/g, '');
     
-    // Handle different formats
     if (cleaned.startsWith('880')) {
       return '+' + cleaned;
     } else if (cleaned.startsWith('0')) {
       return '+880' + cleaned.substring(1);
     } else if (cleaned.length === 10) {
+      return '+880' + cleaned;
+    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
       return '+880' + cleaned;
     }
     return '+880' + cleaned;
@@ -97,69 +85,19 @@ class SMSGatewayService {
   }
 
   /**
-   * Send SMS via SSL Wireless
-   */
-  private async sendViaSSL(request: SMSRequest): Promise<SMSResponse> {
-    try {
-      const response = await fetch(SMS_CONFIG.sslWireless.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          api_token: SMS_CONFIG.sslWireless.apiToken,
-          sid: SMS_CONFIG.sslWireless.sid,
-          msisdn: this.formatBDPhone(request.to).replace('+', ''),
-          sms: request.message,
-          csms_id: `nirnoy_${Date.now()}`,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (data.status === 'SUCCESS') {
-        return { success: true, messageId: data.smsinfo?.sms_id };
-      }
-      return { success: false, error: data.message || 'SMS failed' };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Send SMS via BulkSMS BD
-   */
-  private async sendViaBulkSMS(request: SMSRequest): Promise<SMSResponse> {
-    try {
-      const params = new URLSearchParams({
-        api_key: SMS_CONFIG.bulksmsBD.apiKey,
-        senderid: SMS_CONFIG.bulksmsBD.senderId,
-        number: this.formatBDPhone(request.to).replace('+', ''),
-        message: request.message,
-      });
-
-      const response = await fetch(`${SMS_CONFIG.bulksmsBD.apiUrl}?${params}`);
-      const data = await response.json();
-
-      if (data.response_code === 202) {
-        return { success: true, messageId: data.message_id };
-      }
-      return { success: false, error: data.error_message || 'SMS failed' };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
    * Send SMS via Twilio
    */
   private async sendViaTwilio(request: SMSRequest): Promise<SMSResponse> {
+    if (!this.isConfigured) {
+      return this.sendMock(request);
+    }
+
     try {
-      const auth = btoa(`${SMS_CONFIG.twilio.accountSid}:${SMS_CONFIG.twilio.authToken}`);
+      const auth = btoa(`${TWILIO_CONFIG.accountSid}:${TWILIO_CONFIG.authToken}`);
+      const formattedPhone = this.formatBDPhone(request.to);
       
       const response = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${SMS_CONFIG.twilio.accountSid}/Messages.json`,
+        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_CONFIG.accountSid}/Messages.json`,
         {
           method: 'POST',
           headers: {
@@ -167,8 +105,8 @@ class SMSGatewayService {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            To: this.formatBDPhone(request.to),
-            From: SMS_CONFIG.twilio.phoneNumber,
+            To: formattedPhone,
+            From: TWILIO_CONFIG.phoneNumber,
             Body: request.message,
           }),
         }
@@ -177,47 +115,48 @@ class SMSGatewayService {
       const data = await response.json();
 
       if (data.sid) {
+        console.log('✅ SMS sent successfully:', data.sid);
         return { success: true, messageId: data.sid };
       }
+      
+      console.error('❌ Twilio error:', data);
       return { success: false, error: data.message || 'SMS failed' };
     } catch (error: any) {
+      console.error('❌ SMS send error:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Mock SMS (for development)
+   * Mock SMS for development/demo
    */
   private async sendMock(request: SMSRequest): Promise<SMSResponse> {
-    console.log('📱 Mock SMS:', {
-      to: request.to,
-      message: request.message,
-    });
-    // Simulate delay
+    const formattedPhone = this.formatBDPhone(request.to);
+    console.log('📱 DEMO SMS (not actually sent):');
+    console.log('   To:', formattedPhone);
+    console.log('   Message:', request.message);
+    
+    // Show OTP in console for testing
+    const otpMatch = request.message.match(/\d{6}/);
+    if (otpMatch) {
+      console.log('   🔑 OTP Code:', otpMatch[0]);
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 500));
-    return { success: true, messageId: `mock_${Date.now()}` };
+    return { success: true, messageId: `demo_${Date.now()}` };
   }
 
   /**
    * Send SMS (unified method)
    */
   async sendSMS(request: SMSRequest): Promise<SMSResponse> {
-    switch (this.provider) {
-      case 'ssl':
-        return this.sendViaSSL(request);
-      case 'bulksms':
-        return this.sendViaBulkSMS(request);
-      case 'twilio':
-        return this.sendViaTwilio(request);
-      default:
-        return this.sendMock(request);
-    }
+    return this.sendViaTwilio(request);
   }
 
   /**
    * Send OTP for verification
    */
-  async sendOTP(request: OTPRequest): Promise<{ success: boolean; error?: string }> {
+  async sendOTP(request: OTPRequest): Promise<{ success: boolean; error?: string; otp?: string }> {
     const otp = this.generateOTP();
     const phone = this.formatBDPhone(request.phone);
     
@@ -232,12 +171,12 @@ class SMSGatewayService {
     };
     localStorage.setItem(`${OTP_STORAGE_KEY}${phone}`, JSON.stringify(otpData));
 
-    // Create message based on purpose
+    // Create Bengali message
     const messages: Record<string, string> = {
-      login: `আপনার নির্ণয় লগইন কোড: ${otp}। এই কোড ${OTP_EXPIRY_MINUTES} মিনিট বৈধ। কারো সাথে শেয়ার করবেন না।`,
-      register: `নির্ণয়ে স্বাগতম! আপনার রেজিস্ট্রেশন কোড: ${otp}। এই কোড ${OTP_EXPIRY_MINUTES} মিনিট বৈধ।`,
-      reset_password: `আপনার পাসওয়ার্ড রিসেট কোড: ${otp}। এই কোড ${OTP_EXPIRY_MINUTES} মিনিট বৈধ।`,
-      verify: `আপনার ভেরিফিকেশন কোড: ${otp}। এই কোড ${OTP_EXPIRY_MINUTES} মিনিট বৈধ।`,
+      login: `নির্ণয় লগইন কোড: ${otp}\nএই কোড ${OTP_EXPIRY_MINUTES} মিনিট বৈধ।\nকারো সাথে শেয়ার করবেন না।`,
+      register: `নির্ণয়ে স্বাগতম!\nআপনার রেজিস্ট্রেশন কোড: ${otp}\nএই কোড ${OTP_EXPIRY_MINUTES} মিনিট বৈধ।`,
+      reset_password: `পাসওয়ার্ড রিসেট কোড: ${otp}\nএই কোড ${OTP_EXPIRY_MINUTES} মিনিট বৈধ।`,
+      verify: `ভেরিফিকেশন কোড: ${otp}\nএই কোড ${OTP_EXPIRY_MINUTES} মিনিট বৈধ।`,
     };
 
     const result = await this.sendSMS({
@@ -245,6 +184,11 @@ class SMSGatewayService {
       message: messages[request.purpose] || messages.verify,
       type: 'otp',
     });
+
+    // In demo mode, return the OTP for testing
+    if (!this.isConfigured) {
+      return { ...result, otp };
+    }
 
     return result;
   }
@@ -297,7 +241,7 @@ class SMSGatewayService {
     time: string,
     serial: number
   ): Promise<SMSResponse> {
-    const message = `নির্ণয় রিমাইন্ডার: আপনার ${doctorName} এর সাথে অ্যাপয়েন্টমেন্ট আছে ${date} তারিখে ${time} টায়। সিরিয়াল: ${serial}। সময়মতো উপস্থিত থাকুন।`;
+    const message = `নির্ণয় রিমাইন্ডার:\n${doctorName} এর সাথে অ্যাপয়েন্টমেন্ট\n📅 ${date}\n⏰ ${time}\n🔢 সিরিয়াল: ${serial}\n\nসময়মতো উপস্থিত থাকুন।`;
     
     return this.sendSMS({ to: phone, message, type: 'notification' });
   }
@@ -312,9 +256,16 @@ class SMSGatewayService {
     serial: number,
     fee: number
   ): Promise<SMSResponse> {
-    const message = `নির্ণয়: আপনার অ্যাপয়েন্টমেন্ট কনফার্ম হয়েছে!\nডাক্তার: ${doctorName}\nতারিখ: ${date}\nসিরিয়াল: ${serial}\nফি: ৳${fee}\n\nধন্যবাদ!`;
+    const message = `✅ নির্ণয় বুকিং কনফার্ম!\n\n👨‍⚕️ ${doctorName}\n📅 ${date}\n🔢 সিরিয়াল: ${serial}\n💰 ফি: ৳${fee}\n\nধন্যবাদ!`;
     
     return this.sendSMS({ to: phone, message, type: 'notification' });
+  }
+
+  /**
+   * Check if SMS is configured
+   */
+  isReady(): boolean {
+    return this.isConfigured;
   }
 
   /**
@@ -322,8 +273,8 @@ class SMSGatewayService {
    */
   getProviderInfo(): { provider: string; configured: boolean } {
     return {
-      provider: this.provider,
-      configured: this.provider !== 'mock',
+      provider: this.isConfigured ? 'Twilio' : 'Demo Mode',
+      configured: this.isConfigured,
     };
   }
 }
