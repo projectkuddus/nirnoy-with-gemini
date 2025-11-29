@@ -74,7 +74,7 @@ class AudioPlayer {
       source.start(startTime);
       this.nextPlayTime = startTime + buffer.duration;
 
-      log('🔊 Playing audio chunk:', buffer.duration.toFixed(2) + 's');
+      log('Playing audio chunk:', buffer.duration.toFixed(2) + 's');
     } catch (e) {
       logError('Audio play error:', e);
     }
@@ -153,7 +153,7 @@ class Microphone {
       source.connect(this.processor);
       this.processor.connect(this.context.destination);
       this.isRunning = true;
-      log('🎤 Microphone started');
+      log('Microphone started');
       return true;
     } catch (e: any) {
       logError('Microphone error:', e.name, e.message);
@@ -166,7 +166,7 @@ class Microphone {
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     if (this.processor) { this.processor.disconnect(); this.processor = null; }
     if (this.context) { try { this.context.close(); } catch (e) {} this.context = null; }
-    log('🎤 Microphone stopped');
+    log('Microphone stopped');
   }
 }
 
@@ -176,25 +176,62 @@ function getSystemPrompt(agentName: string, gender: 'male' | 'female'): string {
   let greeting = 'শুভ সন্ধ্যা';
   if (hour >= 5 && hour < 12) greeting = 'সুপ্রভাত';
   else if (hour >= 12 && hour < 17) greeting = 'শুভ দুপুর';
-  else if (hour >= 20) greeting = 'শুভ রাত্রি';
+  else if (hour >= 17 && hour < 20) greeting = 'শুভ সন্ধ্যা';
+  else greeting = 'শুভ রাত্রি';
 
-  const doctors = MOCK_DOCTORS.slice(0, 5).map(d => 
-    `${d.name}: ${d.specialties[0]}, ফি ৳${d.chambers[0]?.fee || 500}`
-  ).join('\n');
+  // Get doctors by specialty
+  const specialties = ['মেডিসিন', 'হৃদরোগ', 'স্ত্রীরোগ', 'শিশুরোগ', 'হাড় ও জোড়া', 'চর্মরোগ'];
+  const doctorsBySpecialty = specialties.map(spec => {
+    const docs = MOCK_DOCTORS.filter(d => d.specialties.includes(spec)).slice(0, 2);
+    if (docs.length === 0) return null;
+    return `${spec}: ${docs.map(d => `${d.name} (ফি ${d.chambers[0]?.fee || 500} টাকা)`).join(', ')}`;
+  }).filter(Boolean).join('\n');
 
-  return `তুমি "${agentName}" - নির্ণয় হেলথ এর ${gender === 'male' ? 'পুরুষ' : 'মহিলা'} AI স্বাস্থ্য সহকারী।
+  const genderWord = gender === 'male' ? 'পুরুষ' : 'মহিলা';
 
-প্রথমে বলো: "আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। আপনার স্বাস্থ্য বিষয়ে কীভাবে সাহায্য করতে পারি?"
+  return `তুমি "${agentName}" - নির্ণয় হেলথের ${genderWord} AI সহকারী।
+
+গুরুত্বপূর্ণ নির্দেশনা:
+সংযোগ হলেই প্রথমে তুমি বলবে: "আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। ডাক্তার সিরিয়াল নিতে বা নির্ণয় সম্পর্কে জানতে বলুন।"
+
+নির্ণয় সম্পর্কে:
+- বাংলাদেশের AI স্বাস্থ্যসেবা প্ল্যাটফর্ম
+- ওয়েবসাইট: nirnoy.ai
+- ২০০ এর বেশি বিশেষজ্ঞ ডাক্তার
+- ২৪ ঘণ্টা AI সহায়তা
+- অনলাইনে সিরিয়াল বুকিং
+- পারিবারিক স্বাস্থ্য ট্র্যাকিং
+
+সিরিয়াল বুকিং:
+১. সমস্যা জিজ্ঞেস করো
+২. উপযুক্ত ডাক্তার সাজেস্ট করো
+৩. তারিখ ও সময় নাও
+৪. কনফার্ম করো
+
+ডাক্তার তালিকা:
+${doctorsBySpecialty}
+
+সমস্যা থেকে বিশেষত্ব:
+- জ্বর, সর্দি, কাশি = মেডিসিন
+- বুকে ব্যথা = হৃদরোগ
+- মহিলাদের সমস্যা = স্ত্রীরোগ
+- শিশুদের সমস্যা = শিশুরোগ
+- হাড়, কোমর ব্যথা = হাড় ও জোড়া
+- চুলকানি, ত্বক = চর্মরোগ
 
 নিয়ম:
 - শুধু বাংলায় কথা বলো
-- ছোট উত্তর দাও (১-২ বাক্য)
-- বিনয়ী হও, "আপনি", "জ্বী" ব্যবহার করো
+- ছোট উত্তর দাও, এক দুই বাক্য
+- বিনয়ী হও, আপনি বলো
+- ইমোজি ব্যবহার করো না
 
-ডাক্তার তালিকা:
-${doctors}
+জরুরি অবস্থা:
+বুকে তীব্র ব্যথা, শ্বাসকষ্ট হলে বলো: "এখনই ৯৯৯ এ কল করুন!"
 
-জরুরি অবস্থা (বুকে ব্যথা, শ্বাসকষ্ট) = "এখনই 999 এ কল করুন!"`;
+যা বলবে না:
+- ওষুধের নাম বা ডোজ
+- রোগ নির্ণয়
+- ব্যক্তিগত তথ্য চাওয়া`;
 }
 
 // ============ TYPES ============
@@ -248,47 +285,48 @@ const VoiceCard: React.FC<{
               status === 'connecting' ? 'bg-yellow-500 animate-pulse' :
               status === 'error' ? 'bg-red-500' : 'bg-slate-400'
             }`}></div>
-            <span className={`text-sm font-medium ${status === 'error' ? 'text-red-500' : 'text-slate-600'}`}>
-              {statusText[status]}
-            </span>
+            <span className="text-sm text-slate-600">{statusText[status]}</span>
           </div>
 
-          {(status === 'listening' || status === 'speaking') && (
-            <div className="flex justify-center gap-1 h-12 items-center bg-slate-50 rounded-xl">
-              {[...Array(7)].map((_, i) => (
-                <div key={i}
-                  className={`w-1.5 rounded-full ${status === 'speaking' ? 'bg-purple-500' : 'bg-green-500'}`}
-                  style={{ height: `${12 + Math.random() * 25}px`, animation: `pulse ${0.3 + i * 0.08}s ease-in-out infinite alternate` }}
-                />
+          {status === 'listening' && (
+            <div className="flex justify-center gap-1 h-8">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="w-1 bg-green-500 rounded-full animate-pulse"
+                  style={{
+                    animationDelay: `${i * 0.1}s`,
+                    height: `${Math.random() * 100}%`,
+                  }}
+                ></div>
               ))}
             </div>
           )}
 
-          {status === 'connecting' && (
-            <div className="flex justify-center gap-2 h-12 items-center bg-slate-50 rounded-xl">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+          {status === 'speaking' && (
+            <div className="flex justify-center gap-1 h-8">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className="w-1 bg-purple-500 rounded-full animate-bounce"
+                  style={{ animationDelay: `${i * 0.1}s` }}
+                ></div>
               ))}
             </div>
           )}
         </div>
       )}
 
-      {isActive ? (
-        <button onClick={onStop}
-          className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl flex items-center justify-center gap-2">
-          <i className="fas fa-phone-slash"></i>
-          {isBn ? 'শেষ করুন' : 'End'}
-        </button>
-      ) : (
-        <button onClick={onStart} disabled={!hasValidApiKey}
-          className={`w-full py-3 font-bold rounded-xl flex items-center justify-center gap-2 ${
-            hasValidApiKey ? `bg-gradient-to-r ${bg} text-white hover:opacity-90` : 'bg-slate-300 text-slate-500'
-          }`}>
-          <i className="fas fa-phone"></i>
-          {isBn ? 'কথা বলুন' : 'Talk'}
-        </button>
-      )}
+      <button
+        onClick={isActive ? onStop : onStart}
+        className={`w-full py-3 rounded-xl font-bold transition-all ${
+          isActive
+            ? 'bg-red-500 hover:bg-red-600 text-white'
+            : `bg-gradient-to-r ${bg} text-white hover:opacity-90`
+        }`}
+      >
+        {isActive ? (isBn ? 'থামান' : 'Stop') : (isBn ? 'কথা বলুন' : 'Talk')}
+      </button>
     </div>
   );
 };
@@ -307,25 +345,39 @@ const HomeVoiceSection: React.FC = () => {
   const audioRef = useRef<AudioPlayer | null>(null);
   const micRef = useRef<Microphone | null>(null);
   const activeRef = useRef(false);
+  const greetingSentRef = useRef(false);
 
+  // Initialize Gemini client
   useEffect(() => {
-    if (hasValidApiKey) {
-      clientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-      log('Gemini client ready');
+    if (hasValidApiKey && !clientRef.current) {
+      try {
+        clientRef.current = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+        log('Gemini client initialized');
+      } catch (e) {
+        logError('Failed to init Gemini client:', e);
+      }
     }
-    return () => cleanup();
   }, []);
 
   const cleanup = useCallback(() => {
-    log('Cleaning up...');
     activeRef.current = false;
-    if (sessionRef.current) { try { sessionRef.current.close(); } catch (e) {} sessionRef.current = null; }
-    if (audioRef.current) { audioRef.current.stop(); audioRef.current = null; }
-    if (micRef.current) { micRef.current.stop(); micRef.current = null; }
+    greetingSentRef.current = false;
+    if (sessionRef.current) {
+      try { sessionRef.current.close(); } catch (e) {}
+      sessionRef.current = null;
+    }
+    audioRef.current?.stop();
+    audioRef.current = null;
+    micRef.current?.stop();
+    micRef.current = null;
+  }, []);
+
+  const handleStop = useCallback(() => {
+    cleanup();
     setActiveAgent(null);
     setStatus('idle');
     setError(null);
-  }, []);
+  }, [cleanup]);
 
   const handleStart = async (gender: 'male' | 'female') => {
     if (!hasValidApiKey || !clientRef.current) return;
@@ -334,6 +386,7 @@ const HomeVoiceSection: React.FC = () => {
     setActiveAgent(gender);
     setStatus('connecting');
     activeRef.current = true;
+    greetingSentRef.current = false;
 
     const agentName = gender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
     // Puck = deep male voice, Kore = female voice
@@ -361,7 +414,7 @@ const HomeVoiceSection: React.FC = () => {
         },
         callbacks: {
           onopen: async () => {
-            log('✅ Connected to Gemini Live!');
+            log('Connected to Gemini Live!');
             activeRef.current = true;
 
             // Start microphone
@@ -379,15 +432,20 @@ const HomeVoiceSection: React.FC = () => {
 
             setStatus('listening');
 
-            // Trigger greeting
-            setTimeout(() => {
-              if (sessionRef.current && activeRef.current) {
-                sessionRef.current.sendClientContent({
-                  turns: [{ role: 'user', parts: [{ text: 'হ্যালো' }] }],
-                  turnComplete: true
-                });
-              }
-            }, 500);
+            // Trigger auto-greeting immediately
+            if (!greetingSentRef.current && sessionRef.current && activeRef.current) {
+              greetingSentRef.current = true;
+              log('Sending greeting trigger...');
+              
+              // Send a greeting request to make the AI speak first
+              sessionRef.current.sendClientContent({
+                turns: [{ 
+                  role: 'user', 
+                  parts: [{ text: 'শুরু করো, নিজের পরিচয় দাও' }] 
+                }],
+                turnComplete: true
+              });
+            }
           },
 
           onmessage: (msg: any) => {
@@ -417,7 +475,7 @@ const HomeVoiceSection: React.FC = () => {
             if (e.code === 1011 && e.reason?.includes('quota')) {
               setError('API কোটা শেষ');
             } else if (e.code === 1007) {
-              setError('API Key সমস্যা - পেইড টিয়ার চেক করুন');
+              setError('API Key সমস্যা');
             } else if (e.code !== 1000) {
               setError('সংযোগ বিচ্ছিন্ন');
             }
@@ -443,7 +501,7 @@ const HomeVoiceSection: React.FC = () => {
       if (e.name === 'NotAllowedError') {
         setError('মাইক্রোফোন পারমিশন দিন');
       } else if (e.message?.includes('API') || e.message?.includes('key')) {
-        setError('API Key বা বিলিং সমস্যা');
+        setError('API Key সমস্যা');
       } else {
         setError('সংযোগ ব্যর্থ');
       }
@@ -451,57 +509,70 @@ const HomeVoiceSection: React.FC = () => {
     }
   };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { cleanup(); };
+  }, [cleanup]);
+
+  if (!hasValidApiKey) {
+    return (
+      <section className="py-16 bg-gradient-to-b from-slate-900 to-slate-800">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <h2 className="text-2xl font-bold text-white mb-4">
+            {isBn ? 'AI ভয়েস সহকারী' : 'AI Voice Assistant'}
+          </h2>
+          <p className="text-slate-400">
+            {isBn ? 'API Key কনফিগার করা হয়নি' : 'API Key not configured'}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 border border-slate-700">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-full text-sm font-semibold mb-4">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative rounded-full h-2 w-2 bg-green-400"></span>
-          </span>
-          24/7 {isBn ? 'সক্রিয়' : 'Active'}
+    <section className="py-16 bg-gradient-to-b from-slate-900 to-slate-800">
+      <div className="max-w-4xl mx-auto px-6">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 rounded-full mb-4">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-green-400 text-sm font-medium">
+              {isBn ? '২৪/৭ সক্রিয়' : '24/7 Active'}
+            </span>
+          </div>
+          <h2 className="text-3xl font-black text-white mb-3">
+            {isBn ? 'AI স্বাস্থ্য সহকারী' : 'AI Health Assistant'}
+          </h2>
+          <p className="text-slate-400">
+            {isBn ? 'বাংলায় কথা বলুন, ডাক্তার সিরিয়াল নিন' : 'Speak in Bangla, book doctor appointment'}
+          </p>
         </div>
 
-        <h3 className="text-2xl font-black text-white mb-2">
-          {isBn ? 'AI স্বাস্থ্য সহকারী' : 'AI Health Assistant'}
-        </h3>
-        <p className="text-slate-400 text-sm">
-          {isBn ? 'বাংলায় কথা বলুন, ডাক্তার সিরিয়াল নিন' : 'Speak in Bangla, Book Doctor Appointments'}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          <VoiceCard
+            name="স্বাস্থ্য"
+            gender="male"
+            status={activeAgent === 'male' ? status : 'idle'}
+            isActive={activeAgent === 'male'}
+            error={activeAgent === 'male' ? error : null}
+            onStart={() => handleStart('male')}
+            onStop={handleStop}
+          />
+          <VoiceCard
+            name="সেবা"
+            gender="female"
+            status={activeAgent === 'female' ? status : 'idle'}
+            isActive={activeAgent === 'female'}
+            error={activeAgent === 'female' ? error : null}
+            onStart={() => handleStart('female')}
+            onStop={handleStop}
+          />
+        </div>
+
+        <p className="text-center text-slate-500 text-sm">
+          {isBn ? 'Gemini Live API • রিয়েল-টাইম ভয়েস' : 'Gemini Live API • Real-time Voice'}
         </p>
-
-        {!hasValidApiKey && (
-          <div className="mt-4 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-lg text-sm">
-            API Key প্রয়োজন
-          </div>
-        )}
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <VoiceCard
-          name="স্বাস্থ্য"
-          gender="male"
-          status={activeAgent === 'male' ? status : 'idle'}
-          isActive={activeAgent === 'male'}
-          error={activeAgent === 'male' ? error : null}
-          onStart={() => handleStart('male')}
-          onStop={cleanup}
-        />
-        <VoiceCard
-          name="সেবা"
-          gender="female"
-          status={activeAgent === 'female' ? status : 'idle'}
-          isActive={activeAgent === 'female'}
-          error={activeAgent === 'female' ? error : null}
-          onStart={() => handleStart('female')}
-          onStop={cleanup}
-        />
-      </div>
-
-      <p className="text-center text-slate-500 text-xs mt-6">
-        <i className="fas fa-shield-alt mr-1"></i>
-        {isBn ? 'Gemini Live API • রিয়েল-টাইম ভয়েস' : 'Gemini Live API • Real-time Voice'}
-      </p>
-    </div>
+    </section>
   );
 };
 
