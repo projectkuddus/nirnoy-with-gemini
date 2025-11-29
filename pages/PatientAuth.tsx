@@ -22,6 +22,13 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
+  
+  // Registration fields
+  const [name, setName] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [emergencyContact, setEmergencyContact] = useState('');
 
   // Calculate date limits for DOB
   const today = new Date();
@@ -30,13 +37,6 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   
   // Check if user is under 12 (kid account)
   const isKidAccount = dateOfBirth ? (today.getFullYear() - new Date(dateOfBirth).getFullYear()) < 12 : false;
-  
-  // Registration fields
-  const [name, setName] = useState('');
-  const [gender, setGender] = useState<'male' | 'female' | ''>('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [bloodGroup, setBloodGroup] = useState('');
-  const [emergencyContact, setEmergencyContact] = useState('');
 
   // TEST MODE: Generated OTP for internal testing
   const [generatedOtp, setGeneratedOtp] = useState('');
