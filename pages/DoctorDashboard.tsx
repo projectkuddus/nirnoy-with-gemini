@@ -71,7 +71,7 @@ interface SOAPNote {
   plan: string;
 }
 
-type TabType = 'overview' | 'queue' | 'appointments' | 'schedule' | 'consult' | 'analytics' | 'rnd';
+type TabType = 'overview' | 'queue' | 'appointments' | 'schedule' | 'consult' | 'analytics' | 'rnd' | 'settings';
 
 // ============ MOCK DATA ============
 const DOCTOR_PROFILE = {
@@ -1577,6 +1577,282 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
   );
 
 
+
+  // ============ SETTINGS STATE ============
+  const [profileForm, setProfileForm] = useState({
+    name: DOCTOR_PROFILE.name,
+    nameBn: DOCTOR_PROFILE.nameBn,
+    email: 'dr.kashem@nirnoy.health',
+    phone: '01700-123456',
+    specialty: DOCTOR_PROFILE.specialty,
+    degrees: DOCTOR_PROFILE.degrees,
+    bmdcNo: DOCTOR_PROFILE.bmdcNo,
+    experience: DOCTOR_PROFILE.experience,
+    bio: 'Experienced cardiologist with 15+ years of practice. Specialized in interventional cardiology and heart failure management.',
+    consultationFee: DOCTOR_PROFILE.consultationFee,
+    followUpFee: 500,
+  });
+  const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
+  const [profileImage, setProfileImage] = useState(DOCTOR_PROFILE.image);
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'security' | 'billing' | 'notifications'>('profile');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleProfileSave = () => {
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handlePasswordChange = () => {
+    if (passwordForm.new !== passwordForm.confirm) {
+      alert('পাসওয়ার্ড মিলছে না!');
+      return;
+    }
+    if (passwordForm.new.length < 6) {
+      alert('পাসওয়ার্ড কমপক্ষে ৬ অক্ষর হতে হবে');
+      return;
+    }
+    setPasswordForm({ current: '', new: '', confirm: '' });
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // ============ RENDER SETTINGS ============
+  const renderSettings = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">সেটিংস</h2>
+          <p className="text-slate-500">প্রোফাইল, নিরাপত্তা ও বিলিং</p>
+        </div>
+        {saveSuccess && (
+          <div className="px-4 py-2 bg-green-100 text-green-700 rounded-lg flex items-center gap-2">
+            <span>✓</span> সংরক্ষিত হয়েছে!
+          </div>
+        )}
+      </div>
+
+      <div className="grid lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 h-fit">
+          <nav className="space-y-1">
+            {[
+              { id: 'profile', icon: '👤', label: 'প্রোফাইল' },
+              { id: 'security', icon: '🔒', label: 'নিরাপত্তা' },
+              { id: 'billing', icon: '💳', label: 'বিলিং' },
+              { id: 'notifications', icon: '🔔', label: 'নোটিফিকেশন' },
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => setSettingsTab(item.id as any)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-left ${
+                  settingsTab === item.id ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span>{item.icon}</span>
+                <span className="font-medium">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="lg:col-span-3 space-y-6">
+          {settingsTab === 'profile' && (
+            <>
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h3 className="font-bold text-slate-800 mb-4">প্রোফাইল ছবি</h3>
+                <div className="flex items-center gap-6">
+                  <div className="relative">
+                    <img src={profileImage} alt="" className="w-24 h-24 rounded-2xl object-cover" />
+                    <label className="absolute -bottom-2 -right-2 w-8 h-8 bg-teal-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-teal-600 transition">
+                      <span className="text-white text-sm">📷</span>
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                    </label>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600">JPG, PNG বা GIF আপলোড করুন</p>
+                    <p className="text-xs text-slate-400 mt-1">সর্বোচ্চ ২MB</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h3 className="font-bold text-slate-800 mb-4">মৌলিক তথ্য</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-slate-600">নাম (English)</label>
+                    <input type="text" value={profileForm.name} onChange={(e) => setProfileForm(p => ({...p, name: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-600">নাম (বাংলা)</label>
+                    <input type="text" value={profileForm.nameBn} onChange={(e) => setProfileForm(p => ({...p, nameBn: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-600">ইমেইল</label>
+                    <input type="email" value={profileForm.email} onChange={(e) => setProfileForm(p => ({...p, email: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-600">মোবাইল</label>
+                    <input type="tel" value={profileForm.phone} onChange={(e) => setProfileForm(p => ({...p, phone: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h3 className="font-bold text-slate-800 mb-4">পেশাগত তথ্য</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-slate-600">বিশেষত্ব</label>
+                    <select value={profileForm.specialty} onChange={(e) => setProfileForm(p => ({...p, specialty: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1">
+                      <option value="Cardiology">হৃদরোগ (Cardiology)</option>
+                      <option value="Medicine">মেডিসিন</option>
+                      <option value="Orthopedics">হাড় ও জোড়া</option>
+                      <option value="Gynecology">স্ত্রীরোগ</option>
+                      <option value="Pediatrics">শিশুরোগ</option>
+                      <option value="Dermatology">চর্মরোগ</option>
+                      <option value="ENT">নাক-কান-গলা</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-600">BMDC নম্বর</label>
+                    <input type="text" value={profileForm.bmdcNo} onChange={(e) => setProfileForm(p => ({...p, bmdcNo: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-600">ডিগ্রি</label>
+                    <input type="text" value={profileForm.degrees} onChange={(e) => setProfileForm(p => ({...p, degrees: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-600">অভিজ্ঞতা (বছর)</label>
+                    <input type="number" value={profileForm.experience} onChange={(e) => setProfileForm(p => ({...p, experience: parseInt(e.target.value)}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm text-slate-600">বায়ো / পরিচিতি</label>
+                    <textarea value={profileForm.bio} onChange={(e) => setProfileForm(p => ({...p, bio: e.target.value}))} rows={3} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                </div>
+                <button onClick={handleProfileSave} className="mt-4 px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600">
+                  সংরক্ষণ করুন
+                </button>
+              </div>
+            </>
+          )}
+
+          {settingsTab === 'security' && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <h3 className="font-bold text-slate-800 mb-4">পাসওয়ার্ড পরিবর্তন</h3>
+              <div className="max-w-md space-y-4">
+                <div>
+                  <label className="text-sm text-slate-600">বর্তমান পাসওয়ার্ড</label>
+                  <input type="password" value={passwordForm.current} onChange={(e) => setPasswordForm(p => ({...p, current: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600">নতুন পাসওয়ার্ড</label>
+                  <input type="password" value={passwordForm.new} onChange={(e) => setPasswordForm(p => ({...p, new: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600">নতুন পাসওয়ার্ড নিশ্চিত করুন</label>
+                  <input type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm(p => ({...p, confirm: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                </div>
+                <button onClick={handlePasswordChange} className="px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600">
+                  পাসওয়ার্ড পরিবর্তন করুন
+                </button>
+              </div>
+              <div className="mt-8 pt-6 border-t">
+                <h4 className="font-bold text-slate-800 mb-4">টু-ফ্যাক্টর অথেনটিকেশন</h4>
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <div>
+                    <p className="font-medium text-slate-800">SMS ভেরিফিকেশন</p>
+                    <p className="text-sm text-slate-500">লগইনের সময় OTP পাঠানো হবে</p>
+                  </div>
+                  <button className="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium">✓ সক্রিয়</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {settingsTab === 'billing' && (
+            <>
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h3 className="font-bold text-slate-800 mb-4">ফি সেটিংস</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-slate-600">নতুন রোগী ফি (৳)</label>
+                    <input type="number" value={profileForm.consultationFee} onChange={(e) => setProfileForm(p => ({...p, consultationFee: parseInt(e.target.value)}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-600">ফলো-আপ ফি (৳)</label>
+                    <input type="number" value={profileForm.followUpFee} onChange={(e) => setProfileForm(p => ({...p, followUpFee: parseInt(e.target.value)}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
+                  </div>
+                </div>
+                <button onClick={handleProfileSave} className="mt-4 px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600">সংরক্ষণ করুন</button>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h3 className="font-bold text-slate-800 mb-4">পেমেন্ট মেথড</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-4 border rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center"><span className="text-2xl">📱</span></div>
+                      <div><p className="font-medium">বিকাশ</p><p className="text-sm text-slate-500">01700-123456</p></div>
+                    </div>
+                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">প্রাইমারি</span>
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><span className="text-2xl">📱</span></div>
+                      <div><p className="font-medium">নগদ</p><p className="text-sm text-slate-500">01700-123456</p></div>
+                    </div>
+                    <button className="text-blue-600 text-sm font-medium">এডিট</button>
+                  </div>
+                  <button className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-teal-500 hover:text-teal-600 transition">+ নতুন পেমেন্ট মেথড যোগ করুন</button>
+                </div>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h3 className="font-bold text-slate-800 mb-4">এই মাসের সারাংশ</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 bg-green-50 rounded-xl"><div className="text-2xl font-bold text-green-600">৳১,৪৫,০০০</div><div className="text-sm text-green-700">মোট আয়</div></div>
+                  <div className="p-4 bg-blue-50 rounded-xl"><div className="text-2xl font-bold text-blue-600">১৫৬</div><div className="text-sm text-blue-700">মোট রোগী</div></div>
+                  <div className="p-4 bg-purple-50 rounded-xl"><div className="text-2xl font-bold text-purple-600">৳৯৩০</div><div className="text-sm text-purple-700">গড় ফি</div></div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {settingsTab === 'notifications' && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <h3 className="font-bold text-slate-800 mb-4">নোটিফিকেশন সেটিংস</h3>
+              <div className="space-y-4">
+                {[
+                  { label: 'নতুন অ্যাপয়েন্টমেন্ট', desc: 'নতুন সিরিয়াল হলে SMS পাবেন', enabled: true },
+                  { label: 'অ্যাপয়েন্টমেন্ট রিমাইন্ডার', desc: 'প্রতিদিন সকালে আজকের তালিকা', enabled: true },
+                  { label: 'রোগীর মেসেজ', desc: 'রোগী মেসেজ পাঠালে নোটিফিকেশন', enabled: false },
+                  { label: 'পেমেন্ট আপডেট', desc: 'পেমেন্ট সম্পন্ন হলে জানাবে', enabled: true },
+                  { label: 'সাপ্তাহিক রিপোর্ট', desc: 'প্রতি সপ্তাহে সারাংশ ইমেইল', enabled: false },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 border rounded-xl">
+                    <div><p className="font-medium text-slate-800">{item.label}</p><p className="text-sm text-slate-500">{item.desc}</p></div>
+                    <button className={`w-12 h-6 rounded-full transition ${item.enabled ? 'bg-teal-500' : 'bg-slate-300'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow transform transition ${item.enabled ? 'translate-x-6' : 'translate-x-0.5'}`}></div>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+
   // ============ SIDEBAR ============
   const sidebarItems = [
     { id: 'overview', icon: '🏠', label: 'ওভারভিউ', labelEn: 'Overview' },
@@ -1586,6 +1862,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
     { id: 'consult', icon: '👨‍⚕️', label: 'কনসাল্টেশন', labelEn: 'Consultation' },
     { id: 'analytics', icon: '📊', label: 'বিশ্লেষণ', labelEn: 'Analytics' },
     { id: 'rnd', icon: '🔬', label: 'R&D', labelEn: 'Research' },
+    { id: 'settings', icon: '⚙️', label: 'সেটিংস', labelEn: 'Settings' },
   ];
 
   // ============ MAIN RENDER ============
@@ -1662,6 +1939,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           {activeTab === 'consult' && renderConsultation()}
           {activeTab === 'analytics' && renderAnalytics()}
           {activeTab === 'rnd' && renderRnD()}
+          {activeTab === 'settings' && renderSettings()}
         </div>
       </main>
     </div>
