@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { chatWithHealthAssistant } from '../services/geminiService';
 import { ChatMessage, PrescriptionItem } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth, PatientProfile } from '../contexts/AuthContext';
 
 // ============ TYPES ============
 interface HealthProfile {
@@ -187,7 +188,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
   const [activeTab, setActiveTab] = useState<'home' | 'doctors' | 'chat' | 'profile'>('home');
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'model', text: `আসসালামু আলাইকুম ${PATIENT.nameBn}! 👋\n\nআমি নির্ণয় - আপনার স্বাস্থ্য সহকারী।\n\n📊 সারসংক্ষেপ:\n• সামগ্রিক: ভালো ✅\n• হৃদযন্ত্র: নজরদারি ⚠️\n\nকোথাও সমস্যা হচ্ছে? 🩺`, timestamp: Date.now() }
+    { role: 'model', text: `আসসালামু আলাইকুম ${patientData.nameBn}! 👋\n\nআমি নির্ণয় - আপনার স্বাস্থ্য সহকারী।\n\n📊 সারসংক্ষেপ:\n• সামগ্রিক: ভালো ✅\n• হৃদযন্ত্র: নজরদারি ⚠️\n\nকোথাও সমস্যা হচ্ছে? 🩺`, timestamp: Date.now() }
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
@@ -195,11 +196,11 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const overallScore = useMemo(() => Math.round(bodyHealth.reduce((sum, p) => sum + p.score, 0) / bodyHealth.length), [bodyHealth]);
-  const age = new Date().getFullYear() - new Date(PATIENT.dateOfBirth).getFullYear();
+  const age = new Date().getFullYear() - new Date(patientData.dateOfBirth).getFullYear();
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const buildContext = () => `রোগী: ${PATIENT.nameBn}, ${age} বছর\nসমস্যা: ${PATIENT.chronicConditions.join(', ')}\nপরিবার: ${PATIENT.familyHistory.map(h => `${h.relation}-${h.condition}`).join(', ')}\nনির্দেশ: সহজ বাংলায় উত্তর দিন।`;
+  const buildContext = () => `রোগী: ${patientData.nameBn}, ${age} বছর\nসমস্যা: ${patientData.chronicConditions.join(', ')}\nপরিবার: ${patientData.familyHistory.map(h => `${h.relation}-${h.condition}`).join(', ')}\nনির্দেশ: সহজ বাংলায় উত্তর দিন।`;
 
   const handleBodyPartClick = (partId: string) => {
     setSelectedBodyPart(partId);
@@ -239,11 +240,11 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
       {/* Profile Card */}
       <div className="bg-gradient-to-br from-teal-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg">
         <div className="flex items-center gap-4">
-          <img src={PATIENT.profileImage} alt="" className="w-14 h-14 rounded-xl border-2 border-white/30" />
+          <img src={patientData.profileImage} alt="" className="w-14 h-14 rounded-xl border-2 border-white/30" />
           <div>
             <p className="text-white/70 text-sm">আসসালামু আলাইকুম</p>
-            <h1 className="text-xl font-bold">{PATIENT.nameBn}</h1>
-            <p className="text-sm text-white/80">{age} বছর • {PATIENT.bloodGroup}</p>
+            <h1 className="text-xl font-bold">{patientData.nameBn}</h1>
+            <p className="text-sm text-white/80">{age} বছর • {patientData.bloodGroup}</p>
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
@@ -271,11 +272,11 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
       <div className="space-y-3">
         <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 flex items-start gap-3">
           <span className="text-xl">👨‍👩‍👧‍👦</span>
-          <div><h3 className="font-bold text-purple-900 text-sm">পারিবারিক ইতিহাস</h3><p className="text-xs text-purple-700 mt-1">{PATIENT.familyHistory.map(h => `${h.relation}: ${h.condition}`).join(' • ')}</p></div>
+          <div><h3 className="font-bold text-purple-900 text-sm">পারিবারিক ইতিহাস</h3><p className="text-xs text-purple-700 mt-1">{patientData.familyHistory.map(h => `${h.relation}: ${h.condition}`).join(' • ')}</p></div>
         </div>
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
           <span className="text-xl">💊</span>
-          <div><h3 className="font-bold text-blue-900 text-sm">বর্তমান ওষুধ</h3><p className="text-xs text-blue-700 mt-1">{PATIENT.currentMedications.join(', ')}</p></div>
+          <div><h3 className="font-bold text-blue-900 text-sm">বর্তমান ওষুধ</h3><p className="text-xs text-blue-700 mt-1">{patientData.currentMedications.join(', ')}</p></div>
         </div>
       </div>
 
@@ -332,22 +333,22 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
   const renderProfile = () => (
     <div className="space-y-4">
       <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100 text-center">
-        <img src={PATIENT.profileImage} alt="" className="w-20 h-20 rounded-full mx-auto border-4 border-teal-100" />
-        <h2 className="font-bold text-xl text-slate-800 mt-3">{PATIENT.nameBn}</h2>
-        <p className="text-slate-500">ID: {PATIENT.id}</p>
+        <img src={patientData.profileImage} alt="" className="w-20 h-20 rounded-full mx-auto border-4 border-teal-100" />
+        <h2 className="font-bold text-xl text-slate-800 mt-3">{patientData.nameBn}</h2>
+        <p className="text-slate-500">ID: {patientData.id}</p>
         <div className="flex justify-center gap-4 mt-3 text-sm">
-          <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-bold">{PATIENT.bloodGroup}</span>
+          <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full font-bold">{patientData.bloodGroup}</span>
           <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full">{age} বছর</span>
         </div>
       </div>
       <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 space-y-3">
-        {[{ l: 'ফোন', v: PATIENT.phone }, { l: 'উচ্চতা', v: `${PATIENT.height} সেমি` }, { l: 'ওজন', v: `${PATIENT.weight} কেজি` }].map((r, i) => (
+        {[{ l: 'ফোন', v: patientData.phone }, { l: 'উচ্চতা', v: `${patientData.height} সেমি` }, { l: 'ওজন', v: `${patientData.weight} কেজি` }].map((r, i) => (
           <div key={i} className="flex justify-between text-sm"><span className="text-slate-500">{r.l}</span><span className="font-medium">{r.v}</span></div>
         ))}
       </div>
       <div className="bg-red-50 rounded-xl p-4 border border-red-100">
         <h3 className="font-bold text-red-800 text-sm mb-2">⚠️ এলার্জি</h3>
-        <div className="flex gap-2">{PATIENT.allergies.map((a, i) => <span key={i} className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">{a}</span>)}</div>
+        <div className="flex gap-2">{patientData.allergies.map((a, i) => <span key={i} className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">{a}</span>)}</div>
       </div>
     </div>
   );
@@ -359,8 +360,8 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
       <div className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col h-screen sticky top-0">
         <div className="p-5 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <img src={PATIENT.profileImage} alt="" className="w-12 h-12 rounded-xl" />
-            <div><h3 className="font-bold text-slate-800">{PATIENT.nameBn}</h3><p className="text-xs text-slate-500">ID: {PATIENT.id}</p></div>
+            <img src={patientData.profileImage} alt="" className="w-12 h-12 rounded-xl" />
+            <div><h3 className="font-bold text-slate-800">{patientData.nameBn}</h3><p className="text-xs text-slate-500">ID: {patientData.id}</p></div>
           </div>
         </div>
         <div className="p-4 mx-4 mt-4 bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl border border-teal-100">

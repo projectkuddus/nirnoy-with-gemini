@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getFeedbacks, updateFeedbackStatus } from '../components/FeedbackWidget';
+import { useAuth, DoctorProfile } from '../contexts/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
 // ============ TYPES ============
-type AdminTab = 'overview' | 'users' | 'subscriptions' | 'payments' | 'feedback' | 'credits' | 'analytics' | 'settings';
+type AdminTab = 'overview' | 'users' | 'doctors' | 'subscriptions' | 'payments' | 'feedback' | 'credits' | 'analytics' | 'settings';
 
 interface DashboardStats {
   totalUsers: number;
@@ -81,6 +82,40 @@ const PLAN_DISTRIBUTION = [
 
 // ============ COMPONENT ============
 export const AdminDashboard: React.FC = () => {
+  const { getAllPendingDoctors, approveDoctor, rejectDoctor, getAllUsers } = useAuth();
+  const [pendingDoctors, setPendingDoctors] = useState<DoctorProfile[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  
+  // Load pending doctors
+  useEffect(() => {
+    const loadData = async () => {
+      const doctors = await getAllPendingDoctors();
+      setPendingDoctors(doctors);
+      const users = await getAllUsers();
+      setAllUsers(users);
+    };
+    loadData();
+  }, []);
+  
+  const handleApproveDoctor = async (doctorId: string) => {
+    const result = await approveDoctor(doctorId);
+    if (result.success) {
+      setPendingDoctors(prev => prev.filter(d => d.id !== doctorId));
+      alert('ডাক্তার অনুমোদিত হয়েছে! / Doctor approved!');
+    }
+  };
+  
+  const handleRejectDoctor = async (doctorId: string) => {
+    const reason = prompt('প্রত্যাখ্যানের কারণ লিখুন / Enter rejection reason:');
+    if (reason) {
+      const result = await rejectDoctor(doctorId, reason);
+      if (result.success) {
+        setPendingDoctors(prev => prev.filter(d => d.id !== doctorId));
+        alert('ডাক্তার প্রত্যাখ্যাত হয়েছে / Doctor rejected');
+      }
+    }
+  };
+
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
