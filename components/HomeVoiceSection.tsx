@@ -466,7 +466,7 @@ const HomeVoiceSection: React.FC = () => {
           {isBn ? 'AI স্বাস্থ্য সহকারী' : 'AI Health Assistant'}
         </h3>
         <p className="text-slate-400 text-sm">
-          {isBn ? 'বাংলায় কথা বলুন, স্বাস্থ্য পরামর্শ নিন' : 'Speak in Bangla'}
+          {isBn ? 'বাংলায় কথা বলুন, ডাক্তার সিরিয়াল নিন' : 'Speak in Bangla, Book Doctor Appointments'}
         </p>
 
         {!hasValidApiKey && (
