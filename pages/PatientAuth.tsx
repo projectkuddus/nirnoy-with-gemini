@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import LanguageToggle from '../components/LanguageToggle';
 
 type AuthStep = 'phone' | 'otp' | 'register' | 'success';
@@ -12,6 +13,7 @@ interface PatientAuthProps {
 export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { sendOTP, verifyOTP, registerPatient, user } = useAuth();
   const isBn = language === 'bn';
 
   // State
@@ -103,17 +105,16 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
     setError('');
     setIsLoading(true);
     
-    // Generate test OTP
-    const testOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(testOtp);
+    const result = await sendOTP(phone);
     
-    await new Promise(r => setTimeout(r, 1000));
+    if (result.success) {
+      setGeneratedOtp(result.otp || '');
+      setStep('otp');
+      setCountdown(60);
+    } else {
+      setError(result.error || 'Failed to send OTP');
+    }
     
-    // Check if user exists (for demo, new users have numbers ending in 0-4)
-    const lastDigit = parseInt(phone.slice(-1));
-    setIsNewUser(lastDigit >= 0 && lastDigit <= 4);
-    setStep('otp');
-    setCountdown(60);
     setIsLoading(false);
   };
 
@@ -160,39 +161,53 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
     setError('');
     setIsLoading(true);
     
-    await new Promise(r => setTimeout(r, 1500));
+    const result = await verifyOTP(phone, otpValue);
     
-    // Verify OTP: Accept generated OTP or bypass code (000000)
-    if (otpValue !== generatedOtp && otpValue !== TEST_BYPASS_CODE) {
-      setError(isBn ? 'ভুল OTP। আবার চেষ্টা করুন।' : 'Wrong OTP. Please try again.');
-      setIsLoading(false);
-      return;
-    }
-    
-    if (isNewUser) {
-      setStep('register');
+    if (result.success) {
+      if (result.isNewUser) {
+        setIsNewUser(true);
+        setStep('register');
+      } else {
+        // Existing user - logged in
+        if (onLogin) onLogin('PATIENT');
+        setStep('success');
+      }
     } else {
-      // Existing user - save phone for now, name will be fetched from backend
-      localStorage.setItem('nirnoy_user', JSON.stringify({ phone, name: 'ব্যবহারকারী' }));
-      setStep('success');
+      setError(result.error || 'Invalid OTP');
     }
+    
     setIsLoading(false);
   };
 
   // Handle registration
   const handleRegister = async () => {
-    if (!name.trim() || !gender) {
-      setError(isBn ? 'নাম ও লিঙ্গ আবশ্যক' : 'Name and gender required');
+    if (!name.trim() || !gender || !dateOfBirth) {
+      setError(isBn ? 'নাম, লিঙ্গ ও জন্ম তারিখ আবশ্যক' : 'Name, gender and date of birth required');
       return;
     }
     setError('');
     setIsLoading(true);
     
-    await new Promise(r => setTimeout(r, 1500));
+    const result = await registerPatient({
+      phone,
+      name: name.trim(),
+      gender: gender as 'male' | 'female',
+      dateOfBirth,
+      bloodGroup: bloodGroup || undefined,
+      emergencyContact: emergencyContact ? {
+        name: '',
+        relation: '',
+        phone: emergencyContact,
+      } : undefined,
+    });
     
-    // In real app: Save user to backend
-    localStorage.setItem('nirnoy_user', JSON.stringify({ name, phone, gender }));
-    setStep('success');
+    if (result.success) {
+      if (onLogin) onLogin('PATIENT');
+      setStep('success');
+    } else {
+      setError(result.error || 'Registration failed');
+    }
+    
     setIsLoading(false);
   };
 
