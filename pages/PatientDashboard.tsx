@@ -183,7 +183,32 @@ interface PatientDashboardProps {
 export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { user, logout } = useAuth();
   const isBn = true;
+  
+  // Use real user data if available, otherwise use demo data
+  const patientData = user && user.role === 'PATIENT' ? {
+    id: user.id,
+    name: user.name,
+    nameBn: user.nameBn || user.name,
+    phone: user.phone,
+    dateOfBirth: (user as PatientProfile).dateOfBirth || '1990-01-01',
+    gender: (user as PatientProfile).gender || 'male',
+    bloodGroup: (user as PatientProfile).bloodGroup || 'O+',
+    height: (user as PatientProfile).height || 170,
+    weight: (user as PatientProfile).weight || 70,
+    profileImage: user.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=3b82f6&color=fff&size=200',
+    emergencyContact: (user as PatientProfile).emergencyContact || { name: '', relation: '', phone: '' },
+    allergies: (user as PatientProfile).allergies || [],
+    chronicConditions: (user as PatientProfile).chronicConditions || [],
+    currentMedications: (user as PatientProfile).currentMedications || [],
+    familyHistory: (user as PatientProfile).familyHistory || [],
+    healthScore: (user as PatientProfile).healthScore || 50,
+    credits: (user as PatientProfile).credits || 0,
+    badges: (user as PatientProfile).badges || [],
+    streak: (user as PatientProfile).streak || 0,
+    subscription: (user as PatientProfile).subscription || { tier: 'free', features: [] },
+  } : PATIENT;
   
   const [activeTab, setActiveTab] = useState<'home' | 'doctors' | 'chat' | 'profile'>('home');
   const [chatInput, setChatInput] = useState('');
