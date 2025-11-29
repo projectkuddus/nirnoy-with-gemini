@@ -10,6 +10,37 @@ const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
 const log = (...args: any[]) => console.log('[Voice]', ...args);
 const logError = (...args: any[]) => console.error('[Voice ERROR]', ...args);
 
+// ============ USER AUTH HELPER ============
+interface UserInfo {
+  isLoggedIn: boolean;
+  name?: string;
+  phone?: string;
+  role?: string;
+}
+
+function getUserInfo(): UserInfo {
+  try {
+    const role = localStorage.getItem('nirnoy_role');
+    const userDataStr = localStorage.getItem('nirnoy_user');
+    
+    if (role && role !== 'GUEST') {
+      let userData: any = {};
+      if (userDataStr) {
+        try { userData = JSON.parse(userDataStr); } catch (e) {}
+      }
+      return {
+        isLoggedIn: true,
+        name: userData.name || undefined,
+        phone: userData.phone || undefined,
+        role: role
+      };
+    }
+  } catch (e) {
+    logError('Error reading user info:', e);
+  }
+  return { isLoggedIn: false };
+}
+
 // ============ AUDIO PLAYER ============
 class AudioPlayer {
   private audioContext: AudioContext | null = null;
@@ -164,11 +195,10 @@ class Microphone {
   }
 }
 
-// ============ GENERATE DOCTOR DATABASE FOR PROMPT ============
+// ============ GENERATE DOCTOR DATABASE ============
 function generateDoctorKnowledge(): string {
   const totalDoctors = MOCK_DOCTORS.length;
   
-  // Count by specialty
   const specialtyCounts: Record<string, number> = {};
   const specialtyDoctors: Record<string, typeof MOCK_DOCTORS> = {};
   
@@ -182,25 +212,24 @@ function generateDoctorKnowledge(): string {
     });
   });
 
-  // Generate specialty summary
   const specialtySummary = Object.entries(specialtyCounts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
+    .slice(0, 12)
     .map(([spec, count]) => {
       const docs = specialtyDoctors[spec] || [];
       const docNames = docs.map(d => `${d.name} (${d.chambers[0]?.fee || 500} টাকা)`).join(', ');
-      return `${spec}: ${count} জন ডাক্তার। যেমন: ${docNames}`;
+      return `${spec}: ${count} জন। যেমন: ${docNames}`;
     })
     .join('\n');
 
-  return `মোট ডাক্তার: ${totalDoctors} জন বিশেষজ্ঞ ডাক্তার নির্ণয়তে আছেন।
+  return `মোট ডাক্তার: ${totalDoctors} জন বিশেষজ্ঞ ডাক্তার।
 
 বিশেষত্ব অনুযায়ী:
 ${specialtySummary}`;
 }
 
 // ============ SYSTEM PROMPT ============
-function getSystemPrompt(agentName: string, gender: 'male' | 'female'): string {
+function getSystemPrompt(agentName: string, gender: 'male' | 'female', userInfo: UserInfo): string {
   const hour = new Date().getHours();
   let greeting = 'শুভ সন্ধ্যা';
   if (hour >= 5 && hour < 12) greeting = 'সুপ্রভাত';
@@ -214,67 +243,91 @@ function getSystemPrompt(agentName: string, gender: 'male' | 'female'): string {
     ? 'তুমি একজন অভিজ্ঞ, বিশ্বস্ত বড় ভাইয়ের মতো। গম্ভীর কিন্তু যত্নশীল।'
     : 'তুমি একজন সহানুভূতিশীল, মিষ্টি বোনের মতো। উষ্ণ এবং সহায়ক।';
 
+  // Different greeting and capabilities based on login status
+  let userContext = '';
+  let bookingCapability = '';
+  let initialGreeting = '';
+
+  if (userInfo.isLoggedIn && userInfo.name) {
+    userContext = `
+বর্তমান ব্যবহারকারী: ${userInfo.name} (লগইন করা আছে)
+এই ব্যবহারকারী রেজিস্টার্ড, তাই তুমি তার জন্য সিরিয়াল বুক করতে পারবে।`;
+    
+    bookingCapability = `
+সিরিয়াল বুকিং (শুধু লগইন করা ব্যবহারকারীর জন্য):
+১. সমস্যা শুনে উপযুক্ত ডাক্তার সাজেস্ট করো
+২. ডাক্তার পছন্দ হলে তারিখ ও সময় জিজ্ঞেস করো
+৩. বুকিং কনফার্ম করো: "${userInfo.name}, আপনার সিরিয়াল বুক হয়ে গেছে!"`;
+
+    initialGreeting = `"আসসালামু আলাইকুম ${userInfo.name}! ${greeting}! আমি ${agentName}। কেমন আছেন? আজ কী সেবা লাগবে?"`;
+  } else {
+    userContext = `
+বর্তমান ব্যবহারকারী: অতিথি (লগইন করা নেই)
+এই ব্যবহারকারী রেজিস্টার্ড নয়, তাই তুমি সিরিয়াল বুক করতে পারবে না।
+শুধু ডাক্তার সাজেস্ট করতে পারবে এবং তথ্য দিতে পারবে।`;
+
+    bookingCapability = `
+গুরুত্বপূর্ণ সীমাবদ্ধতা:
+- তুমি এই ব্যবহারকারীর জন্য সিরিয়াল বুক করতে পারবে না
+- শুধু ডাক্তার সাজেস্ট করতে পারবে
+- সিরিয়াল নিতে চাইলে বলো: "সিরিয়াল নিতে হলে আগে অ্যাকাউন্ট খুলতে হবে। 'শুরু করুন' বাটনে ক্লিক করুন।"
+- অথবা বলো: "আপনি ওয়েবসাইটে গিয়ে সহজেই রেজিস্ট্রেশন করতে পারবেন, তারপর সিরিয়াল নিতে পারবেন।"`;
+
+    initialGreeting = `"আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। কেমন আছেন? কী সমস্যা বলুন, আমি উপযুক্ত ডাক্তার খুঁজে দেব।"`;
+  }
+
   return `তুমি "${agentName}" - নির্ণয় হেলথের ${genderWord} AI সহকারী। ${personality}
+${userContext}
 
 প্রথম কথা (সংযোগ হলেই বলবে):
-"আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। কেমন আছেন? আজ কীভাবে সাহায্য করতে পারি?"
+${initialGreeting}
 
 তোমার ব্যক্তিত্ব:
-- একজন বাস্তব মানুষের মতো কথা বলো, রোবটের মতো নয়
+- একজন বাস্তব মানুষের মতো কথা বলো
 - রোগীর কথা মনোযোগ দিয়ে শোনো
 - সহানুভূতি দেখাও: "বুঝতে পারছি, এটা কষ্টকর"
 - প্রশ্ন করো: "কতদিন ধরে এই সমস্যা?", "ব্যথা কোথায় বেশি?"
 - আশ্বস্ত করো: "চিন্তা করবেন না, ভালো ডাক্তার আছেন"
 
-নির্ণয় সম্পর্কে (যদি জিজ্ঞেস করে):
-- নির্ণয় বাংলাদেশের প্রথম AI স্বাস্থ্যসেবা প্ল্যাটফর্ম
+নির্ণয় সম্পর্কে:
+- বাংলাদেশের প্রথম AI স্বাস্থ্যসেবা প্ল্যাটফর্ম
 - ওয়েবসাইট: nirnoy.ai
 - ${MOCK_DOCTORS.length} জনের বেশি বিশেষজ্ঞ ডাক্তার
-- ২৪ ঘণ্টা AI সহায়তা পাবেন
-- ঘরে বসেই অনলাইনে সিরিয়াল নিতে পারবেন
-- পরিবারের সবার স্বাস্থ্য তথ্য এক জায়গায় রাখতে পারবেন
-- সম্পূর্ণ নিরাপদ ও গোপনীয়
+- ২৪ ঘণ্টা AI সহায়তা
+- ঘরে বসে অনলাইন সিরিয়াল
+- পারিবারিক স্বাস্থ্য ট্র্যাকিং
 
 ডাক্তার তথ্য:
 ${doctorKnowledge}
+${bookingCapability}
 
-সমস্যা বুঝে ডাক্তার সাজেস্ট করো:
-- জ্বর, সর্দি, কাশি, দুর্বলতা, মাথাব্যথা → মেডিসিন বিশেষজ্ঞ
-- বুকে ব্যথা, হার্টের ধড়ফড়, উচ্চ রক্তচাপ → হৃদরোগ বিশেষজ্ঞ
-- মহিলাদের সমস্যা, গর্ভধারণ, মাসিক → স্ত্রীরোগ বিশেষজ্ঞ
+সমস্যা থেকে ডাক্তার সাজেস্ট:
+- জ্বর, সর্দি, কাশি, মাথাব্যথা → মেডিসিন বিশেষজ্ঞ
+- বুকে ব্যথা, হার্টের সমস্যা → হৃদরোগ বিশেষজ্ঞ
+- মহিলাদের সমস্যা → স্ত্রীরোগ বিশেষজ্ঞ
 - বাচ্চাদের অসুখ → শিশুরোগ বিশেষজ্ঞ
-- হাড়ে ব্যথা, কোমর ব্যথা, জয়েন্ট → হাড় ও জোড়া বিশেষজ্ঞ
-- চুলকানি, ত্বকের সমস্যা, এলার্জি → চর্মরোগ বিশেষজ্ঞ
-- কানে সমস্যা, নাক বন্ধ, গলা ব্যথা → নাক-কান-গলা বিশেষজ্ঞ
-- চোখে সমস্যা, চশমা → চক্ষু বিশেষজ্ঞ
-- ডায়াবেটিস, থাইরয়েড → ডায়াবেটিস বিশেষজ্ঞ
-- পেটের সমস্যা, গ্যাস, বদহজম → গ্যাস্ট্রো বিশেষজ্ঞ
-- কিডনি সমস্যা → নেফ্রোলজি বিশেষজ্ঞ
-- মানসিক সমস্যা, ঘুম না হওয়া, দুশ্চিন্তা → মানসিক রোগ বিশেষজ্ঞ
-- দাঁতের সমস্যা → ডেন্টাল বিশেষজ্ঞ
-
-সিরিয়াল বুকিং প্রক্রিয়া:
-১. প্রথমে সমস্যা ভালোভাবে বুঝো
-২. উপযুক্ত বিশেষত্বের ডাক্তার সাজেস্ট করো (নাম, ফি সহ)
-৩. রোগী রাজি হলে তারিখ ও সময় জিজ্ঞেস করো
-৪. বুকিং কনফার্ম করে বলো: "আপনার সিরিয়াল হয়ে গেছে। ধন্যবাদ!"
+- হাড়ে ব্যথা, কোমর ব্যথা → হাড় ও জোড়া বিশেষজ্ঞ
+- চুলকানি, ত্বকের সমস্যা → চর্মরোগ বিশেষজ্ঞ
+- কান, নাক, গলা → নাক-কান-গলা বিশেষজ্ঞ
+- চোখের সমস্যা → চক্ষু বিশেষজ্ঞ
+- ডায়াবেটিস → ডায়াবেটিস বিশেষজ্ঞ
+- পেটের সমস্যা → গ্যাস্ট্রো বিশেষজ্ঞ
+- মানসিক সমস্যা → মানসিক রোগ বিশেষজ্ঞ
 
 কথা বলার নিয়ম:
 - সবসময় বাংলায় কথা বলো
-- ছোট ছোট বাক্যে কথা বলো (২-৩ বাক্য)
-- "আপনি", "জ্বী", "ধন্যবাদ", "আলহামদুলিল্লাহ" ব্যবহার করো
+- ছোট বাক্যে কথা বলো (২-৩ বাক্য)
+- "আপনি", "জ্বী", "ধন্যবাদ" ব্যবহার করো
 - ইমোজি বা ইংরেজি এড়িয়ে চলো
-- প্রশ্ন করো, শুধু তথ্য দিও না
 
 জরুরি অবস্থা:
-বুকে তীব্র ব্যথা, শ্বাসকষ্ট, অজ্ঞান, খিঁচুনি হলে সাথে সাথে বলো:
-"এটা জরুরি! এখনই ৯৯৯ এ কল করুন বা নিকটস্থ হাসপাতালে যান!"
+বুকে তীব্র ব্যথা, শ্বাসকষ্ট, অজ্ঞান হলে বলো:
+"এটা জরুরি! এখনই ৯৯৯ এ কল করুন!"
 
 যা করবে না:
-- কোনো ওষুধের নাম বা ডোজ বলবে না
-- রোগ নির্ণয় করবে না, শুধু ডাক্তারের কাছে পাঠাবে
-- ব্যক্তিগত বা আর্থিক তথ্য চাইবে না
-- অন্য কোনো অ্যাপ বা হাসপাতালের কথা বলবে না`;
+- ওষুধের নাম বা ডোজ বলবে না
+- রোগ নির্ণয় করবে না
+- ব্যক্তিগত তথ্য চাইবে না`;
 }
 
 // ============ TYPES ============
@@ -287,9 +340,10 @@ const VoiceCard: React.FC<{
   status: Status;
   isActive: boolean;
   error: string | null;
+  isLoggedIn: boolean;
   onStart: () => void;
   onStop: () => void;
-}> = ({ name, gender, status, isActive, error, onStart, onStop }) => {
+}> = ({ name, gender, status, isActive, error, isLoggedIn, onStart, onStop }) => {
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
@@ -317,6 +371,18 @@ const VoiceCard: React.FC<{
             {gender === 'male' ? (isBn ? 'পুরুষ সহকারী' : 'Male') : (isBn ? 'মহিলা সহকারী' : 'Female')}
           </p>
         </div>
+      </div>
+
+      {/* Login status indicator */}
+      <div className={`text-xs px-2 py-1 rounded-full mb-3 inline-block ${
+        isLoggedIn 
+          ? 'bg-green-100 text-green-700' 
+          : 'bg-yellow-100 text-yellow-700'
+      }`}>
+        {isLoggedIn 
+          ? (isBn ? '✓ সিরিয়াল বুক করতে পারবেন' : '✓ Can book appointments')
+          : (isBn ? '○ শুধু ডাক্তার সাজেশন' : '○ Doctor suggestions only')
+        }
       </div>
 
       {isActive && (
@@ -382,6 +448,7 @@ const HomeVoiceSection: React.FC = () => {
   const [activeAgent, setActiveAgent] = useState<'male' | 'female' | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [userInfo, setUserInfo] = useState<UserInfo>({ isLoggedIn: false });
 
   const clientRef = useRef<GoogleGenAI | null>(null);
   const sessionRef = useRef<any>(null);
@@ -389,6 +456,26 @@ const HomeVoiceSection: React.FC = () => {
   const micRef = useRef<Microphone | null>(null);
   const activeRef = useRef(false);
   const greetingSentRef = useRef(false);
+
+  // Check user login status
+  useEffect(() => {
+    const checkUser = () => {
+      const info = getUserInfo();
+      setUserInfo(info);
+      log('User info:', info);
+    };
+    
+    checkUser();
+    // Re-check when storage changes
+    window.addEventListener('storage', checkUser);
+    // Also check periodically in case of same-tab login
+    const interval = setInterval(checkUser, 2000);
+    
+    return () => {
+      window.removeEventListener('storage', checkUser);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (hasValidApiKey && !clientRef.current) {
@@ -424,6 +511,10 @@ const HomeVoiceSection: React.FC = () => {
   const handleStart = async (gender: 'male' | 'female') => {
     if (!hasValidApiKey || !clientRef.current) return;
 
+    // Refresh user info before starting
+    const currentUserInfo = getUserInfo();
+    setUserInfo(currentUserInfo);
+
     cleanup();
     setActiveAgent(gender);
     setStatus('connecting');
@@ -440,12 +531,12 @@ const HomeVoiceSection: React.FC = () => {
 
       micRef.current = new Microphone();
 
-      log('Connecting to Gemini Live API...');
+      log('Connecting with user info:', currentUserInfo);
       const session = await clientRef.current.live.connect({
         model: 'gemini-2.0-flash-exp',
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: getSystemPrompt(agentName, gender),
+          systemInstruction: getSystemPrompt(agentName, gender, currentUserInfo),
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName } }
           }
@@ -587,6 +678,7 @@ const HomeVoiceSection: React.FC = () => {
             status={activeAgent === 'male' ? status : 'idle'}
             isActive={activeAgent === 'male'}
             error={activeAgent === 'male' ? error : null}
+            isLoggedIn={userInfo.isLoggedIn}
             onStart={() => handleStart('male')}
             onStop={handleStop}
           />
@@ -596,13 +688,17 @@ const HomeVoiceSection: React.FC = () => {
             status={activeAgent === 'female' ? status : 'idle'}
             isActive={activeAgent === 'female'}
             error={activeAgent === 'female' ? error : null}
+            isLoggedIn={userInfo.isLoggedIn}
             onStart={() => handleStart('female')}
             onStop={handleStop}
           />
         </div>
 
         <p className="text-center text-slate-500 text-sm">
-          {isBn ? `${MOCK_DOCTORS.length}+ ডাক্তার • Gemini Live API` : `${MOCK_DOCTORS.length}+ Doctors • Gemini Live API`}
+          {userInfo.isLoggedIn 
+            ? (isBn ? `${userInfo.name || 'ব্যবহারকারী'} • ${MOCK_DOCTORS.length}+ ডাক্তার` : `${userInfo.name || 'User'} • ${MOCK_DOCTORS.length}+ Doctors`)
+            : (isBn ? `${MOCK_DOCTORS.length}+ ডাক্তার • অ্যাকাউন্ট খুলে সিরিয়াল নিন` : `${MOCK_DOCTORS.length}+ Doctors • Register to book`)
+          }
         </p>
       </div>
     </section>

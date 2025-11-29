@@ -150,6 +150,8 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
     if (isNewUser) {
       setStep('register');
     } else {
+      // Existing user - save phone for now, name will be fetched from backend
+      localStorage.setItem('nirnoy_user', JSON.stringify({ phone, name: 'ব্যবহারকারী' }));
       setStep('success');
     }
     setIsLoading(false);
@@ -167,6 +169,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
     await new Promise(r => setTimeout(r, 1500));
     
     // In real app: Save user to backend
+    localStorage.setItem('nirnoy_user', JSON.stringify({ name, phone, gender }));
     setStep('success');
     setIsLoading(false);
   };
