@@ -333,7 +333,7 @@ ${bookingCapability}
 // ============ TYPES ============
 type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error';
 
-// ============ VOICE CARD ============
+// ============ VOICE CARD - GLASSMORPHISM ============
 const VoiceCard: React.FC<{
   name: string;
   gender: 'male' | 'female';
@@ -355,87 +355,116 @@ const VoiceCard: React.FC<{
     error: error || (isBn ? 'সমস্যা' : 'Error'),
   };
 
-  const bg = gender === 'male' ? 'from-blue-500 to-indigo-600' : 'from-pink-500 to-rose-600';
+  const gradient = gender === 'male' 
+    ? 'from-blue-500 via-indigo-500 to-violet-600' 
+    : 'from-pink-500 via-rose-500 to-red-500';
+  const glow = gender === 'male' ? 'shadow-blue-500/40' : 'shadow-pink-500/40';
+  const bgTint = gender === 'male' ? 'from-blue-500/5 to-indigo-500/10' : 'from-pink-500/5 to-rose-500/10';
 
   return (
-    <div className={`bg-white rounded-2xl p-6 border-2 transition-all ${
-      isActive ? 'border-blue-500 shadow-xl' : 'border-slate-200 hover:border-slate-300'
+    <div className={`relative overflow-hidden rounded-3xl transition-all duration-500 group ${
+      isActive ? `shadow-2xl ${glow} scale-[1.02]` : 'hover:scale-[1.01] hover:shadow-xl'
     }`}>
-      <div className="flex items-center gap-4 mb-4">
-        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${bg} flex items-center justify-center`}>
-          <span className="text-white text-lg font-bold">{gender === 'male' ? 'স্বা' : 'সে'}</span>
-        </div>
-        <div>
-          <h3 className="font-bold text-lg text-slate-800">{name}</h3>
-          <p className="text-sm text-slate-500">
-            {gender === 'male' ? (isBn ? 'পুরুষ সহকারী' : 'Male') : (isBn ? 'মহিলা সহকারী' : 'Female')}
-          </p>
-        </div>
-      </div>
-
-      {/* Login status indicator */}
-      <div className={`text-xs px-2 py-1 rounded-full mb-3 inline-block ${
-        isLoggedIn 
-          ? 'bg-green-100 text-green-700' 
-          : 'bg-yellow-100 text-yellow-700'
-      }`}>
-        {isLoggedIn 
-          ? (isBn ? '✓ সিরিয়াল বুক করতে পারবেন' : '✓ Can book appointments')
-          : (isBn ? '○ শুধু ডাক্তার সাজেশন' : '○ Doctor suggestions only')
-        }
-      </div>
-
-      {isActive && (
-        <div className="mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className={`w-3 h-3 rounded-full ${
-              status === 'speaking' ? 'bg-purple-500 animate-pulse' :
-              status === 'listening' ? 'bg-green-500 animate-pulse' :
-              status === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-              status === 'error' ? 'bg-red-500' : 'bg-slate-400'
-            }`}></div>
-            <span className="text-sm text-slate-600">{statusText[status]}</span>
+      {/* Glass background layers */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${bgTint}`}></div>
+      <div className="absolute inset-0 backdrop-blur-[2px]"></div>
+      
+      {/* Animated glow orbs */}
+      <div className={`absolute -top-16 -right-16 w-40 h-40 rounded-full bg-gradient-to-br ${gradient} opacity-20 blur-3xl transition-opacity duration-500 ${isActive ? 'opacity-40' : 'group-hover:opacity-30'}`}></div>
+      <div className={`absolute -bottom-12 -left-12 w-32 h-32 rounded-full bg-gradient-to-br ${gradient} opacity-10 blur-2xl`}></div>
+      
+      {/* Main card content */}
+      <div className="relative p-6 bg-white/90 backdrop-blur-xl rounded-3xl border border-white/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.8)]">
+        <div className="flex items-center gap-4 mb-5">
+          {/* Avatar with glow effect */}
+          <div className={`relative w-16 h-16 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg ${glow} transition-all duration-300 ${
+            isActive ? 'scale-110' : 'group-hover:scale-105'
+          }`}>
+            <span className="text-white text-xl font-bold drop-shadow-lg">{gender === 'male' ? 'স্বা' : 'সে'}</span>
+            {isActive && (
+              <>
+                <div className={`absolute -inset-1 rounded-2xl bg-gradient-to-br ${gradient} opacity-50 blur animate-pulse`}></div>
+                <div className={`absolute -inset-2 rounded-2xl bg-gradient-to-br ${gradient} opacity-30 blur-md animate-ping`}></div>
+              </>
+            )}
           </div>
-
-          {status === 'listening' && (
-            <div className="flex justify-center gap-1 h-8">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-green-500 rounded-full animate-pulse"
-                  style={{
-                    animationDelay: `${i * 0.1}s`,
-                    height: `${Math.random() * 100}%`,
-                  }}
-                ></div>
-              ))}
-            </div>
-          )}
-
-          {status === 'speaking' && (
-            <div className="flex justify-center gap-1 h-8">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-purple-500 rounded-full animate-bounce"
-                  style={{ animationDelay: `${i * 0.1}s` }}
-                ></div>
-              ))}
-            </div>
-          )}
+          <div className="text-left">
+            <h3 className="font-bold text-xl text-slate-800 tracking-tight">{name}</h3>
+            <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
+              <span className="text-base">{gender === 'male' ? '👨‍⚕️' : '👩‍⚕️'}</span>
+              {gender === 'male' ? (isBn ? 'পুরুষ সহকারী' : 'Male') : (isBn ? 'মহিলা সহকারী' : 'Female')}
+            </p>
+          </div>
         </div>
-      )}
 
-      <button
-        onClick={isActive ? onStop : onStart}
-        className={`w-full py-3 rounded-xl font-bold transition-all ${
-          isActive
-            ? 'bg-red-500 hover:bg-red-600 text-white'
-            : `bg-gradient-to-r ${bg} text-white hover:opacity-90`
-        }`}
-      >
-        {isActive ? (isBn ? 'থামান' : 'Stop') : (isBn ? 'কথা বলুন' : 'Talk')}
-      </button>
+        {/* Login status - Glass pill */}
+        <div className={`text-xs px-3 py-2 rounded-full mb-4 inline-flex items-center gap-2 backdrop-blur-sm border transition-colors ${
+          isLoggedIn 
+            ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' 
+            : 'bg-amber-500/10 text-amber-700 border-amber-500/20'
+        }`}>
+          <span className={`w-2 h-2 rounded-full ${isLoggedIn ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+          {isLoggedIn 
+            ? (isBn ? 'সিরিয়াল বুক করতে পারবেন' : 'Can book appointments')
+            : (isBn ? 'শুধু ডাক্তার সাজেশন' : 'Doctor suggestions only')
+          }
+        </div>
+
+        {isActive && (
+          <div className="mb-5 p-4 bg-slate-50/80 rounded-2xl border border-slate-100">
+            <div className="flex items-center gap-2 mb-3">
+              <div className={`w-3 h-3 rounded-full transition-colors ${
+                status === 'speaking' ? 'bg-violet-500 animate-pulse shadow-lg shadow-violet-500/50' :
+                status === 'listening' ? 'bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50' :
+                status === 'connecting' ? 'bg-amber-500 animate-pulse shadow-lg shadow-amber-500/50' :
+                status === 'error' ? 'bg-red-500 shadow-lg shadow-red-500/50' : 'bg-slate-400'
+              }`}></div>
+              <span className="text-sm font-medium text-slate-600">{statusText[status]}</span>
+            </div>
+
+            {/* Audio visualizer - Listening */}
+            {status === 'listening' && (
+              <div className="flex justify-center items-end gap-1.5 h-10">
+                {[...Array(7)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-1.5 bg-gradient-to-t from-emerald-500 to-emerald-400 rounded-full animate-pulse shadow-sm shadow-emerald-500/30"
+                    style={{
+                      animationDelay: `${i * 0.08}s`,
+                      height: `${20 + Math.random() * 80}%`,
+                    }}
+                  ></div>
+                ))}
+              </div>
+            )}
+
+            {/* Audio visualizer - Speaking */}
+            {status === 'speaking' && (
+              <div className="flex justify-center items-end gap-1.5 h-10">
+                {[...Array(7)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-1.5 bg-gradient-to-t from-violet-500 to-purple-400 rounded-full animate-bounce shadow-sm shadow-violet-500/30"
+                    style={{ animationDelay: `${i * 0.08}s` }}
+                  ></div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action button - Glass style */}
+        <button
+          onClick={isActive ? onStop : onStart}
+          className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-300 ${
+            isActive
+              ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:scale-[1.02]'
+              : `bg-gradient-to-r ${gradient} text-white shadow-lg ${glow} hover:shadow-xl hover:scale-[1.02]`
+          }`}
+        >
+          {isActive ? (isBn ? '🛑 থামান' : '🛑 Stop') : (isBn ? '🎤 কথা বলুন' : '🎤 Talk')}
+        </button>
+      </div>
     </div>
   );
 };
@@ -654,19 +683,39 @@ const HomeVoiceSection: React.FC = () => {
   }
 
   return (
-    <section className="py-16 bg-gradient-to-b from-slate-900 to-slate-800">
-      <div className="max-w-4xl mx-auto px-6">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 rounded-full mb-4">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-green-400 text-sm font-medium">
+    <section className="relative py-20 overflow-hidden">
+      {/* Background with gradient mesh */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-pink-900/20 via-transparent to-transparent"></div>
+      
+      {/* Animated grid pattern */}
+      <div className="absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+        backgroundSize: '50px 50px'
+      }}></div>
+      
+      {/* Floating orbs */}
+      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      
+      <div className="relative max-w-4xl mx-auto px-6">
+        <div className="text-center mb-12">
+          {/* Status badge - Glass style */}
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500/10 backdrop-blur-xl rounded-full mb-6 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
+            <div className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50"></div>
+            <span className="text-emerald-400 text-sm font-semibold tracking-wide">
               {isBn ? '২৪/৭ সক্রিয়' : '24/7 Active'}
             </span>
           </div>
-          <h2 className="text-3xl font-black text-white mb-3">
+          
+          {/* Title with gradient */}
+          <h2 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
             {isBn ? 'AI স্বাস্থ্য সহকারী' : 'AI Health Assistant'}
           </h2>
-          <p className="text-slate-400">
+          
+          {/* Subtitle */}
+          <p className="text-slate-400 text-lg max-w-md mx-auto">
             {isBn ? 'বাংলায় কথা বলুন, ডাক্তার সিরিয়াল নিন' : 'Speak in Bangla, book doctor appointment'}
           </p>
         </div>
@@ -694,12 +743,30 @@ const HomeVoiceSection: React.FC = () => {
           />
         </div>
 
-        <p className="text-center text-slate-500 text-sm">
-          {userInfo.isLoggedIn 
-            ? (isBn ? `${userInfo.name || 'ব্যবহারকারী'} • ${MOCK_DOCTORS.length}+ ডাক্তার` : `${userInfo.name || 'User'} • ${MOCK_DOCTORS.length}+ Doctors`)
-            : (isBn ? `${MOCK_DOCTORS.length}+ ডাক্তার • অ্যাকাউন্ট খুলে সিরিয়াল নিন` : `${MOCK_DOCTORS.length}+ Doctors • Register to book`)
-          }
-        </p>
+        {/* Footer info - Glass card */}
+        <div className="flex justify-center mt-8">
+          <div className="inline-flex items-center gap-3 px-6 py-3 bg-white/5 backdrop-blur-xl rounded-full border border-white/10">
+            <span className="text-slate-400 text-sm">
+              {userInfo.isLoggedIn 
+                ? (isBn ? `👋 ${userInfo.name || 'ব্যবহারকারী'}` : `👋 ${userInfo.name || 'User'}`)
+                : ''
+              }
+            </span>
+            <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
+            <span className="text-slate-400 text-sm flex items-center gap-1.5">
+              <span className="text-emerald-400">✓</span>
+              {MOCK_DOCTORS.length}+ {isBn ? 'ডাক্তার' : 'Doctors'}
+            </span>
+            {!userInfo.isLoggedIn && (
+              <>
+                <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
+                <span className="text-amber-400 text-sm">
+                  {isBn ? 'অ্যাকাউন্ট খুলে সিরিয়াল নিন' : 'Register to book'}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </section>
   );

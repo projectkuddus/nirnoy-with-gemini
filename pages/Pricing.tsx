@@ -46,8 +46,10 @@ export const Pricing: React.FC = () => {
         return (
           <div
             key={plan.id}
-            className={`relative bg-white rounded-3xl border-2 overflow-hidden transition-all hover:shadow-xl ${
-              plan.popular ? 'border-teal-500 shadow-lg shadow-teal-500/20' : 'border-slate-200'
+            className={`relative overflow-hidden rounded-3xl transition-all hover:scale-[1.02] ${
+              plan.popular 
+                ? 'bg-gradient-to-br from-teal-500/20 to-emerald-500/10 border-2 border-teal-500/50 shadow-2xl shadow-teal-500/20' 
+                : 'bg-white/10 backdrop-blur-xl border border-white/20 hover:border-white/40 hover:shadow-xl'
             }`}
           >
             {plan.popular && (
@@ -61,18 +63,18 @@ export const Pricing: React.FC = () => {
               <div className="flex items-center gap-3 mb-4">
                 {plan.badge && <span className="text-3xl">{plan.badge}</span>}
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800">{isBn ? plan.nameBn : plan.name}</h3>
+                  <h3 className="text-xl font-bold text-white">{isBn ? plan.nameBn : plan.name}</h3>
                 </div>
               </div>
 
               {/* Price */}
               <div className="mb-6">
                 {plan.priceMonthly === 0 ? (
-                  <div className="text-3xl font-black text-slate-800">{t.freeForever}</div>
+                  <div className="text-3xl font-black text-white">{t.freeForever}</div>
                 ) : (
                   <>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-black text-slate-800">৳{monthlyEquivalent}</span>
+                      <span className="text-4xl font-black text-white">৳{monthlyEquivalent}</span>
                       <span className="text-slate-500">{t.perMonth}</span>
                     </div>
                     {billingCycle === 'yearly' && savings > 0 && (
@@ -91,7 +93,7 @@ export const Pricing: React.FC = () => {
                     <span className={`mt-0.5 ${feature.included ? 'text-green-500' : 'text-slate-300'}`}>
                       {feature.included ? '✓' : '✗'}
                     </span>
-                    <span className={feature.included ? 'text-slate-700' : 'text-slate-400'}>
+                    <span className={feature.included ? 'text-slate-300' : 'text-slate-500'}>
                       {isBn ? feature.labelBn : feature.label}
                       {feature.value && <span className="text-teal-600 font-medium ml-1">({feature.value})</span>}
                     </span>
@@ -106,7 +108,7 @@ export const Pricing: React.FC = () => {
                   plan.popular
                     ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:shadow-lg'
                     : plan.priceMonthly === 0
-                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'bg-slate-100 text-slate-300 hover:bg-slate-200'
                     : 'bg-slate-800 text-white hover:bg-slate-900'
                 }`}
               >
@@ -144,14 +146,14 @@ export const Pricing: React.FC = () => {
               <div className="flex items-center gap-3 mb-4">
                 {plan.badge && <span className="text-3xl">{plan.badge}</span>}
                 <div>
-                  <h3 className="text-xl font-bold text-slate-800">{isBn ? plan.nameBn : plan.name}</h3>
+                  <h3 className="text-xl font-bold text-white">{isBn ? plan.nameBn : plan.name}</h3>
                 </div>
               </div>
 
               {/* Price */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-800">৳{monthlyEquivalent}</span>
+                  <span className="text-4xl font-black text-white">৳{monthlyEquivalent}</span>
                   <span className="text-slate-500">{t.perMonth}</span>
                 </div>
                 {billingCycle === 'yearly' && savings > 0 && (
@@ -168,7 +170,7 @@ export const Pricing: React.FC = () => {
                     <span className={`mt-0.5 ${feature.included ? 'text-green-500' : 'text-slate-300'}`}>
                       {feature.included ? '✓' : '✗'}
                     </span>
-                    <span className={feature.included ? 'text-slate-700' : 'text-slate-400'}>
+                    <span className={feature.included ? 'text-slate-300' : 'text-slate-500'}>
                       {isBn ? feature.labelBn : feature.label}
                       {feature.value && <span className="text-blue-600 font-medium ml-1">({feature.value})</span>}
                     </span>
@@ -197,7 +199,7 @@ export const Pricing: React.FC = () => {
   const renderRewardsSection = () => (
     <div className="mt-20">
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-black text-slate-800 mb-3">🎮 {t.rewards}</h2>
+        <h2 className="text-3xl font-black text-white mb-3">🎮 {t.rewards}</h2>
         <p className="text-slate-600">{isBn ? 'ক্রেডিট উপার্জন করুন এবং বিনামূল্যে সেবা পান' : 'Earn credits and get free services'}</p>
       </div>
 
@@ -211,7 +213,7 @@ export const Pricing: React.FC = () => {
           <ul className="space-y-3">
             {CREDIT_ACTIONS.filter(a => a.credits > 0).slice(0, 8).map((action, i) => (
               <li key={i} className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">{isBn ? action.labelBn : action.label}</span>
+                <span className="text-slate-300">{isBn ? action.labelBn : action.label}</span>
                 <span className="font-bold text-amber-600">+{action.credits}</span>
               </li>
             ))}
@@ -227,7 +229,7 @@ export const Pricing: React.FC = () => {
           <ul className="space-y-3">
             {FAMILY_BONUSES.map((bonus, i) => (
               <li key={i} className="flex items-center justify-between text-sm">
-                <span className="text-slate-700">{bonus.members} {isBn ? 'সদস্য' : 'members'}</span>
+                <span className="text-slate-300">{bonus.members} {isBn ? 'সদস্য' : 'members'}</span>
                 <span className="font-bold text-pink-600">
                   {bonus.freeMonths} {isBn ? 'মাস ফ্রি!' : 'months FREE!'}
                 </span>
@@ -247,7 +249,7 @@ export const Pricing: React.FC = () => {
               <div key={i} className="flex items-center gap-2 p-2 bg-white/50 rounded-xl">
                 <span className="text-2xl">{badge.icon}</span>
                 <div>
-                  <div className="text-xs font-bold text-slate-700">{isBn ? badge.nameBn : badge.name}</div>
+                  <div className="text-xs font-bold text-slate-300">{isBn ? badge.nameBn : badge.name}</div>
                   <div className="text-xs text-purple-600">+{badge.creditsReward}</div>
                 </div>
               </div>
@@ -280,7 +282,7 @@ export const Pricing: React.FC = () => {
 
     return (
       <div className="mt-20 max-w-3xl mx-auto">
-        <h2 className="text-3xl font-black text-slate-800 mb-8 text-center">❓ {t.faq}</h2>
+        <h2 className="text-3xl font-black text-white mb-8 text-center">❓ {t.faq}</h2>
         <div className="space-y-4">
           {faqs.map((faq, i) => (
             <div key={i} className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -294,15 +296,19 @@ export const Pricing: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-teal-900/30 via-transparent to-transparent"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
       <Navbar />
 
       <main className="pt-24 pb-20 px-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-black text-slate-800 mb-4">{t.title}</h1>
-            <p className="text-xl text-slate-600">{t.subtitle}</p>
+            <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-white via-teal-200 to-white bg-clip-text text-transparent mb-4">{t.title}</h1>
+            <p className="text-xl text-slate-400">{t.subtitle}</p>
           </div>
 
           {/* User Type Toggle */}
