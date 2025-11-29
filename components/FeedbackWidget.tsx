@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { dbService, isSupabaseConfigured } from '../services/supabaseClient';
+import { dbService } from '../services/supabaseClient';
+import { UserRole } from '../types';
 
 // ============ TYPES ============
 type FeedbackType = 'bug' | 'feature' | 'general' | 'doctor' | 'complaint';
@@ -15,10 +17,13 @@ interface FeedbackData {
   page: string;
   userAgent: string;
   timestamp: string;
+  userId?: string;
+  userRole?: string;
 }
 
 // ============ COMPONENT ============
 export const FeedbackWidget: React.FC = () => {
+  const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
@@ -30,6 +35,12 @@ export const FeedbackWidget: React.FC = () => {
   const [contact, setContact] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  // Check if user is logged in
+  const userRole = localStorage.getItem('nirnoy_role') as UserRole | null;
+  const userData = JSON.parse(localStorage.getItem('nirnoy_user') || '{}');
+  const isLoggedIn = userRole && userRole !== UserRole.GUEST;
 
   // Translations
   const t = {
@@ -56,7 +67,11 @@ export const FeedbackWidget: React.FC = () => {
     close: isBn ? 'বন্ধ করুন' : 'Close',
     back: isBn ? 'পিছনে' : 'Back',
     next: isBn ? 'পরবর্তী' : 'Next',
-    anonymous: isBn ? 'বেনামে পাঠান' : 'Send Anonymously',
+    loginRequired: isBn ? 'মতামত দিতে লগইন করুন' : 'Login to Give Feedback',
+    loginMessage: isBn ? 'মতামত দিতে আপনার অ্যাকাউন্টে লগইন করতে হবে। এতে আমরা আপনার সাথে যোগাযোগ করতে পারব।' : 'Please login to your account to submit feedback. This helps us follow up with you.',
+    loginBtn: isBn ? 'লগইন করুন' : 'Login Now',
+    registerBtn: isBn ? 'অ্যাকাউন্ট খুলুন' : 'Create Account',
+    loggedInAs: isBn ? 'লগইন করা হয়েছে' : 'Logged in as',
   };
 
   const feedbackTypes: { type: FeedbackType; label: string; icon: string }[] = [
@@ -67,8 +82,16 @@ export const FeedbackWidget: React.FC = () => {
     { type: 'complaint', label: t.complaint, icon: '😤' },
   ];
 
+  const handleOpen = () => {
+    if (!isLoggedIn) {
+      setShowLoginPrompt(true);
+    } else {
+      setIsOpen(true);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() || !isLoggedIn) return;
 
     setIsSubmitting(true);
 
@@ -76,19 +99,18 @@ export const FeedbackWidget: React.FC = () => {
       type: feedbackType,
       mood: mood || 'neutral',
       message: message.trim(),
-      email: contact.includes('@') ? contact : undefined,
-      phone: !contact.includes('@') && contact ? contact : undefined,
+      email: contact.includes('@') ? contact : userData.email,
+      phone: !contact.includes('@') && contact ? contact : userData.phone,
       page: window.location.pathname,
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
+      userId: userData.id || userData.phone,
+      userRole: userRole || undefined,
     };
 
     try {
-      // Submit to Supabase if configured, otherwise localStorage
       console.log('Feedback submitted:', feedbackData);
-      
       await dbService.submitFeedback(feedbackData);
-
       setSubmitted(true);
     } catch (error) {
       console.error('Failed to submit feedback:', error);
@@ -108,6 +130,7 @@ export const FeedbackWidget: React.FC = () => {
 
   const handleClose = () => {
     setIsOpen(false);
+    setShowLoginPrompt(false);
     setTimeout(resetForm, 300);
   };
 
@@ -115,7 +138,7 @@ export const FeedbackWidget: React.FC = () => {
     <>
       {/* Floating Feedback Button */}
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className="fixed bottom-6 left-6 z-40 group"
         aria-label="Give Feedback"
       >
@@ -125,8 +148,52 @@ export const FeedbackWidget: React.FC = () => {
         </div>
       </button>
 
-      {/* Feedback Modal */}
-      {isOpen && (
+      {/* Login Required Modal */}
+      {showLoginPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-scale-in">
+            <div className="bg-gradient-to-r from-violet-500 to-purple-600 p-6 text-white relative">
+              <button
+                onClick={handleClose}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <i className="fas fa-lock text-2xl"></i>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">{t.loginRequired}</h2>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 text-center">
+              <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i className="fas fa-user-lock text-purple-500 text-3xl"></i>
+              </div>
+              <p className="text-slate-600 mb-6">{t.loginMessage}</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { handleClose(); navigate('/login'); }}
+                  className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-bold hover:shadow-lg transition"
+                >
+                  {t.loginBtn}
+                </button>
+                <button
+                  onClick={() => { handleClose(); navigate('/patient-auth'); }}
+                  className="flex-1 py-3 border-2 border-purple-500 text-purple-600 rounded-xl font-bold hover:bg-purple-50 transition"
+                >
+                  {t.registerBtn}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal - Only for logged in users */}
+      {isOpen && isLoggedIn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-scale-in">
             {/* Header */}
@@ -146,12 +213,16 @@ export const FeedbackWidget: React.FC = () => {
                   <p className="text-purple-100 text-sm">{t.subtitle}</p>
                 </div>
               </div>
+              {/* Show logged in user */}
+              <div className="mt-3 px-3 py-1.5 bg-white/20 rounded-lg inline-flex items-center gap-2 text-sm">
+                <i className="fas fa-user-check"></i>
+                <span>{t.loggedInAs}: {userData.name || userData.phone || userRole}</span>
+              </div>
             </div>
 
             {/* Content */}
             <div className="p-6">
               {submitted ? (
-                /* Success State */
                 <div className="text-center py-8">
                   <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i className="fas fa-check text-green-500 text-3xl"></i>
@@ -167,7 +238,6 @@ export const FeedbackWidget: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  {/* Step 1: Mood */}
                   {step === 1 && (
                     <div className="space-y-6">
                       <h3 className="text-lg font-bold text-slate-800 text-center">{t.howFeeling}</h3>
@@ -179,14 +249,9 @@ export const FeedbackWidget: React.FC = () => {
                         ].map((item) => (
                           <button
                             key={item.mood}
-                            onClick={() => {
-                              setMood(item.mood);
-                              setStep(2);
-                            }}
+                            onClick={() => { setMood(item.mood); setStep(2); }}
                             className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all hover:scale-105 ${
-                              mood === item.mood
-                                ? `border-${item.color}-500 bg-${item.color}-50`
-                                : 'border-slate-200 hover:border-slate-300'
+                              mood === item.mood ? `border-${item.color}-500 bg-${item.color}-50` : 'border-slate-200 hover:border-slate-300'
                             }`}
                           >
                             <span className="text-4xl">{item.emoji}</span>
@@ -197,7 +262,6 @@ export const FeedbackWidget: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Step 2: Type & Message */}
                   {step === 2 && (
                     <div className="space-y-5">
                       <div>
@@ -231,24 +295,12 @@ export const FeedbackWidget: React.FC = () => {
                         />
                       </div>
 
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-500 uppercase mb-2">{t.contactOptional}</h3>
-                        <input
-                          type="text"
-                          value={contact}
-                          onChange={(e) => setContact(e.target.value)}
-                          placeholder={t.contactPlaceholder}
-                          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 outline-none transition"
-                        />
-                      </div>
-
                       <div className="flex gap-3">
                         <button
                           onClick={() => setStep(1)}
                           className="px-4 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition"
                         >
-                          <i className="fas fa-arrow-left mr-2"></i>
-                          {t.back}
+                          <i className="fas fa-arrow-left mr-2"></i>{t.back}
                         </button>
                         <button
                           onClick={handleSubmit}
@@ -262,30 +314,17 @@ export const FeedbackWidget: React.FC = () => {
                           )}
                         </button>
                       </div>
-
-                      {!contact && (
-                        <p className="text-xs text-center text-slate-400">
-                          <i className="fas fa-user-secret mr-1"></i>
-                          {t.anonymous}
-                        </p>
-                      )}
                     </div>
                   )}
                 </>
               )}
             </div>
 
-            {/* Progress Indicator */}
             {!submitted && (
               <div className="px-6 pb-4">
                 <div className="flex gap-2">
                   {[1, 2].map((s) => (
-                    <div
-                      key={s}
-                      className={`flex-1 h-1 rounded-full transition ${
-                        step >= s ? 'bg-purple-500' : 'bg-slate-200'
-                      }`}
-                    />
+                    <div key={s} className={`flex-1 h-1 rounded-full transition ${step >= s ? 'bg-purple-500' : 'bg-slate-200'}`} />
                   ))}
                 </div>
               </div>
@@ -298,4 +337,3 @@ export const FeedbackWidget: React.FC = () => {
 };
 
 export default FeedbackWidget;
-
