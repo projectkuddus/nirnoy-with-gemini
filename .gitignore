@@ -28,3 +28,5 @@ dist-ssr
 .env.local
 .env.*.local
 backend/nirnoy-api/.env
+.vercel
+.env*.local
