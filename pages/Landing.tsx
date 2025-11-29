@@ -24,7 +24,7 @@ const AnimatedCounter: React.FC<{ end: number; suffix?: string }> = ({ end, suff
   return <>{count}{suffix}</>;
 };
 
-// Specialty Card
+// Specialty Card - Compact Design
 const SpecialtyCard: React.FC<{
   name: string;
   nameBn: string;
@@ -38,16 +38,18 @@ const SpecialtyCard: React.FC<{
   return (
     <button
       onClick={onClick}
-      className="group bg-white rounded-2xl p-5 border border-slate-100 hover:border-transparent hover:shadow-xl transition-all duration-300 text-left"
+      className="group flex items-center gap-3 bg-white/80 backdrop-blur-sm rounded-xl px-4 py-3 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-md transition-all duration-200"
     >
       <div 
-        className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
+        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
         style={{ backgroundColor: `${color}15` }}
       >
-        <i className={`fas ${icon} text-lg`} style={{ color }}></i>
+        <i className={`fas ${icon} text-base`} style={{ color }}></i>
       </div>
-      <h3 className="font-bold text-slate-800 mb-1 text-sm">{language === 'bn' ? nameBn : name}</h3>
-      <p className="text-xs text-slate-400">{count} {language === 'bn' ? 'ডাক্তার' : 'doctors'}</p>
+      <div className="text-left min-w-0">
+        <h3 className="font-semibold text-slate-800 text-sm truncate">{language === 'bn' ? nameBn : name}</h3>
+        <p className="text-xs text-slate-400">{count} {language === 'bn' ? 'ডাক্তার' : 'doctors'}</p>
+      </div>
     </button>
   );
 };
@@ -162,7 +164,7 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole, onLogout })
       </section>
 
       {/* Specialties Section */}
-      <section className="py-16 px-6 bg-white">
+      <section className="py-12 px-6 bg-gradient-to-b from-slate-50 to-white">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -177,7 +179,7 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole, onLogout })
             </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-3">
             {specialties.map(spec => (
               <SpecialtyCard
                 key={spec.name}

@@ -22,6 +22,14 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
+
+  // Calculate date limits for DOB
+  const today = new Date();
+  const maxDate = today.toISOString().split('T')[0]; // Today - no future dates
+  const minDate = new Date(today.getFullYear() - 120, today.getMonth(), today.getDate()).toISOString().split('T')[0];
+  
+  // Check if user is under 12 (kid account)
+  const isKidAccount = dateOfBirth ? (today.getFullYear() - new Date(dateOfBirth).getFullYear()) < 12 : false;
   
   // Registration fields
   const [name, setName] = useState('');
@@ -393,9 +401,19 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       type="date"
                       value={dateOfBirth}
                       onChange={(e) => setDateOfBirth(e.target.value)}
+                      max={maxDate}
+                      min={minDate}
                       className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition"
                       title="Date of Birth"
                     />
+                    {isKidAccount && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-xs text-blue-700 flex items-center gap-1">
+                          <span>👶</span>
+                          {isBn ? 'শিশু অ্যাকাউন্ট - অভিভাবক তত্ত্বাবধানে' : 'Kid Account - Under parental supervision'}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Blood Group */}

@@ -489,6 +489,11 @@ export const DoctorRegistration: React.FC = () => {
   };
 
   const [submitted, setSubmitted] = useState(false);
+  
+  // Calculate date limits for DOB (doctors must be at least 22 years old)
+  const today = new Date();
+  const maxDOB = new Date(today.getFullYear() - 22, today.getMonth(), today.getDate()).toISOString().split('T')[0];
+  const minDOB = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate()).toISOString().split('T')[0];
 
   if (submitted) {
     return (
@@ -666,7 +671,9 @@ export const DoctorRegistration: React.FC = () => {
                         </label>
                         <input
                           type="date"
-                          value={data.dateOfBirth}
+                      max={maxDOB}
+                      min={minDOB}
+                      value={data.dateOfBirth}
                           onChange={(e) => updateData('dateOfBirth', e.target.value)}
                           className={`w-full p-4 border-2 rounded-xl outline-none transition ${
                             errors.dateOfBirth ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
