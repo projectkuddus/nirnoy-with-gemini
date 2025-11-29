@@ -1,16 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nirnoy - Health Synchronized | www.nirnoy.ai</title>
-  <meta name="description" content="Bangladesh's most advanced AI-powered healthcare platform. Find doctors, book appointments, track health - all synchronized." />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>ন</text></svg>" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  
+  <!-- Primary Meta Tags -->
+  <title>নির্ণয় | Nirnoy Health - AI-Powered Healthcare Platform Bangladesh</title>
+  <meta name="title" content="নির্ণয় | Nirnoy Health - AI-Powered Healthcare Platform Bangladesh" />
+  <meta name="description" content="বাংলাদেশের সবচেয়ে উন্নত AI-চালিত স্বাস্থ্যসেবা প্ল্যাটফর্ম। ২০০+ বিশেষজ্ঞ ডাক্তার, ২৪/৭ AI সহকারী, অনলাইন অ্যাপয়েন্টমেন্ট - সব এক জায়গায়।" />
+  <meta name="keywords" content="nirnoy, নির্ণয়, doctor appointment, ডাক্তার, bangladesh healthcare, health app, AI health assistant, বাংলাদেশ স্বাস্থ্যসেবা, online doctor, ডাক্তার সিরিয়াল, telemedicine bangladesh" />
+  <meta name="author" content="Nirnoy Health" />
+  <meta name="robots" content="index, follow" />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.nirnoy.ai/" />
+  <meta property="og:title" content="নির্ণয় | Nirnoy Health - AI-Powered Healthcare Platform" />
+  <meta property="og:description" content="বাংলাদেশের সবচেয়ে উন্নত AI-চালিত স্বাস্থ্যসেবা প্ল্যাটফর্ম। ২০০+ বিশেষজ্ঞ ডাক্তার, ২৪/৭ AI সহকারী।" />
+  <meta property="og:image" content="https://www.nirnoy.ai/og-image.png" />
+  <meta property="og:locale" content="bn_BD" />
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://www.nirnoy.ai/" />
+  <meta name="twitter:title" content="নির্ণয় | Nirnoy Health - AI-Powered Healthcare" />
+  <meta name="twitter:description" content="বাংলাদেশের সবচেয়ে উন্নত AI-চালিত স্বাস্থ্যসেবা প্ল্যাটফর্ম।" />
+  
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Nirnoy" />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230f172a' rx='20' width='100' height='100'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='%2314b8a6' font-weight='bold'>ন</text></svg>" />
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://www.nirnoy.ai/" />
+  
+  <!-- Preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://www.googletagmanager.com" />
   
   <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Bengali:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Bengali:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -22,8 +56,8 @@
       theme: {
         extend: {
           colors: {
-            primary: '#0d9488',
-            secondary: '#0f766e',
+            primary: '#14b8a6',
+            secondary: '#0f172a',
           },
           fontFamily: {
             sans: ['Inter', 'Noto Sans Bengali', 'system-ui', 'sans-serif'],
@@ -34,12 +68,57 @@
     }
   </script>
   
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PSGSG6VE4S"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-PSGSG6VE4S', {
+      'anonymize_ip': true,
+      'send_page_view': true
+    });
+  </script>
+  
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "MedicalOrganization",
+    "name": "Nirnoy Health",
+    "alternateName": "নির্ণয় হেলথ",
+    "url": "https://www.nirnoy.ai",
+    "description": "AI-Powered Healthcare Platform for Bangladesh",
+    "address": {
+      "@type": "PostalAddress",
+      "addressCountry": "BD",
+      "addressLocality": "Dhaka"
+    },
+    "medicalSpecialty": ["GeneralPractice", "Cardiology", "Pediatrics", "Gynecology", "Orthopedics"]
+  }
+  </script>
+  
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Nirnoy Health",
+    "applicationCategory": "HealthApplication",
+    "operatingSystem": "Any",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "BDT"
+    },
+    "featureList": ["200+ Expert Doctors", "24/7 AI Health Assistant", "Voice Consultation in Bangla", "Online Appointment Booking"]
+  }
+  </script>
+  
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     html { scroll-behavior: smooth; }
     body { font-family: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif; }
     
-    /* Animations */
     @keyframes fade-in-up {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
@@ -56,20 +135,17 @@
     .animate-pulse-slow { animation: pulse-slow 2s infinite; }
     .animate-float { animation: float 3s ease-in-out infinite; }
     
-    /* Custom scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #f1f5f9; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
     
-    /* Hide scrollbar for horizontal scroll */
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body>
+<body class="bg-white">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>
-
