@@ -1,411 +1,387 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import PageHeader from '../components/PageHeader';
+import { Navbar } from '../components/Navbar';
+import { PATIENT_PLANS, DOCTOR_PLANS, CREDIT_ACTIONS, BADGES, FAMILY_BONUSES, calculateYearlySavings } from '../services/subscription/plans';
+import { PatientPlan, DoctorPlan } from '../services/subscription/types';
 
-// ============ TYPES ============
-interface PricingPlan {
-  id: string;
-  name: string;
-  nameBn: string;
-  description: string;
-  descriptionBn: string;
-  price: number;
-  priceBn: string;
-  period: string;
-  periodBn: string;
-  features: { text: string; textBn: string; included: boolean }[];
-  popular?: boolean;
-  cta: string;
-  ctaBn: string;
-}
-
-// ============ DATA ============
-const PATIENT_PLANS: PricingPlan[] = [
-  {
-    id: 'free',
-    name: 'Basic',
-    nameBn: 'বেসিক',
-    description: 'For occasional healthcare needs',
-    descriptionBn: 'মাঝে মাঝে স্বাস্থ্যসেবার জন্য',
-    price: 0,
-    priceBn: '০',
-    period: 'Forever Free',
-    periodBn: 'চিরকাল বিনামূল্যে',
-    features: [
-      { text: 'Book appointments', textBn: 'অ্যাপয়েন্টমেন্ট বুক করুন', included: true },
-      { text: 'Live queue tracking', textBn: 'লাইভ কিউ ট্র্যাকিং', included: true },
-      { text: 'Basic health records', textBn: 'বেসিক স্বাস্থ্য রেকর্ড', included: true },
-      { text: 'SMS notifications', textBn: 'SMS নোটিফিকেশন', included: true },
-      { text: 'AI Health Assistant', textBn: 'AI স্বাস্থ্য সহকারী', included: false },
-      { text: 'Family profiles', textBn: 'পারিবারিক প্রোফাইল', included: false },
-      { text: 'Priority booking', textBn: 'প্রায়োরিটি বুকিং', included: false },
-    ],
-    cta: 'Get Started Free',
-    ctaBn: 'বিনামূল্যে শুরু করুন',
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    nameBn: 'প্রিমিয়াম',
-    description: 'For individuals who want more',
-    descriptionBn: 'যারা আরও চান তাদের জন্য',
-    price: 99,
-    priceBn: '৯৯',
-    period: '/month',
-    periodBn: '/মাস',
-    popular: true,
-    features: [
-      { text: 'Everything in Basic', textBn: 'বেসিকের সবকিছু', included: true },
-      { text: 'AI Health Assistant', textBn: 'AI স্বাস্থ্য সহকারী', included: true },
-      { text: 'Unlimited AI chats', textBn: 'আনলিমিটেড AI চ্যাট', included: true },
-      { text: 'Health insights & trends', textBn: 'স্বাস্থ্য ইনসাইট ও ট্রেন্ড', included: true },
-      { text: 'Priority booking', textBn: 'প্রায়োরিটি বুকিং', included: true },
-      { text: 'Family profiles (up to 3)', textBn: 'পারিবারিক প্রোফাইল (৩ জন)', included: true },
-      { text: '10% discount on fees', textBn: 'ফি-তে ১০% ছাড়', included: true },
-    ],
-    cta: 'Start Premium',
-    ctaBn: 'প্রিমিয়াম শুরু করুন',
-  },
-  {
-    id: 'family',
-    name: 'Family',
-    nameBn: 'ফ্যামিলি',
-    description: 'For the whole family',
-    descriptionBn: 'পুরো পরিবারের জন্য',
-    price: 249,
-    priceBn: '২৪৯',
-    period: '/month',
-    periodBn: '/মাস',
-    features: [
-      { text: 'Everything in Premium', textBn: 'প্রিমিয়ামের সবকিছু', included: true },
-      { text: 'Up to 6 family members', textBn: '৬ জন পরিবারের সদস্য', included: true },
-      { text: 'Family health dashboard', textBn: 'পারিবারিক স্বাস্থ্য ড্যাশবোর্ড', included: true },
-      { text: 'Shared health calendar', textBn: 'শেয়ারড স্বাস্থ্য ক্যালেন্ডার', included: true },
-      { text: 'Emergency contacts', textBn: 'জরুরি যোগাযোগ', included: true },
-      { text: '15% discount on fees', textBn: 'ফি-তে ১৫% ছাড়', included: true },
-      { text: 'Priority support', textBn: 'প্রায়োরিটি সাপোর্ট', included: true },
-    ],
-    cta: 'Start Family Plan',
-    ctaBn: 'ফ্যামিলি প্ল্যান শুরু করুন',
-  },
-];
-
-const DOCTOR_PLANS: PricingPlan[] = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    nameBn: 'স্টার্টার',
-    description: 'For new practitioners',
-    descriptionBn: 'নতুন প্র্যাক্টিশনারদের জন্য',
-    price: 0,
-    priceBn: '০',
-    period: 'Forever Free',
-    periodBn: 'চিরকাল বিনামূল্যে',
-    features: [
-      { text: 'Up to 50 patients/month', textBn: '৫০ রোগী/মাস', included: true },
-      { text: 'Basic queue management', textBn: 'বেসিক কিউ ম্যানেজমেন্ট', included: true },
-      { text: 'Patient records', textBn: 'রোগীর রেকর্ড', included: true },
-      { text: 'SMS notifications', textBn: 'SMS নোটিফিকেশন', included: true },
-      { text: 'AI Clinical Copilot', textBn: 'AI ক্লিনিক্যাল কোপাইলট', included: false },
-      { text: 'Analytics dashboard', textBn: 'এনালিটিক্স ড্যাশবোর্ড', included: false },
-      { text: 'Multiple chambers', textBn: 'একাধিক চেম্বার', included: false },
-    ],
-    cta: 'Start Free',
-    ctaBn: 'বিনামূল্যে শুরু করুন',
-  },
-  {
-    id: 'professional',
-    name: 'Professional',
-    nameBn: 'প্রফেশনাল',
-    description: 'For established practitioners',
-    descriptionBn: 'প্রতিষ্ঠিত প্র্যাক্টিশনারদের জন্য',
-    price: 999,
-    priceBn: '৯৯৯',
-    period: '/month',
-    periodBn: '/মাস',
-    popular: true,
-    features: [
-      { text: 'Unlimited patients', textBn: 'আনলিমিটেড রোগী', included: true },
-      { text: 'AI Clinical Copilot', textBn: 'AI ক্লিনিক্যাল কোপাইলট', included: true },
-      { text: 'Advanced analytics', textBn: 'অ্যাডভান্সড এনালিটিক্স', included: true },
-      { text: 'Up to 3 chambers', textBn: '৩টি চেম্বার', included: true },
-      { text: 'Custom prescription', textBn: 'কাস্টম প্রেসক্রিপশন', included: true },
-      { text: 'Patient intake forms', textBn: 'রোগী ইনটেক ফর্ম', included: true },
-      { text: 'Priority listing', textBn: 'প্রায়োরিটি লিস্টিং', included: true },
-    ],
-    cta: 'Go Professional',
-    ctaBn: 'প্রফেশনাল হোন',
-  },
-  {
-    id: 'clinic',
-    name: 'Clinic',
-    nameBn: 'ক্লিনিক',
-    description: 'For clinics & hospitals',
-    descriptionBn: 'ক্লিনিক ও হাসপাতালের জন্য',
-    price: 4999,
-    priceBn: '৪৯৯৯',
-    period: '/month',
-    periodBn: '/মাস',
-    features: [
-      { text: 'Everything in Professional', textBn: 'প্রফেশনালের সবকিছু', included: true },
-      { text: 'Unlimited doctors', textBn: 'আনলিমিটেড ডাক্তার', included: true },
-      { text: 'Clinic branding', textBn: 'ক্লিনিক ব্র্যান্ডিং', included: true },
-      { text: 'Staff management', textBn: 'স্টাফ ম্যানেজমেন্ট', included: true },
-      { text: 'Revenue reports', textBn: 'রেভিনিউ রিপোর্ট', included: true },
-      { text: 'API access', textBn: 'API অ্যাক্সেস', included: true },
-      { text: 'Dedicated support', textBn: 'ডেডিকেটেড সাপোর্ট', included: true },
-    ],
-    cta: 'Contact Sales',
-    ctaBn: 'সেলস এ যোগাযোগ',
-  },
-];
-
-// ============ COMPONENT ============
 export const Pricing: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
-  const [activeTab, setActiveTab] = useState<'patient' | 'doctor'>('patient');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+  const [userType, setUserType] = useState<'patient' | 'doctor'>('patient');
+  const [showRewardsModal, setShowRewardsModal] = useState(false);
 
-  const plans = activeTab === 'patient' ? PATIENT_PLANS : DOCTOR_PLANS;
-
-  // Translations
   const t = {
-    title: isBn ? 'সহজ ও স্বচ্ছ মূল্য' : 'Simple, Transparent Pricing',
-    subtitle: isBn ? 'আপনার প্রয়োজন অনুযায়ী প্ল্যান বেছে নিন' : 'Choose the plan that fits your needs',
-    forPatients: isBn ? 'রোগীদের জন্য' : 'For Patients',
-    forDoctors: isBn ? 'ডাক্তারদের জন্য' : 'For Doctors',
+    title: isBn ? 'সাশ্রয়ী মূল্যে সেরা স্বাস্থ্যসেবা' : 'Premium Healthcare at Affordable Prices',
+    subtitle: isBn ? 'আপনার জন্য সঠিক প্ল্যান বেছে নিন' : 'Choose the right plan for you',
+    patient: isBn ? 'রোগী' : 'Patient',
+    doctor: isBn ? 'ডাক্তার' : 'Doctor',
+    monthly: isBn ? 'মাসিক' : 'Monthly',
+    yearly: isBn ? 'বার্ষিক' : 'Yearly',
+    save: isBn ? 'সাশ্রয়' : 'Save',
+    perMonth: isBn ? '/মাস' : '/month',
+    perYear: isBn ? '/বছর' : '/year',
     popular: isBn ? 'জনপ্রিয়' : 'Popular',
-    taka: '৳',
-    perBooking: isBn ? 'প্রতি বুকিংয়ে' : 'per booking',
-    compare: isBn ? 'সব ফিচার তুলনা করুন' : 'Compare all features',
-    faq: isBn ? 'মূল্য সম্পর্কিত প্রশ্ন' : 'Pricing FAQ',
-    enterprise: isBn ? 'এন্টারপ্রাইজ সলিউশন দরকার?' : 'Need an enterprise solution?',
-    enterpriseDesc: isBn ? 'বড় হাসপাতাল ও স্বাস্থ্য নেটওয়ার্কের জন্য কাস্টম প্ল্যান' : 'Custom plans for large hospitals & healthcare networks',
-    contactSales: isBn ? 'সেলস এ যোগাযোগ করুন' : 'Contact Sales',
+    getStarted: isBn ? 'শুরু করুন' : 'Get Started',
+    currentPlan: isBn ? 'বর্তমান প্ল্যান' : 'Current Plan',
+    features: isBn ? 'সুবিধাসমূহ' : 'Features',
+    freeForever: isBn ? 'চিরকালের জন্য ফ্রি' : 'Free Forever',
+    rewards: isBn ? 'রিওয়ার্ড সিস্টেম' : 'Rewards System',
+    earnCredits: isBn ? 'ক্রেডিট উপার্জন করুন' : 'Earn Credits',
+    familyBonus: isBn ? 'পারিবারিক বোনাস' : 'Family Bonus',
+    badges: isBn ? 'ব্যাজ ও অর্জন' : 'Badges & Achievements',
+    faq: isBn ? 'সাধারণ প্রশ্ন' : 'FAQ',
+  };
+
+  const renderPatientPlans = () => (
+    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {PATIENT_PLANS.map((plan) => {
+        const price = billingCycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;
+        const monthlyEquivalent = billingCycle === 'yearly' ? Math.round(plan.priceYearly / 12) : plan.priceMonthly;
+        const savings = calculateYearlySavings(plan);
+
+        return (
+          <div
+            key={plan.id}
+            className={`relative bg-white rounded-3xl border-2 overflow-hidden transition-all hover:shadow-xl ${
+              plan.popular ? 'border-teal-500 shadow-lg shadow-teal-500/20' : 'border-slate-200'
+            }`}
+          >
+            {plan.popular && (
+              <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-teal-500 to-emerald-500 text-white text-center py-1 text-sm font-bold">
+                ⭐ {t.popular}
+              </div>
+            )}
+
+            <div className={`p-6 ${plan.popular ? 'pt-10' : ''}`}>
+              {/* Plan Header */}
+              <div className="flex items-center gap-3 mb-4">
+                {plan.badge && <span className="text-3xl">{plan.badge}</span>}
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">{isBn ? plan.nameBn : plan.name}</h3>
+                </div>
+              </div>
+
+              {/* Price */}
+              <div className="mb-6">
+                {plan.priceMonthly === 0 ? (
+                  <div className="text-3xl font-black text-slate-800">{t.freeForever}</div>
+                ) : (
+                  <>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-black text-slate-800">৳{monthlyEquivalent}</span>
+                      <span className="text-slate-500">{t.perMonth}</span>
+                    </div>
+                    {billingCycle === 'yearly' && savings > 0 && (
+                      <div className="text-sm text-green-600 font-medium mt-1">
+                        {t.save} ৳{savings}/year
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Features */}
+              <ul className="space-y-3 mb-6">
+                {plan.features.map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className={`mt-0.5 ${feature.included ? 'text-green-500' : 'text-slate-300'}`}>
+                      {feature.included ? '✓' : '✗'}
+                    </span>
+                    <span className={feature.included ? 'text-slate-700' : 'text-slate-400'}>
+                      {isBn ? feature.labelBn : feature.label}
+                      {feature.value && <span className="text-teal-600 font-medium ml-1">({feature.value})</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* CTA Button */}
+              <button
+                onClick={() => navigate('/patient-auth')}
+                className={`w-full py-3 rounded-xl font-bold transition ${
+                  plan.popular
+                    ? 'bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:shadow-lg'
+                    : plan.priceMonthly === 0
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'bg-slate-800 text-white hover:bg-slate-900'
+                }`}
+              >
+                {t.getStarted}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderDoctorPlans = () => (
+    <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+      {DOCTOR_PLANS.map((plan) => {
+        const price = billingCycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;
+        const monthlyEquivalent = billingCycle === 'yearly' ? Math.round(plan.priceYearly / 12) : plan.priceMonthly;
+        const savings = calculateYearlySavings(plan);
+
+        return (
+          <div
+            key={plan.id}
+            className={`relative bg-white rounded-3xl border-2 overflow-hidden transition-all hover:shadow-xl ${
+              plan.popular ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-slate-200'
+            }`}
+          >
+            {plan.popular && (
+              <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-center py-1 text-sm font-bold">
+                ⭐ {t.popular}
+              </div>
+            )}
+
+            <div className={`p-6 ${plan.popular ? 'pt-10' : ''}`}>
+              {/* Plan Header */}
+              <div className="flex items-center gap-3 mb-4">
+                {plan.badge && <span className="text-3xl">{plan.badge}</span>}
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">{isBn ? plan.nameBn : plan.name}</h3>
+                </div>
+              </div>
+
+              {/* Price */}
+              <div className="mb-6">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-black text-slate-800">৳{monthlyEquivalent}</span>
+                  <span className="text-slate-500">{t.perMonth}</span>
+                </div>
+                {billingCycle === 'yearly' && savings > 0 && (
+                  <div className="text-sm text-green-600 font-medium mt-1">
+                    {t.save} ৳{savings}/year
+                  </div>
+                )}
+              </div>
+
+              {/* Features */}
+              <ul className="space-y-3 mb-6">
+                {plan.features.map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className={`mt-0.5 ${feature.included ? 'text-green-500' : 'text-slate-300'}`}>
+                      {feature.included ? '✓' : '✗'}
+                    </span>
+                    <span className={feature.included ? 'text-slate-700' : 'text-slate-400'}>
+                      {isBn ? feature.labelBn : feature.label}
+                      {feature.value && <span className="text-blue-600 font-medium ml-1">({feature.value})</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* CTA Button */}
+              <button
+                onClick={() => navigate('/doctor-registration')}
+                className={`w-full py-3 rounded-xl font-bold transition ${
+                  plan.popular
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:shadow-lg'
+                    : 'bg-slate-800 text-white hover:bg-slate-900'
+                }`}
+              >
+                {t.getStarted}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderRewardsSection = () => (
+    <div className="mt-20">
+      <div className="text-center mb-12">
+        <h2 className="text-3xl font-black text-slate-800 mb-3">🎮 {t.rewards}</h2>
+        <p className="text-slate-600">{isBn ? 'ক্রেডিট উপার্জন করুন এবং বিনামূল্যে সেবা পান' : 'Earn credits and get free services'}</p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        {/* Earn Credits */}
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-6 border border-amber-200">
+          <h3 className="text-xl font-bold text-amber-800 mb-4 flex items-center gap-2">
+            <span className="text-2xl">💰</span> {t.earnCredits}
+          </h3>
+          <p className="text-amber-700 text-sm mb-4">{isBn ? '১ ক্রেডিট = ৳১০' : '1 Credit = ৳10'}</p>
+          <ul className="space-y-3">
+            {CREDIT_ACTIONS.filter(a => a.credits > 0).slice(0, 8).map((action, i) => (
+              <li key={i} className="flex items-center justify-between text-sm">
+                <span className="text-slate-700">{isBn ? action.labelBn : action.label}</span>
+                <span className="font-bold text-amber-600">+{action.credits}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Family Bonus */}
+        <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-3xl p-6 border border-pink-200">
+          <h3 className="text-xl font-bold text-pink-800 mb-4 flex items-center gap-2">
+            <span className="text-2xl">👨‍👩‍👧‍👦</span> {t.familyBonus}
+          </h3>
+          <p className="text-pink-700 text-sm mb-4">{isBn ? 'পরিবার যত বড়, সুবিধা তত বেশি!' : 'Bigger family, bigger benefits!'}</p>
+          <ul className="space-y-3">
+            {FAMILY_BONUSES.map((bonus, i) => (
+              <li key={i} className="flex items-center justify-between text-sm">
+                <span className="text-slate-700">{bonus.members} {isBn ? 'সদস্য' : 'members'}</span>
+                <span className="font-bold text-pink-600">
+                  {bonus.freeMonths} {isBn ? 'মাস ফ্রি!' : 'months FREE!'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Badges */}
+        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-3xl p-6 border border-purple-200">
+          <h3 className="text-xl font-bold text-purple-800 mb-4 flex items-center gap-2">
+            <span className="text-2xl">🏆</span> {t.badges}
+          </h3>
+          <p className="text-purple-700 text-sm mb-4">{isBn ? 'অর্জন আনলক করুন এবং ক্রেডিট পান' : 'Unlock achievements and earn credits'}</p>
+          <div className="grid grid-cols-2 gap-3">
+            {BADGES.slice(0, 6).map((badge, i) => (
+              <div key={i} className="flex items-center gap-2 p-2 bg-white/50 rounded-xl">
+                <span className="text-2xl">{badge.icon}</span>
+                <div>
+                  <div className="text-xs font-bold text-slate-700">{isBn ? badge.nameBn : badge.name}</div>
+                  <div className="text-xs text-purple-600">+{badge.creditsReward}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderFAQ = () => {
+    const faqs = [
+      {
+        q: isBn ? 'ফ্রি প্ল্যানে কি কি পাব?' : 'What do I get in the Free plan?',
+        a: isBn ? 'মাসে ২টি অ্যাপয়েন্টমেন্ট, ১টি AI ট্রায়াল, এবং সকল ডাক্তার সার্চ করতে পারবেন।' : 'You get 2 appointments per month, 1 AI trial, and unlimited doctor search.',
+      },
+      {
+        q: isBn ? 'ক্রেডিট কিভাবে ব্যবহার করব?' : 'How do I use credits?',
+        a: isBn ? 'ক্রেডিট দিয়ে অ্যাপয়েন্টমেন্ট বুক, AI সেশন, বা ভিডিও কল করতে পারবেন। ১ ক্রেডিট = ৳১০।' : 'Use credits for bookings, AI sessions, or video calls. 1 credit = ৳10.',
+      },
+      {
+        q: isBn ? 'পরিবার প্ল্যানে কতজন যোগ করতে পারব?' : 'How many members in Family plan?',
+        a: isBn ? 'সর্বোচ্চ ৬ জন। প্রতিজন যোগ করলে ৫০ ক্রেডিট পাবেন!' : 'Up to 6 members. Earn 50 credits for each member added!',
+      },
+      {
+        q: isBn ? 'ডাক্তারদের কমিশন কত?' : 'What is the doctor commission?',
+        a: isBn ? 'স্টার্টার: ১৫%, প্রফেশনাল: ১০%, এন্টারপ্রাইজ: ৫%। সরাসরি ক্যাশ নিলে কমিশন নেই।' : 'Starter: 15%, Professional: 10%, Enterprise: 5%. No commission for cash payments.',
+      },
+    ];
+
+    return (
+      <div className="mt-20 max-w-3xl mx-auto">
+        <h2 className="text-3xl font-black text-slate-800 mb-8 text-center">❓ {t.faq}</h2>
+        <div className="space-y-4">
+          {faqs.map((faq, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-slate-200 p-6">
+              <h3 className="font-bold text-slate-800 mb-2">{faq.q}</h3>
+              <p className="text-slate-600">{faq.a}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <PageHeader showNav={true} showGetStarted={true} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/30">
+      <Navbar />
 
-      {/* Hero Section */}
-      <section className="pt-28 pb-16 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyem0wLTRWMjhIMjR2MmgxMnptMC0xMHYySDI0di0yaDEyem0wLTR2MkgyNHYtMmgxMnoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50"></div>
-        
-        <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
-          <h1 className="text-4xl md:text-5xl font-black mb-4">{t.title}</h1>
-          <p className="text-slate-400 text-lg mb-10">{t.subtitle}</p>
-
-          {/* Tab Switcher */}
-          <div className="inline-flex bg-slate-800 rounded-2xl p-1.5">
-            <button
-              onClick={() => setActiveTab('patient')}
-              className={`px-8 py-3 rounded-xl text-sm font-bold transition ${
-                activeTab === 'patient'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <i className="fas fa-user mr-2"></i>
-              {t.forPatients}
-            </button>
-            <button
-              onClick={() => setActiveTab('doctor')}
-              className={`px-8 py-3 rounded-xl text-sm font-bold transition ${
-                activeTab === 'doctor'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <i className="fas fa-user-md mr-2"></i>
-              {t.forDoctors}
-            </button>
+      <main className="pt-24 pb-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-4xl md:text-5xl font-black text-slate-800 mb-4">{t.title}</h1>
+            <p className="text-xl text-slate-600">{t.subtitle}</p>
           </div>
-        </div>
-      </section>
 
-      {/* Pricing Cards */}
-      <section className="py-16 -mt-8">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map((plan, index) => (
-              <div
-                key={plan.id}
-                className={`relative bg-white rounded-3xl border-2 overflow-hidden transition-all hover:shadow-2xl ${
-                  plan.popular 
-                    ? 'border-blue-500 shadow-xl shadow-blue-500/10 scale-105 z-10' 
-                    : 'border-slate-200'
+          {/* User Type Toggle */}
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex bg-slate-100 rounded-2xl p-1.5">
+              <button
+                onClick={() => setUserType('patient')}
+                className={`px-8 py-3 rounded-xl font-bold transition ${
+                  userType === 'patient' ? 'bg-white text-teal-600 shadow-lg' : 'text-slate-600'
                 }`}
               >
-                {plan.popular && (
-                  <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-center py-1.5 text-xs font-bold">
-                    <i className="fas fa-star mr-1"></i>
-                    {t.popular}
-                  </div>
-                )}
-
-                <div className={`p-8 ${plan.popular ? 'pt-12' : ''}`}>
-                  <h3 className="text-xl font-bold text-slate-800 mb-1">
-                    {isBn ? plan.nameBn : plan.name}
-                  </h3>
-                  <p className="text-sm text-slate-500 mb-6">
-                    {isBn ? plan.descriptionBn : plan.description}
-                  </p>
-
-                  <div className="mb-6">
-                    <span className="text-4xl font-black text-slate-900">
-                      {t.taka}{isBn ? plan.priceBn : plan.price}
-                    </span>
-                    <span className="text-slate-500 ml-1">
-                      {isBn ? plan.periodBn : plan.period}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={() => navigate(plan.id === 'clinic' ? '/contact' : '/patient-auth')}
-                    className={`w-full py-3.5 rounded-xl font-bold transition ${
-                      plan.popular
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/25 hover:shadow-xl'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {isBn ? plan.ctaBn : plan.cta}
-                  </button>
-                </div>
-
-                <div className="border-t border-slate-100 p-8">
-                  <ul className="space-y-3">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs ${
-                          feature.included 
-                            ? 'bg-green-100 text-green-600' 
-                            : 'bg-slate-100 text-slate-400'
-                        }`}>
-                          <i className={`fas ${feature.included ? 'fa-check' : 'fa-times'}`}></i>
-                        </span>
-                        <span className={feature.included ? 'text-slate-700' : 'text-slate-400'}>
-                          {isBn ? feature.textBn : feature.text}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Transaction Fees */}
-      <section className="py-12 bg-white border-y border-slate-100">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-2xl font-bold text-slate-800 mb-4">
-            {isBn ? 'লেনদেন ফি' : 'Transaction Fees'}
-          </h2>
-          <p className="text-slate-500 mb-8">
-            {isBn 
-              ? 'প্রতিটি সফল বুকিংয়ের উপর সামান্য প্ল্যাটফর্ম ফি প্রযোজ্য'
-              : 'A small platform fee applies on each successful booking'}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { label: isBn ? 'রোগীর ফি' : 'Patient Fee', value: '৳0', desc: isBn ? 'বুকিং বিনামূল্যে' : 'Free to book' },
-              { label: isBn ? 'ডাক্তারের কমিশন' : 'Doctor Commission', value: '5%', desc: isBn ? 'প্রতি কনসালটেশনে' : 'Per consultation' },
-              { label: isBn ? 'পেমেন্ট প্রসেসিং' : 'Payment Processing', value: '2%', desc: isBn ? 'অনলাইন পেমেন্টে' : 'On online payments' },
-            ].map((item, i) => (
-              <div key={i} className="bg-slate-50 rounded-2xl p-6">
-                <p className="text-sm text-slate-500 mb-2">{item.label}</p>
-                <p className="text-3xl font-black text-slate-900 mb-1">{item.value}</p>
-                <p className="text-xs text-slate-400">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Enterprise CTA */}
-      <section className="py-16">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-10 text-center text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
-            
-            <div className="relative z-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <i className="fas fa-building text-2xl"></i>
-              </div>
-              <h2 className="text-2xl font-bold mb-3">{t.enterprise}</h2>
-              <p className="text-slate-400 mb-8 max-w-md mx-auto">{t.enterpriseDesc}</p>
+                👤 {t.patient}
+              </button>
               <button
-                onClick={() => navigate('/contact')}
-                className="px-8 py-4 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition"
+                onClick={() => setUserType('doctor')}
+                className={`px-8 py-3 rounded-xl font-bold transition ${
+                  userType === 'doctor' ? 'bg-white text-blue-600 shadow-lg' : 'text-slate-600'
+                }`}
               >
-                {t.contactSales}
+                👨‍⚕️ {t.doctor}
+              </button>
+            </div>
+          </div>
+
+          {/* Billing Cycle Toggle */}
+          <div className="flex justify-center mb-12">
+            <div className="inline-flex items-center gap-4 bg-white rounded-2xl p-2 shadow-lg border border-slate-200">
+              <button
+                onClick={() => setBillingCycle('monthly')}
+                className={`px-6 py-2 rounded-xl font-medium transition ${
+                  billingCycle === 'monthly' ? 'bg-slate-800 text-white' : 'text-slate-600'
+                }`}
+              >
+                {t.monthly}
+              </button>
+              <button
+                onClick={() => setBillingCycle('yearly')}
+                className={`px-6 py-2 rounded-xl font-medium transition flex items-center gap-2 ${
+                  billingCycle === 'yearly' ? 'bg-green-500 text-white' : 'text-slate-600'
+                }`}
+              >
+                {t.yearly}
+                <span className="text-xs bg-green-400 text-white px-2 py-0.5 rounded-full">
+                  {t.save} 17%
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Plans */}
+          {userType === 'patient' ? renderPatientPlans() : renderDoctorPlans()}
+
+          {/* Rewards Section */}
+          {renderRewardsSection()}
+
+          {/* FAQ */}
+          {renderFAQ()}
+
+          {/* CTA */}
+          <div className="mt-20 text-center">
+            <div className="inline-block bg-gradient-to-r from-teal-500 to-emerald-500 rounded-3xl p-8 text-white">
+              <h3 className="text-2xl font-bold mb-2">
+                {isBn ? '🎉 প্রথম ১০০০ ব্যবহারকারী!' : '🎉 First 1000 Users!'}
+              </h3>
+              <p className="mb-4 opacity-90">
+                {isBn ? '৩ মাস প্রিমিয়াম ফ্রি + ১০০ বোনাস ক্রেডিট' : '3 months Premium FREE + 100 bonus credits'}
+              </p>
+              <button
+                onClick={() => navigate('/patient-auth')}
+                className="px-8 py-3 bg-white text-teal-600 rounded-xl font-bold hover:shadow-lg transition"
+              >
+                {isBn ? 'এখনই শুরু করুন' : 'Start Now'}
               </button>
             </div>
           </div>
         </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="py-16 bg-white border-t border-slate-100">
-        <div className="max-w-3xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-slate-800 mb-8 text-center">{t.faq}</h2>
-          
-          <div className="space-y-4">
-            {[
-              {
-                q: isBn ? 'কি পেমেন্ট মেথড গ্রহণ করা হয়?' : 'What payment methods are accepted?',
-                a: isBn 
-                  ? 'বিকাশ, নগদ, রকেট, ভিসা, মাস্টারকার্ড এবং ব্যাংক ট্রান্সফার গ্রহণযোগ্য।'
-                  : 'We accept bKash, Nagad, Rocket, Visa, Mastercard, and bank transfers.',
-              },
-              {
-                q: isBn ? 'আমি কি যেকোনো সময় প্ল্যান পরিবর্তন করতে পারি?' : 'Can I change my plan anytime?',
-                a: isBn
-                  ? 'হ্যাঁ, আপনি যেকোনো সময় আপগ্রেড বা ডাউনগ্রেড করতে পারবেন। পরিবর্তন পরবর্তী বিলিং সাইকেল থেকে কার্যকর হবে।'
-                  : 'Yes, you can upgrade or downgrade anytime. Changes take effect from the next billing cycle.',
-              },
-              {
-                q: isBn ? 'ফ্রি ট্রায়াল আছে?' : 'Is there a free trial?',
-                a: isBn
-                  ? 'হ্যাঁ! প্রিমিয়াম ও প্রফেশনাল প্ল্যানে ১৪ দিনের ফ্রি ট্রায়াল আছে। কোনো ক্রেডিট কার্ড লাগবে না।'
-                  : 'Yes! Premium and Professional plans come with a 14-day free trial. No credit card required.',
-              },
-              {
-                q: isBn ? 'রিফান্ড পলিসি কি?' : 'What is the refund policy?',
-                a: isBn
-                  ? 'সাবস্ক্রিপশনের প্রথম ৭ দিনের মধ্যে সম্পূর্ণ রিফান্ড পাবেন। এরপর প্রো-রেটেড রিফান্ড প্রযোজ্য।'
-                  : 'Full refund within the first 7 days of subscription. Pro-rated refunds apply after that.',
-              },
-            ].map((item, i) => (
-              <details key={i} className="group bg-slate-50 rounded-xl">
-                <summary className="px-6 py-4 cursor-pointer font-semibold text-slate-800 flex items-center justify-between">
-                  {item.q}
-                  <i className="fas fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform"></i>
-                </summary>
-                <div className="px-6 pb-4 text-slate-600">
-                  {item.a}
-                </div>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-8 text-center text-sm">
-        <p>&copy; 2025 Nirnoy Health Tech Ltd. {isBn ? 'সর্বস্বত্ব সংরক্ষিত।' : 'All rights reserved.'}</p>
-      </footer>
+      </main>
     </div>
   );
 };
 
 export default Pricing;
-
-
-
