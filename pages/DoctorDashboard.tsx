@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { chatWithDoctorAssistant } from '../services/geminiService';
+import { chatWithDoctorAssistant, getMedicalNews, searchMedicalGuidelines } from '../services/geminiService';
 import { ChatMessage, PrescriptionItem } from '../types';
 import { openPrescriptionWindow, PrescriptionData } from '../utils/prescriptionPDF';
 
@@ -71,7 +71,7 @@ interface SOAPNote {
   plan: string;
 }
 
-type TabType = 'overview' | 'queue' | 'appointments' | 'schedule' | 'consult' | 'analytics';
+type TabType = 'overview' | 'queue' | 'appointments' | 'schedule' | 'consult' | 'analytics' | 'rnd';
 
 // ============ MOCK DATA ============
 const DOCTOR_PROFILE = {
@@ -1071,44 +1071,108 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
         {/* Right: AI Assistant & History */}
         <div className="space-y-6">
-          {/* AI Assistant */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-purple-500 to-indigo-600 text-white">
-              <h3 className="font-bold flex items-center gap-2">
-                <span>🤖</span> AI সহকারী
-              </h3>
-              <p className="text-sm opacity-90">রোগী সম্পর্কে প্রশ্ন করুন</p>
+          {/* AI Clinical Assistant - Improved */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-lg">
+            <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold flex items-center gap-2 text-lg">
+                    <span>🧠</span> Nirnoy Medical AI
+                  </h3>
+                  <p className="text-sm opacity-90">Evidence-based clinical support</p>
+                </div>
+                <div className="px-2 py-1 bg-white/20 rounded-full text-xs">
+                  Gemini Pro
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="p-3 border-b border-slate-100 bg-slate-50">
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setAiInput('Differential diagnosis?')} className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium hover:bg-blue-200">
+                  DDx
+                </button>
+                <button onClick={() => setAiInput('Drug interactions?')} className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium hover:bg-orange-200">
+                  Drug Interactions
+                </button>
+                <button onClick={() => setAiInput('Treatment guidelines?')} className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-medium hover:bg-green-200">
+                  Guidelines
+                </button>
+                <button onClick={() => setAiInput('Red flags to watch?')} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-xs font-medium hover:bg-red-200">
+                  Red Flags
+                </button>
+              </div>
             </div>
             
-            <div ref={chatRef} className="h-64 overflow-y-auto p-4 space-y-3">
+            {/* Chat Area - Improved */}
+            <div ref={chatRef} className="h-72 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-50 to-white">
               {aiChat.length === 0 && (
-                <div className="text-center text-slate-400 text-sm py-8">
-                  এই রোগী সম্পর্কে AI কে প্রশ্ন করুন
+                <div className="text-center py-8">
+                  <div className="text-5xl mb-3">🩺</div>
+                  <p className="text-slate-500 font-medium">Clinical Decision Support</p>
+                  <p className="text-slate-400 text-sm mt-1">Ask about diagnosis, treatment, or guidelines</p>
                 </div>
               )}
               {aiChat.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] px-4 py-2 rounded-xl ${msg.role === 'user' ? 'bg-purple-500 text-white' : 'bg-slate-100 text-slate-800'}`}>
-                    {msg.text}
+                  <div className={`max-w-[90%] ${msg.role === 'user' ? '' : ''}`}>
+                    {msg.role === 'assistant' && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">AI</span>
+                        </div>
+                        <span className="text-xs text-slate-400">Nirnoy AI</span>
+                      </div>
+                    )}
+                    <div className={`px-4 py-3 rounded-2xl ${
+                      msg.role === 'user' 
+                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-br-md' 
+                        : 'bg-white border border-slate-200 text-slate-700 rounded-bl-md shadow-sm'
+                    }`}>
+                      <pre className="whitespace-pre-wrap font-sans text-sm">{msg.text}</pre>
+                    </div>
                   </div>
                 </div>
               ))}
               {isAiThinking && (
                 <div className="flex justify-start">
-                  <div className="bg-slate-100 px-4 py-2 rounded-xl text-slate-500">
-                    চিন্তা করছি...
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center animate-pulse">
+                      <span className="text-white text-xs">AI</span>
+                    </div>
+                    <div className="bg-white border border-slate-200 px-4 py-3 rounded-2xl rounded-bl-md shadow-sm">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                        <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
             
-            <div className="p-4 border-t border-slate-200">
+            {/* Input Area - Improved */}
+            <div className="p-4 border-t border-slate-200 bg-white">
               <div className="flex gap-2">
-                <input type="text" value={aiInput} onChange={(e) => setAiInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleAIChat()} placeholder="প্রশ্ন করুন..." className="flex-1 px-4 py-2 border rounded-lg" />
-                <button onClick={handleAIChat} disabled={isAiThinking} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50">
-                  পাঠান
+                <input 
+                  type="text" 
+                  value={aiInput} 
+                  onChange={(e) => setAiInput(e.target.value)} 
+                  onKeyPress={(e) => e.key === 'Enter' && handleAIChat()} 
+                  placeholder="Ask about diagnosis, treatment, drug interactions..." 
+                  className="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                />
+                <button 
+                  onClick={handleAIChat} 
+                  disabled={isAiThinking || !aiInput.trim()} 
+                  className="px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg shadow-purple-500/25"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                 </button>
               </div>
+              <p className="text-xs text-slate-400 mt-2 text-center">AI-powered clinical support • Always verify with current guidelines</p>
             </div>
           </div>
 
@@ -1324,6 +1388,195 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
     );
   };
 
+
+  // ============ R&D / MEDICAL NEWS STATE ============
+  const [medicalNews, setMedicalNews] = useState<any[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [selectedSpecialty, setSelectedSpecialty] = useState('Cardiology');
+  const [guidelineQuery, setGuidelineQuery] = useState('');
+  const [guidelineResult, setGuidelineResult] = useState('');
+  const [guidelineLoading, setGuidelineLoading] = useState(false);
+
+  const fetchMedicalNews = async () => {
+    setNewsLoading(true);
+    try {
+      const result = await getMedicalNews(selectedSpecialty);
+      const parsed = JSON.parse(result);
+      setMedicalNews(Array.isArray(parsed) ? parsed : []);
+    } catch (e) {
+      console.error(e);
+      setMedicalNews([]);
+    }
+    setNewsLoading(false);
+  };
+
+  const searchGuidelines = async () => {
+    if (!guidelineQuery.trim()) return;
+    setGuidelineLoading(true);
+    try {
+      const result = await searchMedicalGuidelines(guidelineQuery);
+      setGuidelineResult(result);
+    } catch (e) {
+      setGuidelineResult('Error fetching guidelines.');
+    }
+    setGuidelineLoading(false);
+  };
+
+  // ============ RENDER R&D ============
+  const renderRnD = () => (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">R&D - গবেষণা ও উন্নয়ন</h2>
+          <p className="text-slate-500">সর্বশেষ মেডিকেল জার্নাল ও গাইডলাইন</p>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Medical News Feed */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+            <h3 className="font-bold flex items-center gap-2">
+              <span>📰</span> মেডিকেল নিউজ ফিড
+            </h3>
+            <p className="text-sm opacity-90">সাম্প্রতিক গবেষণা ও আপডেট</p>
+          </div>
+          
+          <div className="p-4 border-b border-slate-100">
+            <div className="flex gap-2">
+              <select value={selectedSpecialty} onChange={(e) => setSelectedSpecialty(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg">
+                <option value="Cardiology">হৃদরোগ (Cardiology)</option>
+                <option value="Endocrinology">ডায়াবেটিস (Endocrinology)</option>
+                <option value="Internal Medicine">মেডিসিন (Internal Medicine)</option>
+                <option value="Neurology">স্নায়ুরোগ (Neurology)</option>
+                <option value="Oncology">ক্যান্সার (Oncology)</option>
+                <option value="Pediatrics">শিশুরোগ (Pediatrics)</option>
+                <option value="General Medicine">সাধারণ চিকিৎসা</option>
+              </select>
+              <button onClick={fetchMedicalNews} disabled={newsLoading} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">
+                {newsLoading ? '...' : 'লোড করুন'}
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[500px] overflow-y-auto">
+            {medicalNews.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                <div className="text-4xl mb-2">🔬</div>
+                <p>বিশেষত্ব নির্বাচন করে "লোড করুন" ক্লিক করুন</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {medicalNews.map((item, i) => (
+                  <div key={i} className="p-4 hover:bg-slate-50">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg ${
+                        item.category === 'Research' ? 'bg-purple-500' :
+                        item.category === 'Guideline' ? 'bg-green-500' :
+                        item.category === 'Drug' ? 'bg-orange-500' :
+                        'bg-blue-500'
+                      }`}>
+                        {item.category === 'Research' ? '📊' : item.category === 'Guideline' ? '📋' : item.category === 'Drug' ? '💊' : '🔬'}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-slate-800 text-sm">{item.title}</h4>
+                        <p className="text-xs text-slate-500 mt-1">{item.source} • {item.date}</p>
+                        <p className="text-sm text-slate-600 mt-2">{item.summary}</p>
+                        <p className="text-xs text-blue-600 mt-2 font-medium">{item.relevance}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Guidelines Search */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-green-500 to-teal-600 text-white">
+              <h3 className="font-bold flex items-center gap-2">
+                <span>📚</span> গাইডলাইন সার্চ
+              </h3>
+              <p className="text-sm opacity-90">WHO, AHA, ESC, NICE গাইডলাইন</p>
+            </div>
+            
+            <div className="p-4">
+              <div className="flex gap-2 mb-4">
+                <input 
+                  type="text" 
+                  value={guidelineQuery} 
+                  onChange={(e) => setGuidelineQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && searchGuidelines()}
+                  placeholder="যেমন: Hypertension management, Diabetes treatment..."
+                  className="flex-1 px-4 py-2 border rounded-lg"
+                />
+                <button onClick={searchGuidelines} disabled={guidelineLoading} className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50">
+                  {guidelineLoading ? '...' : 'সার্চ'}
+                </button>
+              </div>
+
+              {/* Quick Searches */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {['Hypertension 2024', 'Diabetes ADA', 'Heart Failure ESC', 'Antibiotic Guidelines'].map(q => (
+                  <button key={q} onClick={() => { setGuidelineQuery(q); }} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs hover:bg-slate-200">
+                    {q}
+                  </button>
+                ))}
+              </div>
+
+              {guidelineResult && (
+                <div className="bg-slate-50 rounded-xl p-4 max-h-80 overflow-y-auto">
+                  <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans">{guidelineResult}</pre>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Reference */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-200 bg-slate-50">
+              <h3 className="font-bold text-slate-800">দ্রুত রেফারেন্স</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <a href="https://www.uptodate.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
+                <span className="text-2xl">📖</span>
+                <div>
+                  <div className="font-medium text-blue-700">UpToDate</div>
+                  <div className="text-xs text-blue-600">Evidence-based clinical decisions</div>
+                </div>
+              </a>
+              <a href="https://pubmed.ncbi.nlm.nih.gov" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition">
+                <span className="text-2xl">🔬</span>
+                <div>
+                  <div className="font-medium text-green-700">PubMed</div>
+                  <div className="text-xs text-green-600">Medical literature database</div>
+                </div>
+              </a>
+              <a href="https://www.who.int/publications" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition">
+                <span className="text-2xl">🌍</span>
+                <div>
+                  <div className="font-medium text-purple-700">WHO Guidelines</div>
+                  <div className="text-xs text-purple-600">World Health Organization</div>
+                </div>
+              </a>
+              <a href="https://www.nejm.org" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-red-50 rounded-lg hover:bg-red-100 transition">
+                <span className="text-2xl">📰</span>
+                <div>
+                  <div className="font-medium text-red-700">NEJM</div>
+                  <div className="text-xs text-red-600">New England Journal of Medicine</div>
+                </div>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+
   // ============ SIDEBAR ============
   const sidebarItems = [
     { id: 'overview', icon: '🏠', label: 'ওভারভিউ', labelEn: 'Overview' },
@@ -1332,6 +1585,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
     { id: 'schedule', icon: '⏰', label: 'সময়সূচী', labelEn: 'Schedule' },
     { id: 'consult', icon: '👨‍⚕️', label: 'কনসাল্টেশন', labelEn: 'Consultation' },
     { id: 'analytics', icon: '📊', label: 'বিশ্লেষণ', labelEn: 'Analytics' },
+    { id: 'rnd', icon: '🔬', label: 'R&D', labelEn: 'Research' },
   ];
 
   // ============ MAIN RENDER ============
@@ -1407,6 +1661,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           {activeTab === 'schedule' && renderSchedule()}
           {activeTab === 'consult' && renderConsultation()}
           {activeTab === 'analytics' && renderAnalytics()}
+          {activeTab === 'rnd' && renderRnD()}
         </div>
       </main>
     </div>
