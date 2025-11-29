@@ -336,8 +336,8 @@ const HomeVoiceSection: React.FC = () => {
     activeRef.current = true;
 
     const agentName = gender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
-    // Aoede = deeper male voice, Kore = female voice
-    const voiceName = gender === 'male' ? 'Aoede' : 'Kore';
+    // Puck = deep male voice, Kore = female voice
+    const voiceName = gender === 'male' ? 'Puck' : 'Kore';
 
     try {
       // Initialize audio player

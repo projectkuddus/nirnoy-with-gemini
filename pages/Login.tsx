@@ -47,7 +47,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
               <span className="text-white font-black text-lg">ন</span>
             </div>
-            <div className="leading-tight">
+            <div className="leading-tight text-left">
               <span className="font-black text-slate-900 text-lg tracking-tight">Nirnoy</span>
               <span className="text-[10px] text-blue-600 font-semibold block -mt-0.5 tracking-widest uppercase">Health Synchronized</span>
             </div>
