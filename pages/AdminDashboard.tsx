@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getFeedbacks, updateFeedbackStatus } from '../components/FeedbackWidget';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
 // ============ TYPES ============
-type AdminTab = 'overview' | 'users' | 'subscriptions' | 'payments' | 'credits' | 'analytics' | 'settings';
+type AdminTab = 'overview' | 'users' | 'subscriptions' | 'payments' | 'feedback' | 'credits' | 'analytics' | 'settings';
 
 interface DashboardStats {
   totalUsers: number;
@@ -88,7 +89,14 @@ export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>(MOCK_STATS);
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [payments, setPayments] = useState<Payment[]>(MOCK_PAYMENTS);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Load feedbacks
+  useEffect(() => {
+    const loadedFeedbacks = getFeedbacks();
+    setFeedbacks(loadedFeedbacks);
+  }, [activeTab]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
 
@@ -117,7 +125,102 @@ export const AdminDashboard: React.FC = () => {
 
   // Login screen
   if (!isAuthenticated) {
+  
+  // Render Feedback
+  const renderFeedback = () => {
+    const newCount = feedbacks.filter(f => f.status === 'new').length;
+    const resolvedCount = feedbacks.filter(f => f.status === 'resolved').length;
+    
+    const handleStatusChange = (id: string, status: 'new' | 'reviewed' | 'resolved') => {
+      updateFeedbackStatus(id, status);
+      setFeedbacks(getFeedbacks());
+    };
+    
+    const getMoodEmoji = (mood: string) => {
+      switch(mood) {
+        case 'happy': return '😊';
+        case 'sad': return '😞';
+        default: return '😐';
+      }
+    };
+    
+    const getTypeColor = (type: string) => {
+      switch(type) {
+        case 'bug': return 'bg-red-500/20 text-red-400';
+        case 'feature': return 'bg-blue-500/20 text-blue-400';
+        case 'complaint': return 'bg-orange-500/20 text-orange-400';
+        case 'doctor': return 'bg-purple-500/20 text-purple-400';
+        default: return 'bg-slate-500/20 text-slate-400';
+      }
+    };
+    
     return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white">User Feedback</h2>
+          <div className="flex gap-3">
+            <div className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-xl font-medium">
+              {newCount} New
+            </div>
+            <div className="px-4 py-2 bg-green-500/20 text-green-400 rounded-xl font-medium">
+              {resolvedCount} Resolved
+            </div>
+          </div>
+        </div>
+        
+        {feedbacks.length === 0 ? (
+          <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-12 border border-white/10 text-center">
+            <div className="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">💬</span>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">No Feedback Yet</h3>
+            <p className="text-slate-400">User feedback will appear here</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {feedbacks.map((feedback) => (
+              <div key={feedback.id} className="bg-white/10 backdrop-blur-xl rounded-2xl p-5 border border-white/10">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{getMoodEmoji(feedback.mood)}</span>
+                    <div>
+                      <div className="text-white font-medium">{feedback.userName || feedback.phone || 'Anonymous'}</div>
+                      <div className="text-slate-400 text-sm">{feedback.page} • {new Date(feedback.timestamp).toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded-lg text-xs font-medium ${getTypeColor(feedback.type)}`}>
+                      {feedback.type}
+                    </span>
+                    <select
+                      value={feedback.status}
+                      onChange={(e) => handleStatusChange(feedback.id, e.target.value as any)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium bg-white/10 border border-white/20 text-white focus:outline-none ${
+                        feedback.status === 'new' ? 'text-amber-400' :
+                        feedback.status === 'reviewed' ? 'text-blue-400' : 'text-green-400'
+                      }`}
+                    >
+                      <option value="new">New</option>
+                      <option value="reviewed">Reviewed</option>
+                      <option value="resolved">Resolved</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="text-slate-300 bg-white/5 rounded-xl p-3">{feedback.message}</p>
+                {(feedback.email || feedback.phone) && (
+                  <div className="mt-3 text-sm text-slate-400">
+                    Contact: {feedback.email || feedback.phone}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md border border-white/20">
           <div className="text-center mb-8">
@@ -155,6 +258,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'users', icon: '👥', label: 'Users' },
     { id: 'subscriptions', icon: '💳', label: 'Subscriptions' },
     { id: 'payments', icon: '💰', label: 'Payments' },
+    { id: 'feedback', icon: '💬', label: 'Feedback' },
     { id: 'credits', icon: '🎮', label: 'Credits' },
     { id: 'analytics', icon: '📈', label: 'Analytics' },
     { id: 'settings', icon: '⚙️', label: 'Settings' },
