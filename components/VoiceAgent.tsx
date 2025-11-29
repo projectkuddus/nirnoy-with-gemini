@@ -10,7 +10,7 @@ const hasValidApiKey = GEMINI_API_KEY && GEMINI_API_KEY.length > 10;
 const log = (...args: any[]) => console.log('[Voice]', ...args);
 const logError = (...args: any[]) => console.error('[Voice ERROR]', ...args);
 
-// ============ AUDIO PLAYER (for Gemini Live API) ============
+// ============ AUDIO PLAYER ============
 class AudioPlayer {
   private audioContext: AudioContext | null = null;
   private gainNode: GainNode | null = null;
@@ -26,13 +26,11 @@ class AudioPlayer {
       const AC = window.AudioContext || (window as any).webkitAudioContext;
       this.audioContext = new AC({ sampleRate: 24000 });
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.gain.value = 3.0; // Boost volume
+      this.gainNode.gain.value = 3.0;
       this.gainNode.connect(this.audioContext.destination);
       
       if (this.audioContext.state === 'suspended') await this.audioContext.resume();
-      
       this.nextPlayTime = 0;
-      log('AudioContext ready:', this.audioContext.state);
       return true;
     } catch (e) {
       logError('AudioContext init failed:', e);
@@ -73,8 +71,6 @@ class AudioPlayer {
       const startTime = Math.max(now + 0.05, this.nextPlayTime);
       source.start(startTime);
       this.nextPlayTime = startTime + buffer.duration;
-
-      log('Playing audio chunk:', buffer.duration.toFixed(2) + 's');
     } catch (e) {
       logError('Audio play error:', e);
     }
@@ -153,7 +149,6 @@ class Microphone {
       source.connect(this.processor);
       this.processor.connect(this.context.destination);
       this.isRunning = true;
-      log('Microphone started');
       return true;
     } catch (e: any) {
       logError('Microphone error:', e.name, e.message);
@@ -166,8 +161,42 @@ class Microphone {
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     if (this.processor) { this.processor.disconnect(); this.processor = null; }
     if (this.context) { try { this.context.close(); } catch (e) {} this.context = null; }
-    log('Microphone stopped');
   }
+}
+
+// ============ GENERATE DOCTOR DATABASE FOR PROMPT ============
+function generateDoctorKnowledge(): string {
+  const totalDoctors = MOCK_DOCTORS.length;
+  
+  // Count by specialty
+  const specialtyCounts: Record<string, number> = {};
+  const specialtyDoctors: Record<string, typeof MOCK_DOCTORS> = {};
+  
+  MOCK_DOCTORS.forEach(doc => {
+    doc.specialties.forEach(spec => {
+      specialtyCounts[spec] = (specialtyCounts[spec] || 0) + 1;
+      if (!specialtyDoctors[spec]) specialtyDoctors[spec] = [];
+      if (specialtyDoctors[spec].length < 3) {
+        specialtyDoctors[spec].push(doc);
+      }
+    });
+  });
+
+  // Generate specialty summary
+  const specialtySummary = Object.entries(specialtyCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([spec, count]) => {
+      const docs = specialtyDoctors[spec] || [];
+      const docNames = docs.map(d => `${d.name} (${d.chambers[0]?.fee || 500} টাকা)`).join(', ');
+      return `${spec}: ${count} জন ডাক্তার। যেমন: ${docNames}`;
+    })
+    .join('\n');
+
+  return `মোট ডাক্তার: ${totalDoctors} জন বিশেষজ্ঞ ডাক্তার নির্ণয়তে আছেন।
+
+বিশেষত্ব অনুযায়ী:
+${specialtySummary}`;
 }
 
 // ============ SYSTEM PROMPT ============
@@ -179,59 +208,73 @@ function getSystemPrompt(agentName: string, gender: 'male' | 'female'): string {
   else if (hour >= 17 && hour < 20) greeting = 'শুভ সন্ধ্যা';
   else greeting = 'শুভ রাত্রি';
 
-  // Get doctors by specialty
-  const specialties = ['মেডিসিন', 'হৃদরোগ', 'স্ত্রীরোগ', 'শিশুরোগ', 'হাড় ও জোড়া', 'চর্মরোগ'];
-  const doctorsBySpecialty = specialties.map(spec => {
-    const docs = MOCK_DOCTORS.filter(d => d.specialties.includes(spec)).slice(0, 2);
-    if (docs.length === 0) return null;
-    return `${spec}: ${docs.map(d => `${d.name} (ফি ${d.chambers[0]?.fee || 500} টাকা)`).join(', ')}`;
-  }).filter(Boolean).join('\n');
-
+  const doctorKnowledge = generateDoctorKnowledge();
   const genderWord = gender === 'male' ? 'পুরুষ' : 'মহিলা';
+  const personality = gender === 'male' 
+    ? 'তুমি একজন অভিজ্ঞ, বিশ্বস্ত বড় ভাইয়ের মতো। গম্ভীর কিন্তু যত্নশীল।'
+    : 'তুমি একজন সহানুভূতিশীল, মিষ্টি বোনের মতো। উষ্ণ এবং সহায়ক।';
 
-  return `তুমি "${agentName}" - নির্ণয় হেলথের ${genderWord} AI সহকারী।
+  return `তুমি "${agentName}" - নির্ণয় হেলথের ${genderWord} AI সহকারী। ${personality}
 
-গুরুত্বপূর্ণ নির্দেশনা:
-সংযোগ হলেই প্রথমে তুমি বলবে: "আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। ডাক্তার সিরিয়াল নিতে বা নির্ণয় সম্পর্কে জানতে বলুন।"
+প্রথম কথা (সংযোগ হলেই বলবে):
+"আসসালামু আলাইকুম! ${greeting}! আমি ${agentName}। কেমন আছেন? আজ কীভাবে সাহায্য করতে পারি?"
 
-নির্ণয় সম্পর্কে:
-- বাংলাদেশের AI স্বাস্থ্যসেবা প্ল্যাটফর্ম
+তোমার ব্যক্তিত্ব:
+- একজন বাস্তব মানুষের মতো কথা বলো, রোবটের মতো নয়
+- রোগীর কথা মনোযোগ দিয়ে শোনো
+- সহানুভূতি দেখাও: "বুঝতে পারছি, এটা কষ্টকর"
+- প্রশ্ন করো: "কতদিন ধরে এই সমস্যা?", "ব্যথা কোথায় বেশি?"
+- আশ্বস্ত করো: "চিন্তা করবেন না, ভালো ডাক্তার আছেন"
+
+নির্ণয় সম্পর্কে (যদি জিজ্ঞেস করে):
+- নির্ণয় বাংলাদেশের প্রথম AI স্বাস্থ্যসেবা প্ল্যাটফর্ম
 - ওয়েবসাইট: nirnoy.ai
-- ২০০ এর বেশি বিশেষজ্ঞ ডাক্তার
-- ২৪ ঘণ্টা AI সহায়তা
-- অনলাইনে সিরিয়াল বুকিং
-- পারিবারিক স্বাস্থ্য ট্র্যাকিং
+- ${MOCK_DOCTORS.length} জনের বেশি বিশেষজ্ঞ ডাক্তার
+- ২৪ ঘণ্টা AI সহায়তা পাবেন
+- ঘরে বসেই অনলাইনে সিরিয়াল নিতে পারবেন
+- পরিবারের সবার স্বাস্থ্য তথ্য এক জায়গায় রাখতে পারবেন
+- সম্পূর্ণ নিরাপদ ও গোপনীয়
 
-সিরিয়াল বুকিং:
-১. সমস্যা জিজ্ঞেস করো
-২. উপযুক্ত ডাক্তার সাজেস্ট করো
-৩. তারিখ ও সময় নাও
-৪. কনফার্ম করো
+ডাক্তার তথ্য:
+${doctorKnowledge}
 
-ডাক্তার তালিকা:
-${doctorsBySpecialty}
+সমস্যা বুঝে ডাক্তার সাজেস্ট করো:
+- জ্বর, সর্দি, কাশি, দুর্বলতা, মাথাব্যথা → মেডিসিন বিশেষজ্ঞ
+- বুকে ব্যথা, হার্টের ধড়ফড়, উচ্চ রক্তচাপ → হৃদরোগ বিশেষজ্ঞ
+- মহিলাদের সমস্যা, গর্ভধারণ, মাসিক → স্ত্রীরোগ বিশেষজ্ঞ
+- বাচ্চাদের অসুখ → শিশুরোগ বিশেষজ্ঞ
+- হাড়ে ব্যথা, কোমর ব্যথা, জয়েন্ট → হাড় ও জোড়া বিশেষজ্ঞ
+- চুলকানি, ত্বকের সমস্যা, এলার্জি → চর্মরোগ বিশেষজ্ঞ
+- কানে সমস্যা, নাক বন্ধ, গলা ব্যথা → নাক-কান-গলা বিশেষজ্ঞ
+- চোখে সমস্যা, চশমা → চক্ষু বিশেষজ্ঞ
+- ডায়াবেটিস, থাইরয়েড → ডায়াবেটিস বিশেষজ্ঞ
+- পেটের সমস্যা, গ্যাস, বদহজম → গ্যাস্ট্রো বিশেষজ্ঞ
+- কিডনি সমস্যা → নেফ্রোলজি বিশেষজ্ঞ
+- মানসিক সমস্যা, ঘুম না হওয়া, দুশ্চিন্তা → মানসিক রোগ বিশেষজ্ঞ
+- দাঁতের সমস্যা → ডেন্টাল বিশেষজ্ঞ
 
-সমস্যা থেকে বিশেষত্ব:
-- জ্বর, সর্দি, কাশি = মেডিসিন
-- বুকে ব্যথা = হৃদরোগ
-- মহিলাদের সমস্যা = স্ত্রীরোগ
-- শিশুদের সমস্যা = শিশুরোগ
-- হাড়, কোমর ব্যথা = হাড় ও জোড়া
-- চুলকানি, ত্বক = চর্মরোগ
+সিরিয়াল বুকিং প্রক্রিয়া:
+১. প্রথমে সমস্যা ভালোভাবে বুঝো
+২. উপযুক্ত বিশেষত্বের ডাক্তার সাজেস্ট করো (নাম, ফি সহ)
+৩. রোগী রাজি হলে তারিখ ও সময় জিজ্ঞেস করো
+৪. বুকিং কনফার্ম করে বলো: "আপনার সিরিয়াল হয়ে গেছে। ধন্যবাদ!"
 
-নিয়ম:
-- শুধু বাংলায় কথা বলো
-- ছোট উত্তর দাও, এক দুই বাক্য
-- বিনয়ী হও, আপনি বলো
-- ইমোজি ব্যবহার করো না
+কথা বলার নিয়ম:
+- সবসময় বাংলায় কথা বলো
+- ছোট ছোট বাক্যে কথা বলো (২-৩ বাক্য)
+- "আপনি", "জ্বী", "ধন্যবাদ", "আলহামদুলিল্লাহ" ব্যবহার করো
+- ইমোজি বা ইংরেজি এড়িয়ে চলো
+- প্রশ্ন করো, শুধু তথ্য দিও না
 
 জরুরি অবস্থা:
-বুকে তীব্র ব্যথা, শ্বাসকষ্ট হলে বলো: "এখনই ৯৯৯ এ কল করুন!"
+বুকে তীব্র ব্যথা, শ্বাসকষ্ট, অজ্ঞান, খিঁচুনি হলে সাথে সাথে বলো:
+"এটা জরুরি! এখনই ৯৯৯ এ কল করুন বা নিকটস্থ হাসপাতালে যান!"
 
-যা বলবে না:
-- ওষুধের নাম বা ডোজ
-- রোগ নির্ণয়
-- ব্যক্তিগত তথ্য চাওয়া`;
+যা করবে না:
+- কোনো ওষুধের নাম বা ডোজ বলবে না
+- রোগ নির্ণয় করবে না, শুধু ডাক্তারের কাছে পাঠাবে
+- ব্যক্তিগত বা আর্থিক তথ্য চাইবে না
+- অন্য কোনো অ্যাপ বা হাসপাতালের কথা বলবে না`;
 }
 
 // ============ TYPES ============
@@ -347,7 +390,6 @@ const HomeVoiceSection: React.FC = () => {
   const activeRef = useRef(false);
   const greetingSentRef = useRef(false);
 
-  // Initialize Gemini client
   useEffect(() => {
     if (hasValidApiKey && !clientRef.current) {
       try {
@@ -389,19 +431,15 @@ const HomeVoiceSection: React.FC = () => {
     greetingSentRef.current = false;
 
     const agentName = gender === 'male' ? 'স্বাস্থ্য' : 'সেবা';
-    // Puck = deep male voice, Kore = female voice
     const voiceName = gender === 'male' ? 'Puck' : 'Kore';
 
     try {
-      // Initialize audio player
       audioRef.current = new AudioPlayer();
       const audioOk = await audioRef.current.init();
       if (!audioOk) throw new Error('Audio init failed');
 
-      // Initialize microphone
       micRef.current = new Microphone();
 
-      // Connect to Gemini Live API
       log('Connecting to Gemini Live API...');
       const session = await clientRef.current.live.connect({
         model: 'gemini-2.0-flash-exp',
@@ -417,7 +455,6 @@ const HomeVoiceSection: React.FC = () => {
             log('Connected to Gemini Live!');
             activeRef.current = true;
 
-            // Start microphone
             const micOk = await micRef.current!.start((audioData) => {
               if (sessionRef.current && activeRef.current) {
                 try { sessionRef.current.sendRealtimeInput({ media: audioData }); } catch (e) {}
@@ -432,16 +469,14 @@ const HomeVoiceSection: React.FC = () => {
 
             setStatus('listening');
 
-            // Trigger auto-greeting immediately
+            // Auto-greet
             if (!greetingSentRef.current && sessionRef.current && activeRef.current) {
               greetingSentRef.current = true;
-              log('Sending greeting trigger...');
-              
-              // Send a greeting request to make the AI speak first
+              log('Triggering auto-greeting...');
               sessionRef.current.sendClientContent({
                 turns: [{ 
                   role: 'user', 
-                  parts: [{ text: 'শুরু করো, নিজের পরিচয় দাও' }] 
+                  parts: [{ text: 'হ্যালো, শুরু করো' }] 
                 }],
                 turnComplete: true
               });
@@ -493,7 +528,6 @@ const HomeVoiceSection: React.FC = () => {
       });
 
       sessionRef.current = session;
-      log('Session created');
 
     } catch (e: any) {
       logError('Connection failed:', e);
@@ -509,7 +543,6 @@ const HomeVoiceSection: React.FC = () => {
     }
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => { cleanup(); };
   }, [cleanup]);
@@ -569,7 +602,7 @@ const HomeVoiceSection: React.FC = () => {
         </div>
 
         <p className="text-center text-slate-500 text-sm">
-          {isBn ? 'Gemini Live API • রিয়েল-টাইম ভয়েস' : 'Gemini Live API • Real-time Voice'}
+          {isBn ? `${MOCK_DOCTORS.length}+ ডাক্তার • Gemini Live API` : `${MOCK_DOCTORS.length}+ Doctors • Gemini Live API`}
         </p>
       </div>
     </section>
