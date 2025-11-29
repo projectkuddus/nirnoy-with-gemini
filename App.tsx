@@ -1,6 +1,7 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { UserRole } from './types';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PageLoading } from './components/LoadingSpinner';
@@ -51,6 +52,7 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
+      <AuthProvider>
       <LanguageProvider>
         <BrowserRouter>
           <FeedbackWidget />
@@ -94,6 +96,7 @@ const App: React.FC = () => {
           </Suspense>
         </BrowserRouter>
       </LanguageProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 };
