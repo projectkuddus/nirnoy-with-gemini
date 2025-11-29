@@ -24,8 +24,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     } else {
       if (activeTab === 'patient') {
         onLogin(UserRole.PATIENT);
+      navigate("/patient-dashboard");
       } else {
         onLogin(UserRole.DOCTOR);
+      navigate("/doctor-dashboard");
       }
     }
   };
@@ -33,8 +35,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const handleDemoLogin = (role: 'patient' | 'doctor') => {
     if (role === 'patient') {
       onLogin(UserRole.PATIENT);
+      navigate("/patient-dashboard");
     } else {
       onLogin(UserRole.DOCTOR);
+      navigate("/doctor-dashboard");
     }
   };
 
