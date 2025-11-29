@@ -30,6 +30,10 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   const [bloodGroup, setBloodGroup] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
 
+  // TEST MODE: Generated OTP for internal testing
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const TEST_BYPASS_CODE = '000000'; // Universal bypass for internal team
+
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Translations
@@ -91,11 +95,15 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
     setError('');
     setIsLoading(true);
     
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 1500));
+    // Generate test OTP
+    const testOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(testOtp);
     
-    // In real app: Check if user exists, send OTP
-    setIsNewUser(Math.random() > 0.5); // Simulate 50% new users
+    await new Promise(r => setTimeout(r, 1000));
+    
+    // Check if user exists (for demo, new users have numbers ending in 0-4)
+    const lastDigit = parseInt(phone.slice(-1));
+    setIsNewUser(lastDigit >= 0 && lastDigit <= 4);
     setStep('otp');
     setCountdown(60);
     setIsLoading(false);
@@ -146,7 +154,13 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
     
     await new Promise(r => setTimeout(r, 1500));
     
-    // In real app: Verify OTP with backend
+    // Verify OTP: Accept generated OTP or bypass code (000000)
+    if (otpValue !== generatedOtp && otpValue !== TEST_BYPASS_CODE) {
+      setError(isBn ? 'ভুল OTP। আবার চেষ্টা করুন।' : 'Wrong OTP. Please try again.');
+      setIsLoading(false);
+      return;
+    }
+    
     if (isNewUser) {
       setStep('register');
     } else {
@@ -269,6 +283,17 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                   <h2 className="text-xl font-bold text-slate-800">{t.otpTitle}</h2>
                   <p className="text-sm text-slate-500 mt-1">{t.otpSubtitle}</p>
                   <p className="text-sm text-blue-600 font-medium mt-2">+880 {phone}</p>
+                  
+                  {/* TEST MODE: Show OTP for internal testing */}
+                  {generatedOtp && (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs text-amber-600 font-medium">🧪 টেস্ট মোড / Test Mode</p>
+                      <p className="text-2xl font-bold text-amber-700 tracking-widest mt-1">{generatedOtp}</p>
+                      <p className="text-xs text-amber-500 mt-1">
+                        {isBn ? 'অথবা 000000 দিন' : 'Or use 000000'}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* OTP Input */}
