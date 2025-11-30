@@ -171,7 +171,7 @@ const MEMBERSHIPS = [
 const getProfilePhoto = (gender: string, index: number): string => {
   // Mix of sources for variety
   if (index % 3 === 0) {
-    return `https://randomuser.me/api/portraits/${gender === 'Male' ? 'men' : 'women'}/${index % 100}.jpg`;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${gender === 'Male' ? '3b82f6' : 'ec4899'}&color=fff&size=200`;
   } else if (index % 3 === 1) {
     return `https://i.pravatar.cc/300?img=${(index % 70) + 1}`;
   } else {

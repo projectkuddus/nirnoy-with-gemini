@@ -82,7 +82,7 @@ const DOCTOR_PROFILE = {
   specialty: 'Cardiology',
   specialtyBn: 'হৃদরোগ বিশেষজ্ঞ',
   degrees: 'MBBS, FCPS (Cardiology), MD',
-  image: 'https://randomuser.me/api/portraits/men/85.jpg',
+  image: 'https://ui-avatars.com/api/?name=M&background=3b82f6&color=fff&size=200',
   hospital: 'Square Hospital, Dhaka',
   hospitalBn: 'স্কয়ার হাসপাতাল, ঢাকা',
   experience: 15,
@@ -95,7 +95,7 @@ const DOCTOR_PROFILE = {
 const PATIENTS: PatientRecord[] = [
   {
     id: 'p1', name: 'Rahim Uddin', nameBn: 'রহিম উদ্দিন', age: 45, gender: 'Male',
-    phone: '01712345678', bloodGroup: 'A+', profileImage: 'https://randomuser.me/api/portraits/men/32.jpg',
+    phone: '01712345678', bloodGroup: 'A+', profileImage: 'https://ui-avatars.com/api/?name=M&background=3b82f6&color=fff&size=200',
     lastVisit: '2024-11-20', totalVisits: 8, diagnosis: 'Hypertension', diagnosisBn: 'উচ্চ রক্তচাপ',
     riskLevel: 'High', conditions: ['Hypertension', 'Pre-diabetic'], medications: ['Amlodipine 5mg', 'Aspirin 75mg'],
     allergies: ['Penicillin'], familyHistory: [{ condition: 'Heart Disease', relation: 'Father' }],
@@ -104,7 +104,7 @@ const PATIENTS: PatientRecord[] = [
   },
   {
     id: 'p2', name: 'Fatima Begum', nameBn: 'ফাতিমা বেগম', age: 52, gender: 'Female',
-    phone: '01812345679', bloodGroup: 'B+', profileImage: 'https://randomuser.me/api/portraits/women/44.jpg',
+    phone: '01812345679', bloodGroup: 'B+', profileImage: 'https://ui-avatars.com/api/?name=F&background=ec4899&color=fff&size=200',
     lastVisit: '2024-11-22', totalVisits: 5, diagnosis: 'Diabetes Type 2', diagnosisBn: 'ডায়াবেটিস টাইপ ২',
     riskLevel: 'Medium', conditions: ['Diabetes Type 2'], medications: ['Metformin 500mg'],
     allergies: [], familyHistory: [{ condition: 'Diabetes', relation: 'Mother' }],
@@ -113,7 +113,7 @@ const PATIENTS: PatientRecord[] = [
   },
   {
     id: 'p3', name: 'Karim Ahmed', nameBn: 'করিম আহমেদ', age: 38, gender: 'Male',
-    phone: '01912345680', bloodGroup: 'O+', profileImage: 'https://randomuser.me/api/portraits/men/55.jpg',
+    phone: '01912345680', bloodGroup: 'O+', profileImage: 'https://ui-avatars.com/api/?name=M&background=3b82f6&color=fff&size=200',
     lastVisit: '2024-11-25', totalVisits: 3, diagnosis: 'Chest Pain', diagnosisBn: 'বুকে ব্যথা',
     riskLevel: 'High', conditions: ['Angina'], medications: ['Sorbitrate 5mg'],
     allergies: ['Sulfa drugs'], familyHistory: [],
@@ -122,7 +122,7 @@ const PATIENTS: PatientRecord[] = [
   },
   {
     id: 'p4', name: 'Nasreen Akter', nameBn: 'নাসরিন আক্তার', age: 28, gender: 'Female',
-    phone: '01612345681', bloodGroup: 'AB+', profileImage: 'https://randomuser.me/api/portraits/women/33.jpg',
+    phone: '01612345681', bloodGroup: 'AB+', profileImage: 'https://ui-avatars.com/api/?name=F&background=ec4899&color=fff&size=200',
     lastVisit: '2024-11-28', totalVisits: 2, diagnosis: 'Palpitations', diagnosisBn: 'বুক ধড়ফড়',
     riskLevel: 'Low', conditions: ['Anxiety-related palpitations'], medications: [],
     allergies: [], familyHistory: [],
@@ -134,14 +134,14 @@ const PATIENTS: PatientRecord[] = [
 const generateTodayAppointments = (): Appointment[] => {
   const today = new Date().toISOString().split('T')[0];
   return [
-    { id: 'a1', patientId: 'p1', patientName: 'Rahim Uddin', patientNameBn: 'রহিম উদ্দিন', patientImage: 'https://randomuser.me/api/portraits/men/32.jpg', patientPhone: '01712345678', patientAge: 45, patientGender: 'Male', date: today, time: '09:00', serial: 1, type: 'Follow-up', status: 'Completed', chiefComplaint: 'BP check', fee: 500, paymentStatus: 'Paid' },
-    { id: 'a2', patientId: 'p2', patientName: 'Fatima Begum', patientNameBn: 'ফাতিমা বেগম', patientImage: 'https://randomuser.me/api/portraits/women/44.jpg', patientPhone: '01812345679', patientAge: 52, patientGender: 'Female', date: today, time: '09:15', serial: 2, type: 'Follow-up', status: 'In-Progress', chiefComplaint: 'Sugar level review', fee: 500, paymentStatus: 'Paid' },
-    { id: 'a3', patientId: 'p3', patientName: 'Karim Ahmed', patientNameBn: 'করিম আহমেদ', patientImage: 'https://randomuser.me/api/portraits/men/55.jpg', patientPhone: '01912345680', patientAge: 38, patientGender: 'Male', date: today, time: '09:30', serial: 3, type: 'New', status: 'Waiting', chiefComplaint: 'Chest pain for 2 days', fee: 1000, paymentStatus: 'Paid' },
-    { id: 'a4', patientId: 'p4', patientName: 'Nasreen Akter', patientNameBn: 'নাসরিন আক্তার', patientImage: 'https://randomuser.me/api/portraits/women/33.jpg', patientPhone: '01612345681', patientAge: 28, patientGender: 'Female', date: today, time: '09:45', serial: 4, type: 'New', status: 'Waiting', chiefComplaint: 'Heart racing', fee: 1000, paymentStatus: 'Pending' },
-    { id: 'a5', patientId: 'p1', patientName: 'Jamal Hossain', patientNameBn: 'জামাল হোসেন', patientImage: 'https://randomuser.me/api/portraits/men/41.jpg', patientPhone: '01512345682', patientAge: 60, patientGender: 'Male', date: today, time: '10:00', serial: 5, type: 'Report', status: 'Waiting', chiefComplaint: 'ECG report', fee: 500, paymentStatus: 'Paid' },
-    { id: 'a6', patientId: 'p2', patientName: 'Salma Khatun', patientNameBn: 'সালমা খাতুন', patientImage: 'https://randomuser.me/api/portraits/women/52.jpg', patientPhone: '01412345683', patientAge: 48, patientGender: 'Female', date: today, time: '10:15', serial: 6, type: 'New', status: 'Waiting', chiefComplaint: 'Breathing difficulty', fee: 1000, paymentStatus: 'Paid' },
-    { id: 'a7', patientId: 'p3', patientName: 'Rafiq Islam', patientNameBn: 'রফিক ইসলাম', patientImage: 'https://randomuser.me/api/portraits/men/62.jpg', patientPhone: '01312345684', patientAge: 55, patientGender: 'Male', date: today, time: '10:30', serial: 7, type: 'Follow-up', status: 'Waiting', fee: 500, paymentStatus: 'Waived' },
-    { id: 'a8', patientId: 'p4', patientName: 'Amina Sultana', patientNameBn: 'আমিনা সুলতানা', patientImage: 'https://randomuser.me/api/portraits/women/28.jpg', patientPhone: '01212345685', patientAge: 35, patientGender: 'Female', date: today, time: '10:45', serial: 8, type: 'Emergency', status: 'Waiting', chiefComplaint: 'Severe chest pain', fee: 1500, paymentStatus: 'Pending' },
+    { id: 'a1', patientId: 'p1', patientName: 'Rahim Uddin', patientNameBn: 'রহিম উদ্দিন', patientImage: 'https://ui-avatars.com/api/?name=M&background=3b82f6&color=fff&size=200', patientPhone: '01712345678', patientAge: 45, patientGender: 'Male', date: today, time: '09:00', serial: 1, type: 'Follow-up', status: 'Completed', chiefComplaint: 'BP check', fee: 500, paymentStatus: 'Paid' },
+    { id: 'a2', patientId: 'p2', patientName: 'Fatima Begum', patientNameBn: 'ফাতিমা বেগম', patientImage: 'https://ui-avatars.com/api/?name=F&background=ec4899&color=fff&size=200', patientPhone: '01812345679', patientAge: 52, patientGender: 'Female', date: today, time: '09:15', serial: 2, type: 'Follow-up', status: 'In-Progress', chiefComplaint: 'Sugar level review', fee: 500, paymentStatus: 'Paid' },
+    { id: 'a3', patientId: 'p3', patientName: 'Karim Ahmed', patientNameBn: 'করিম আহমেদ', patientImage: 'https://ui-avatars.com/api/?name=M&background=3b82f6&color=fff&size=200', patientPhone: '01912345680', patientAge: 38, patientGender: 'Male', date: today, time: '09:30', serial: 3, type: 'New', status: 'Waiting', chiefComplaint: 'Chest pain for 2 days', fee: 1000, paymentStatus: 'Paid' },
+    { id: 'a4', patientId: 'p4', patientName: 'Nasreen Akter', patientNameBn: 'নাসরিন আক্তার', patientImage: 'https://ui-avatars.com/api/?name=F&background=ec4899&color=fff&size=200', patientPhone: '01612345681', patientAge: 28, patientGender: 'Female', date: today, time: '09:45', serial: 4, type: 'New', status: 'Waiting', chiefComplaint: 'Heart racing', fee: 1000, paymentStatus: 'Pending' },
+    { id: 'a5', patientId: 'p1', patientName: 'Jamal Hossain', patientNameBn: 'জামাল হোসেন', patientImage: 'https://ui-avatars.com/api/?name=M&background=3b82f6&color=fff&size=200', patientPhone: '01512345682', patientAge: 60, patientGender: 'Male', date: today, time: '10:00', serial: 5, type: 'Report', status: 'Waiting', chiefComplaint: 'ECG report', fee: 500, paymentStatus: 'Paid' },
+    { id: 'a6', patientId: 'p2', patientName: 'Salma Khatun', patientNameBn: 'সালমা খাতুন', patientImage: 'https://ui-avatars.com/api/?name=F&background=ec4899&color=fff&size=200', patientPhone: '01412345683', patientAge: 48, patientGender: 'Female', date: today, time: '10:15', serial: 6, type: 'New', status: 'Waiting', chiefComplaint: 'Breathing difficulty', fee: 1000, paymentStatus: 'Paid' },
+    { id: 'a7', patientId: 'p3', patientName: 'Rafiq Islam', patientNameBn: 'রফিক ইসলাম', patientImage: 'https://ui-avatars.com/api/?name=M&background=3b82f6&color=fff&size=200', patientPhone: '01312345684', patientAge: 55, patientGender: 'Male', date: today, time: '10:30', serial: 7, type: 'Follow-up', status: 'Waiting', fee: 500, paymentStatus: 'Waived' },
+    { id: 'a8', patientId: 'p4', patientName: 'Amina Sultana', patientNameBn: 'আমিনা সুলতানা', patientImage: 'https://ui-avatars.com/api/?name=F&background=ec4899&color=fff&size=200', patientPhone: '01212345685', patientAge: 35, patientGender: 'Female', date: today, time: '10:45', serial: 8, type: 'Emergency', status: 'Waiting', chiefComplaint: 'Severe chest pain', fee: 1500, paymentStatus: 'Pending' },
   ];
 };
 

@@ -58,6 +58,7 @@ export interface Doctor {
   gender?: 'Male' | 'Female';
   isVerified: boolean;
   isActive: boolean;
+  isDemo?: boolean; // Flag for demo/sample accounts
   chambers: Chamber[];
   nextAvailable?: string;
 }

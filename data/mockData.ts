@@ -265,10 +265,11 @@ export const MOCK_DOCTORS: Doctor[] = RAW_DOCTORS_MINIMAL.map((doc, index) => {
     specialties: doc.specs,
     degrees: doc.deg,
     chambers: chambers,
+    // Default avatars for demo doctors (like Facebook default profile)
     image: doc.sex === 'Female' 
-      ? `https://randomuser.me/api/portraits/women/${index % 99}.jpg`
-      : `https://randomuser.me/api/portraits/men/${index % 99}.jpg`,
-    experience: Math.floor(Math.random() * 25) + 5, // 5 to 30 years
+      ? 'https://ui-avatars.com/api/?name=' + encodeURIComponent(doc.name) + '&background=ec4899&color=fff&size=200&bold=true'
+      : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(doc.name) + '&background=3b82f6&color=fff&size=200&bold=true',
+    isDemo: true, // Mark as demo account
     rating: parseFloat((Math.random() * (5 - 4) + 4).toFixed(1)), // 4.0 to 5.0
     patientCount: Math.floor(Math.random() * 5000) + 500,
     bio: bio,

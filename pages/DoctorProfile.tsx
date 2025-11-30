@@ -142,8 +142,12 @@ export const DoctorProfile: React.FC = () => {
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <h1 className="text-lg font-black text-slate-800 mb-0.5">{doctor.name}</h1>
-                <p className="text-sm text-blue-600 font-medium mb-1">{doctor.degrees}</p>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-black text-slate-800 mb-0.5">{doctor.name}</h1>
+                  {(doctor as any).isDemo && (
+                    <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold">DEMO</span>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-1 mb-2">
                   {doctor.specialties?.slice(0, 2).map((s: string) => (
                     <span key={s} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{s}</span>

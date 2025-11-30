@@ -251,8 +251,12 @@ export const DoctorSearch: React.FC = () => {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition truncate">{doctor.name}</h3>
-                        <p className="text-sm text-slate-500 truncate mb-2">{doctor.degrees}</p>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition truncate">{doctor.name}</h3>
+                          {(doctor as any).isDemo && (
+                            <span className="bg-amber-100 text-amber-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">DEMO</span>
+                          )}
+                        </div>
                         <div className="flex flex-wrap gap-1.5 mb-3">
                           {doctor.specialties.slice(0, 2).map(s => {
                             const meta = getSpecialtyMeta(s);

@@ -1175,10 +1175,50 @@ export const DoctorRegistration: React.FC = () => {
                       <label className="block text-sm font-bold text-slate-700 mb-2">
                         {t.profilePhoto} <span className="text-slate-400 font-normal">({t.optional})</span>
                       </label>
-                      <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-blue-400 transition cursor-pointer">
-                        <i className="fas fa-cloud-upload-alt text-4xl text-slate-300 mb-3"></i>
-                        <p className="text-slate-500">{t.uploadPhoto}</p>
-                        <p className="text-xs text-slate-400 mt-1">JPG, PNG (Max 2MB)</p>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/jpg"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 2 * 1024 * 1024) {
+                                alert(isBn ? 'ফাইল সাইজ ২MB এর বেশি হতে পারবে না' : 'File size must be less than 2MB');
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                updateData('profilePhotoUrl', reader.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="hidden"
+                          id="profile-photo-upload"
+                        />
+                        <label
+                          htmlFor="profile-photo-upload"
+                          className="block border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition cursor-pointer"
+                        >
+                          {data.profilePhotoUrl ? (
+                            <div className="flex flex-col items-center">
+                              <img src={data.profilePhotoUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-blue-500 mb-3" />
+                              <p className="text-green-600 font-medium flex items-center gap-1">
+                                <i className="fas fa-check-circle"></i>
+                                {isBn ? 'ছবি আপলোড হয়েছে' : 'Photo uploaded'}
+                              </p>
+                              <p className="text-xs text-slate-400 mt-1">{isBn ? 'পরিবর্তন করতে ক্লিক করুন' : 'Click to change'}</p>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <i className="fas fa-user-md text-3xl text-slate-400"></i>
+                              </div>
+                              <p className="text-slate-500">{t.uploadPhoto}</p>
+                              <p className="text-xs text-slate-400 mt-1">JPG, PNG (Max 2MB)</p>
+                            </>
+                          )}
+                        </label>
                       </div>
                     </div>
                   </div>
