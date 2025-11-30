@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Storage Test</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    pre { background: #f0f0f0; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h1>LocalStorage Test</h1>
+  
+  <button onclick="testSave()">Save Test Data</button>
+  <button onclick="testRead()">Read Test Data</button>
+  <button onclick="testClear()">Clear Test Data</button>
+  <button onclick="listAll()">List All Keys</button>
+  
+  <h2>Result:</h2>
+  <pre id="result">Click a button...</pre>
+  
+  <script>
+    function testSave() {
+      try {
+        const testData = { name: 'Test User', time: new Date().toISOString() };
+        localStorage.setItem('nirnoy_session', JSON.stringify({ userId: '123', role: 'patient', user: testData, ts: Date.now() }));
+        document.getElementById('result').textContent = 'SAVED: ' + JSON.stringify(testData);
+      } catch (e) {
+        document.getElementById('result').textContent = 'ERROR saving: ' + e.message;
+      }
+    }
+    
+    function testRead() {
+      try {
+        const data = localStorage.getItem('nirnoy_session');
+        document.getElementById('result').textContent = data ? 'FOUND: ' + data : 'NOT FOUND - localStorage is empty';
+      } catch (e) {
+        document.getElementById('result').textContent = 'ERROR reading: ' + e.message;
+      }
+    }
+    
+    function testClear() {
+      localStorage.removeItem('nirnoy_session');
+      document.getElementById('result').textContent = 'CLEARED';
+    }
+    
+    function listAll() {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        keys.push(localStorage.key(i));
+      }
+      document.getElementById('result').textContent = 'All keys (' + keys.length + '): ' + keys.join(', ');
+    }
+  </script>
+</body>
+</html>
