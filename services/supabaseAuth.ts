@@ -240,7 +240,7 @@ const db = {
         .from('patients')
         .insert({
           profile_id: profile.id,
-          emergency_contact: patientData.emergencyContact || null,
+          emergency_contact_phone: patientData.emergencyContact || null,
           chronic_conditions: patientData.chronicConditions || [],
           allergies: patientData.allergies || [],
           subscription_tier: 'premium'
@@ -458,7 +458,7 @@ export const authService = {
       gender: profile.gender,
       bloodGroup: profile.blood_group,
       avatarUrl: profile.avatar_url,
-      emergencyContact: patientData?.emergency_contact,
+      emergencyContact: patientData?.emergency_contact_phone,
       chronicConditions: patientData?.chronic_conditions || [],
       allergies: patientData?.allergies || [],
       subscriptionTier: patientData?.subscription_tier || 'premium',
