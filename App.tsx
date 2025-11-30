@@ -18,6 +18,7 @@ const DoctorRegistration = lazy(() => import('./pages/DoctorRegistration').then(
 const MyAppointments = lazy(() => import('./pages/MyAppointments').then(m => ({ default: m.MyAppointments })));
 const FamilyHealth = lazy(() => import('./pages/FamilyHealth').then(m => ({ default: m.FamilyHealth })));
 const About = lazy(() => import('./pages/About').then(m => ({ default: m.About })));
+const HealthArticles = lazy(() => import('./pages/HealthArticles').then(m => ({ default: m.HealthArticles })));
 const Privacy = lazy(() => import('./pages/Privacy').then(m => ({ default: m.Privacy })));
 const Terms = lazy(() => import('./pages/Terms').then(m => ({ default: m.Terms })));
 const Help = lazy(() => import('./pages/Help').then(m => ({ default: m.Help })));
@@ -65,6 +66,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/doctor-registration" element={<DoctorRegistration />} />
       <Route path="/doctor-register" element={<DoctorRegistration />} />
       <Route path="/about" element={<About />} />
+      <Route path="/health" element={<HealthArticles />} />
+      <Route path="/health/:articleId" element={<HealthArticles />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/help" element={<Help />} />
