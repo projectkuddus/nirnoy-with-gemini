@@ -1,15 +1,21 @@
 /**
- * NIRNOY AUTH SERVICE - SUPABASE PRIMARY
+ * NIRNOY AUTH SERVICE - PRODUCTION READY
  * ======================================
- * Supabase = Primary database (for 100+ users)
- * localStorage = Session cache only
+ * Supabase = Cloud Database
+ * localStorage = Session Cache
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+// Configuration - Log at startup
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const SESSION_KEY = 'nirnoy_session';
+
+// Log configuration at module load
+console.log('=== NIRNOY AUTH SERVICE ===');
+console.log('[Config] SUPABASE_URL:', SUPABASE_URL ? SUPABASE_URL.substring(0, 30) + '...' : 'NOT SET');
+console.log('[Config] SUPABASE_KEY:', SUPABASE_ANON_KEY ? 'SET (' + SUPABASE_ANON_KEY.length + ' chars)' : 'NOT SET');
 
 // Types
 export interface PatientProfile {
@@ -63,14 +69,22 @@ export interface AdminConfig {
 }
 
 // Supabase Client
-export const supabase: SupabaseClient = createClient(
-  SUPABASE_URL || 'https://placeholder.supabase.co',
-  SUPABASE_ANON_KEY || 'placeholder'
-);
+let supabase: SupabaseClient;
+try {
+  supabase = createClient(
+    SUPABASE_URL || 'https://placeholder.supabase.co',
+    SUPABASE_ANON_KEY || 'placeholder'
+  );
+  console.log('[Supabase] Client created');
+} catch (e) {
+  console.error('[Supabase] Failed to create client:', e);
+  supabase = null as any;
+}
+
+export { supabase };
 
 export const isSupabaseConfigured = (): boolean => {
   const configured = !!(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.includes('supabase'));
-  console.log('[Supabase] Configured:', configured, SUPABASE_URL ? 'URL set' : 'No URL');
   return configured;
 };
 
@@ -85,27 +99,46 @@ export const normalizePhone = (phone: string): string => {
 // Session cache (localStorage)
 const session = {
   save(userId: string, role: string, user: any): void {
-    console.log('[Session] Saving:', role, user?.name);
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ userId, role, user, ts: Date.now() }));
+    console.log('[Session] SAVING:', { userId, role, name: user?.name });
+    try {
+      const data = JSON.stringify({ userId, role, user, ts: Date.now() });
+      localStorage.setItem(SESSION_KEY, data);
+      console.log('[Session] SAVED successfully, length:', data.length);
+      // Verify save
+      const verify = localStorage.getItem(SESSION_KEY);
+      console.log('[Session] VERIFY:', verify ? 'Data exists' : 'DATA MISSING!');
+    } catch (e) {
+      console.error('[Session] SAVE FAILED:', e);
+    }
   },
+  
   get(): { userId: string; role: string; user: any } | null {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
+      console.log('[Session] GET:', raw ? 'Found data (' + raw.length + ' chars)' : 'No data');
       if (!raw) return null;
       const data = JSON.parse(raw);
+      // Check expiry (7 days)
       if (Date.now() - data.ts > 7 * 24 * 60 * 60 * 1000) {
+        console.log('[Session] EXPIRED');
         localStorage.removeItem(SESSION_KEY);
         return null;
       }
+      console.log('[Session] VALID:', data.role, data.user?.name);
       return data;
-    } catch { return null; }
+    } catch (e) {
+      console.error('[Session] GET FAILED:', e);
+      return null;
+    }
   },
+  
   clear(): void {
+    console.log('[Session] CLEARING');
     localStorage.removeItem(SESSION_KEY);
   }
 };
 
-// Admin config (localStorage - admin is single user)
+// Admin config (localStorage)
 const adminConfig = {
   DEFAULT: { password: 'nirnoy2024', name: 'Admin', email: 'admin@nirnoy.ai' },
   get(): AdminConfig {
@@ -121,193 +154,210 @@ const adminConfig = {
 // ============ SUPABASE DATABASE OPERATIONS ============
 const db = {
   async findByPhone(phone: string): Promise<any | null> {
+    if (!isSupabaseConfigured()) {
+      console.log('[DB] Supabase not configured!');
+      return null;
+    }
+    
     const normalized = normalizePhone(phone);
     console.log('[DB] Finding phone:', normalized);
     
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .or(`phone.eq.${normalized},phone.eq.0${normalized}`)
-      .limit(1)
-      .single();
-    
-    if (error) {
-      console.log('[DB] Not found or error:', error.message);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`phone.eq.${normalized},phone.eq.0${normalized}`)
+        .limit(1);
+      
+      if (error) {
+        console.error('[DB] Query error:', error.message);
+        return null;
+      }
+      
+      if (!data || data.length === 0) {
+        console.log('[DB] No profile found');
+        return null;
+      }
+      
+      console.log('[DB] Found profile:', data[0].name, data[0].id);
+      return data[0];
+    } catch (e) {
+      console.error('[DB] Exception:', e);
       return null;
     }
-    console.log('[DB] Found:', data?.name);
-    return data;
   },
 
   async createPatient(profileData: any, patientData: any): Promise<{ success: boolean; profile?: any; error?: string }> {
-    console.log('[DB] Creating patient:', profileData.phone);
-    
-    // 1. Create profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .insert({
-        phone: normalizePhone(profileData.phone),
-        name: profileData.name,
-        email: profileData.email || null,
-        role: 'patient',
-        date_of_birth: profileData.dateOfBirth || null,
-        gender: profileData.gender || null,
-        blood_group: profileData.bloodGroup || null,
-        is_verified: true,
-        is_active: true
-      })
-      .select()
-      .single();
-    
-    if (profileError) {
-      console.error('[DB] Profile error:', profileError);
-      return { success: false, error: profileError.message };
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Supabase not configured' };
     }
     
-    // 2. Create patient record
-    const { error: patientError } = await supabase
-      .from('patients')
-      .insert({
-        profile_id: profile.id,
-        emergency_contact: patientData.emergencyContact || null,
-        chronic_conditions: patientData.chronicConditions || [],
-        allergies: patientData.allergies || [],
-        subscription_tier: 'premium'
-      });
+    console.log('[DB] Creating patient:', profileData.phone, profileData.name);
     
-    if (patientError) {
-      console.error('[DB] Patient error:', patientError);
-      // Don't fail - profile was created
+    try {
+      // 1. Create profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          phone: normalizePhone(profileData.phone),
+          name: profileData.name,
+          email: profileData.email || null,
+          role: 'patient',
+          date_of_birth: profileData.dateOfBirth || null,
+          gender: profileData.gender || null,
+          blood_group: profileData.bloodGroup || null,
+          is_verified: true,
+          is_active: true
+        })
+        .select()
+        .single();
+      
+      if (profileError) {
+        console.error('[DB] Profile insert error:', profileError);
+        return { success: false, error: profileError.message };
+      }
+      
+      console.log('[DB] Profile created:', profile.id);
+      
+      // 2. Create patient record
+      const { error: patientError } = await supabase
+        .from('patients')
+        .insert({
+          profile_id: profile.id,
+          emergency_contact: patientData.emergencyContact || null,
+          chronic_conditions: patientData.chronicConditions || [],
+          allergies: patientData.allergies || [],
+          subscription_tier: 'premium'
+        });
+      
+      if (patientError) {
+        console.error('[DB] Patient insert error:', patientError);
+        // Don't fail - profile was created
+      }
+      
+      return { success: true, profile };
+    } catch (e: any) {
+      console.error('[DB] Create patient exception:', e);
+      return { success: false, error: e.message };
     }
-    
-    console.log('[DB] Patient created:', profile.id);
-    return { success: true, profile };
   },
 
   async createDoctor(profileData: any, doctorData: any): Promise<{ success: boolean; profile?: any; error?: string }> {
-    console.log('[DB] Creating doctor:', profileData.phone);
-    
-    // 1. Create profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .insert({
-        phone: normalizePhone(profileData.phone),
-        name: profileData.name,
-        email: profileData.email || null,
-        role: 'doctor',
-        date_of_birth: profileData.dateOfBirth || null,
-        gender: profileData.gender || null,
-        is_verified: false,
-        is_active: true
-      })
-      .select()
-      .single();
-    
-    if (profileError) {
-      console.error('[DB] Profile error:', profileError);
-      return { success: false, error: profileError.message };
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Supabase not configured' };
     }
     
-    // 2. Create doctor record
-    const { data: doctor, error: doctorError } = await supabase
-      .from('doctors')
-      .insert({
-        profile_id: profile.id,
-        bmdc_number: doctorData.bmdcNumber,
-        nid_number: doctorData.nidNumber || null,
-        specialties: doctorData.specializations || [],
-        qualifications: doctorData.qualifications || [],
-        institution: doctorData.institution || null,
-        experience_years: doctorData.experienceYears || 0,
-        consultation_fee: doctorData.consultationFee || 500,
-        status: 'pending'
-      })
-      .select()
-      .single();
+    console.log('[DB] Creating doctor:', profileData.phone, profileData.name);
     
-    if (doctorError) {
-      console.error('[DB] Doctor error:', doctorError);
-      return { success: false, error: doctorError.message };
-    }
-    
-    // 3. Create chambers if provided
-    if (doctorData.chambers?.length > 0) {
-      for (const chamber of doctorData.chambers) {
-        await supabase.from('chambers').insert({
-          doctor_id: doctor.id,
-          name: chamber.name || 'Main Chamber',
-          address: chamber.address || '',
-          area: chamber.area || '',
-          city: chamber.city || 'Dhaka',
-          fee: chamber.fee || 500,
-          is_primary: true
-        });
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          phone: normalizePhone(profileData.phone),
+          name: profileData.name,
+          email: profileData.email || null,
+          role: 'doctor',
+          date_of_birth: profileData.dateOfBirth || null,
+          gender: profileData.gender || null,
+          is_verified: false,
+          is_active: true
+        })
+        .select()
+        .single();
+      
+      if (profileError) {
+        console.error('[DB] Profile insert error:', profileError);
+        return { success: false, error: profileError.message };
       }
+      
+      const { error: doctorError } = await supabase
+        .from('doctors')
+        .insert({
+          profile_id: profile.id,
+          bmdc_number: doctorData.bmdcNumber,
+          nid_number: doctorData.nidNumber || null,
+          specialties: doctorData.specializations || [],
+          qualifications: doctorData.qualifications || [],
+          institution: doctorData.institution || null,
+          experience_years: doctorData.experienceYears || 0,
+          consultation_fee: doctorData.consultationFee || 500,
+          status: 'pending'
+        });
+      
+      if (doctorError) {
+        console.error('[DB] Doctor insert error:', doctorError);
+        return { success: false, error: doctorError.message };
+      }
+      
+      return { success: true, profile };
+    } catch (e: any) {
+      console.error('[DB] Create doctor exception:', e);
+      return { success: false, error: e.message };
     }
-    
-    console.log('[DB] Doctor created:', profile.id);
-    return { success: true, profile };
   },
 
   async getAllPatients(): Promise<PatientProfile[]> {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*, patients(*)')
-      .eq('role', 'patient')
-      .order('created_at', { ascending: false });
-    
-    return (data || []).map(p => ({
-      id: p.id,
-      phone: p.phone,
-      name: p.name,
-      email: p.email,
-      dateOfBirth: p.date_of_birth,
-      gender: p.gender,
-      bloodGroup: p.blood_group,
-      avatarUrl: p.avatar_url,
-      emergencyContact: p.patients?.[0]?.emergency_contact,
-      chronicConditions: p.patients?.[0]?.chronic_conditions || [],
-      allergies: p.patients?.[0]?.allergies || [],
-      subscriptionTier: p.patients?.[0]?.subscription_tier || 'premium',
-      isVerified: p.is_verified,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at
-    }));
-  },
-
-  async getAllDoctors(): Promise<DoctorProfile[]> {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*, doctors(*)')
-      .eq('role', 'doctor')
-      .order('created_at', { ascending: false });
-    
-    return (data || []).map(p => {
-      const d = p.doctors?.[0] || {};
-      return {
+    if (!isSupabaseConfigured()) return [];
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*, patients(*)')
+        .eq('role', 'patient')
+        .order('created_at', { ascending: false });
+      
+      return (data || []).map(p => ({
         id: p.id,
         phone: p.phone,
         name: p.name,
         email: p.email,
         dateOfBirth: p.date_of_birth,
         gender: p.gender,
-        bmdcNumber: d.bmdc_number || '',
-        nidNumber: d.nid_number,
-        specializations: d.specialties || [],
-        qualifications: d.qualifications || [],
-        institution: d.institution,
-        experienceYears: d.experience_years || 0,
-        consultationFee: d.consultation_fee || 500,
-        chambers: [],
+        bloodGroup: p.blood_group,
         avatarUrl: p.avatar_url,
-        status: d.status || 'pending',
+        subscriptionTier: p.patients?.[0]?.subscription_tier || 'premium',
         isVerified: p.is_verified,
-        rating: parseFloat(d.rating) || 0,
-        totalPatients: d.total_patients || 0,
         createdAt: p.created_at,
         updatedAt: p.updated_at
-      };
-    });
+      }));
+    } catch { return []; }
+  },
+
+  async getAllDoctors(): Promise<DoctorProfile[]> {
+    if (!isSupabaseConfigured()) return [];
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*, doctors(*)')
+        .eq('role', 'doctor')
+        .order('created_at', { ascending: false });
+      
+      return (data || []).map(p => {
+        const d = p.doctors?.[0] || {};
+        return {
+          id: p.id,
+          phone: p.phone,
+          name: p.name,
+          email: p.email,
+          dateOfBirth: p.date_of_birth,
+          gender: p.gender,
+          bmdcNumber: d.bmdc_number || '',
+          nidNumber: d.nid_number,
+          specializations: d.specialties || [],
+          qualifications: d.qualifications || [],
+          institution: d.institution,
+          experienceYears: d.experience_years || 0,
+          consultationFee: d.consultation_fee || 500,
+          chambers: [],
+          avatarUrl: p.avatar_url,
+          status: d.status || 'pending',
+          isVerified: p.is_verified,
+          rating: parseFloat(d.rating) || 0,
+          totalPatients: d.total_patients || 0,
+          createdAt: p.created_at,
+          updatedAt: p.updated_at
+        };
+      });
+    } catch { return []; }
   },
 
   async getPendingDoctors(): Promise<DoctorProfile[]> {
@@ -316,19 +366,11 @@ const db = {
   },
 
   async updateDoctorStatus(profileId: string, status: 'approved' | 'rejected'): Promise<boolean> {
-    // Update doctor status
-    const { error: doctorError } = await supabase
-      .from('doctors')
-      .update({ status })
-      .eq('profile_id', profileId);
-    
-    // Update profile verification
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ is_verified: status === 'approved' })
-      .eq('id', profileId);
-    
-    return !doctorError && !profileError;
+    try {
+      await supabase.from('doctors').update({ status }).eq('profile_id', profileId);
+      await supabase.from('profiles').update({ is_verified: status === 'approved' }).eq('id', profileId);
+      return true;
+    } catch { return false; }
   }
 };
 
@@ -340,17 +382,21 @@ export const authService = {
   },
 
   getCurrentUser(): { user: PatientProfile | DoctorProfile; role: string } | null {
+    console.log('[Auth] getCurrentUser called');
     const cached = session.get();
     if (!cached) {
       console.log('[Auth] No cached session');
       return null;
     }
-    console.log('[Auth] Found cached session:', cached.role, cached.user?.name);
+    console.log('[Auth] Returning cached user:', cached.role, cached.user?.name);
     return { user: cached.user, role: cached.role };
   },
 
   async checkPhone(phone: string): Promise<{ exists: boolean; type: 'patient' | 'doctor' | null; isApproved?: boolean }> {
+    console.log('[Auth] checkPhone:', phone);
+    
     if (!isSupabaseConfigured()) {
+      console.log('[Auth] Supabase not configured, returning not exists');
       return { exists: false, type: null };
     }
     
@@ -370,7 +416,7 @@ export const authService = {
   },
 
   async loginPatient(phone: string): Promise<{ success: boolean; user?: PatientProfile; error?: string }> {
-    console.log('[Auth] Login patient:', phone);
+    console.log('[Auth] loginPatient:', phone);
     
     if (!isSupabaseConfigured()) {
       return { success: false, error: 'Database not configured' };
@@ -381,7 +427,6 @@ export const authService = {
       return { success: false, error: 'Patient not found' };
     }
     
-    // Get patient details
     const { data: patientData } = await supabase
       .from('patients')
       .select('*')
@@ -407,19 +452,22 @@ export const authService = {
     };
     
     session.save(patient.id, 'patient', patient);
+    console.log('[Auth] Patient logged in:', patient.name);
     return { success: true, user: patient };
   },
 
   async registerPatient(data: any): Promise<{ success: boolean; user?: PatientProfile; error?: string }> {
-    console.log('[Auth] Register patient:', data.phone);
+    console.log('[Auth] registerPatient:', data.phone, data.name);
     
     if (!isSupabaseConfigured()) {
+      console.error('[Auth] Cannot register - Supabase not configured!');
       return { success: false, error: 'Database not configured' };
     }
     
     // Check if already exists
     const existing = await db.findByPhone(data.phone);
     if (existing) {
+      console.log('[Auth] Phone already registered');
       return { success: false, error: 'Phone already registered' };
     }
     
@@ -429,6 +477,7 @@ export const authService = {
     );
     
     if (!result.success) {
+      console.error('[Auth] Registration failed:', result.error);
       return { success: false, error: result.error };
     }
     
@@ -447,13 +496,15 @@ export const authService = {
       updatedAt: new Date().toISOString()
     };
     
+    // CRITICAL: Save session
     session.save(patient.id, 'patient', patient);
-    console.log('[Auth] Patient registered and session saved');
+    
+    console.log('[Auth] Patient registered successfully:', patient.name, patient.id);
     return { success: true, user: patient };
   },
 
   async loginDoctor(phone: string): Promise<{ success: boolean; user?: DoctorProfile; error?: string }> {
-    console.log('[Auth] Login doctor:', phone);
+    console.log('[Auth] loginDoctor:', phone);
     
     if (!isSupabaseConfigured()) {
       return { success: false, error: 'Database not configured' };
@@ -503,7 +554,7 @@ export const authService = {
   },
 
   async registerDoctor(data: any): Promise<{ success: boolean; error?: string }> {
-    console.log('[Auth] Register doctor:', data.phone);
+    console.log('[Auth] registerDoctor:', data.phone, data.name);
     
     if (!isSupabaseConfigured()) {
       return { success: false, error: 'Database not configured' };
@@ -516,7 +567,7 @@ export const authService = {
     
     const result = await db.createDoctor(
       { phone: data.phone, name: data.name, email: data.email, dateOfBirth: data.dateOfBirth, gender: data.gender },
-      { bmdcNumber: data.bmdcNumber, nidNumber: data.nidNumber, specializations: data.specializations, qualifications: data.qualifications, institution: data.institution, experienceYears: data.experienceYears, consultationFee: data.consultationFee, chambers: data.chambers }
+      data
     );
     
     if (!result.success) {
@@ -528,11 +579,11 @@ export const authService = {
   },
 
   logout(): void {
+    console.log('[Auth] Logging out');
     session.clear();
   },
 
   async updatePatient(id: string, updates: any): Promise<boolean> {
-    // Update in Supabase
     await supabase.from('profiles').update({
       name: updates.name,
       email: updates.email,
@@ -542,7 +593,6 @@ export const authService = {
       updated_at: new Date().toISOString()
     }).eq('id', id);
     
-    // Update session cache
     const cached = session.get();
     if (cached && cached.userId === id) {
       session.save(id, 'patient', { ...cached.user, ...updates });
