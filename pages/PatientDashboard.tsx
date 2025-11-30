@@ -28,7 +28,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const patientUser: PatientProfile = useMemo(() => {
     if (user && role === 'patient') return user as PatientProfile;
     return {
-      id: '', visibleId: '', phone: '', name: 'Loading...',
+      id: '', phone: '', name: 'Loading...',
       subscriptionTier: 'free' as const, isVerified: false, createdAt: '', updatedAt: ''
     };
   }, [user, role]);

@@ -27,16 +27,23 @@ export interface PatientProfile {
   gender?: 'male' | 'female' | 'other';
   bloodGroup?: string;
   emergencyContact?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
   chronicConditions?: string[];
   allergies?: string[];
-  height?: number;
-  weight?: number;
+  heightCm?: number;
+  weightKg?: number;
   avatarUrl?: string;
   subscriptionTier: 'free' | 'basic' | 'premium' | 'family';
+  quizPoints?: number;
+  streakDays?: number;
+  healthScore?: number;
   isVerified: boolean;
   createdAt: string;
   updatedAt: string;
 }
+
 
 export interface DoctorProfile {
   id: string;
