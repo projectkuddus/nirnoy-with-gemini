@@ -1,7 +1,44 @@
+# Nirnoy Health - robots.txt
+# https://www.nirnoy.ai
+
 User-agent: *
 Allow: /
+
+# Sitemap
+Sitemap: https://www.nirnoy.ai/sitemap.xml
+
+# Crawl-delay for politeness
+Crawl-delay: 1
+
+# Block admin and private areas
 Disallow: /admin
 Disallow: /api/
-Disallow: /patient-dashboard
-Disallow: /doctor-dashboard
-Sitemap: https://www.nirnoy.ai/sitemap.xml
+Disallow: /*.json$
+
+# Allow important pages
+Allow: /search
+Allow: /patient-auth
+Allow: /doctor-registration
+Allow: /pricing
+Allow: /about
+Allow: /help
+Allow: /free-care
+Allow: /privacy
+Allow: /terms
+
+# Google specific
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Bing specific
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Allow all image crawlers
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot-Image
+Allow: /
