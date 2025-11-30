@@ -154,18 +154,23 @@ Provide:
 
 export const chatWithHealthAssistant = async (message: string, history: string[], patientContext?: string): Promise<string> => {
   try {
-    const systemInstruction = `You are "Nirnoy Health Assistant" - a patient-facing AI that helps people understand their health.
+    const systemInstruction = `You are "নির্ণয় এআই" (Nirnoy AI) - a friendly health assistant for Bangladeshi patients.
 
-RULES:
-- Explain medical terms in simple Bengali/English
-- Be empathetic and reassuring
-- Never diagnose - always recommend seeing a doctor
-- Use the patient's history to personalize responses
-- Keep responses concise and actionable
+CRITICAL RULES:
+1. ALWAYS respond in Bengali (বাংলা) - this is MANDATORY
+2. Be warm, empathetic, and conversational like a caring friend  
+3. NEVER prescribe medications or give specific treatment advice
+4. Ask follow-up questions to understand the problem better
+5. When appropriate, suggest seeing a doctor through Nirnoy platform
+6. Use the patient's health data to personalize responses
+7. Keep responses short (2-4 sentences) and easy to understand
+8. Use emojis sparingly to be friendly
 
-Patient Context: ${patientContext || 'General health query'}`;
+PATIENT INFO: ${patientContext || 'No specific health data'}
+
+Remember: You help identify problems and guide to doctors. You do NOT diagnose or prescribe.`;
     
-    const context = history.length > 0 ? `Chat:\n${history.slice(-4).join('\n')}\n\nUser:` : 'User:';
+    const context = history.length > 0 ? `Previous chat:\n${history.slice(-4).join('\n')}\n\nPatient says:` : 'Patient says:';
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: FAST_MODEL,
@@ -173,10 +178,11 @@ Patient Context: ${patientContext || 'General health query'}`;
       config: { systemInstruction }
     });
 
-    trackAIUsage(500); return response.text || "I couldn't understand that.";
+    trackAIUsage(500); 
+    return response.text || "দুঃখিত, বুঝতে পারলাম না। আবার বলুন?";
   } catch (error) {
     console.error("Error in chat:", error);
-    return "Connection issue. Please try again.";
+    return "সংযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।";
   }
 };
 

@@ -1,6 +1,6 @@
 /**
  * NIRNOY PATIENT DASHBOARD - PRODUCTION READY
- * Conversational AI, Supabase backend, 1000+ users
+ * Real Gemini AI, Supabase backend, 1000+ users
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -8,6 +8,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth, PatientProfile } from '../contexts/AuthContext';
 import { saveFeedback } from '../components/FeedbackWidget';
+import { chatWithHealthAssistant } from '../services/geminiService';
 
 const PLANS = [
   { id: 'free', nameBn: 'ফ্রি', price: 0, featuresBn: ['বেসিক এআই চ্যাট', 'প্রোফাইল দেখুন'] },
@@ -26,7 +27,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { user, role, logout, isLoading, updateProfile } = useAuth();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   
   const [initDelay, setInitDelay] = useState(true);
   const [activeTab, setActiveTab] = useState<'home' | 'ai' | 'quiz' | 'feedback' | 'profile'>('home');
@@ -52,6 +53,20 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   
   const patientUser = useMemo(() => (user && role === 'patient') ? user as PatientProfile : null, [user, role]);
 
+  // Build patient context for AI
+  const patientContext = useMemo(() => {
+    if (!patientUser) return '';
+    const parts = [`Name: ${patientUser.name}`];
+    if (patientUser.gender) parts.push(`Gender: ${patientUser.gender}`);
+    if (patientUser.dateOfBirth) parts.push(`DOB: ${patientUser.dateOfBirth}`);
+    if (patientUser.bloodGroup) parts.push(`Blood: ${patientUser.bloodGroup}`);
+    if (patientUser.chronicConditions?.length) parts.push(`Conditions: ${patientUser.chronicConditions.join(', ')}`);
+    if (patientUser.allergies?.length) parts.push(`Allergies: ${patientUser.allergies.join(', ')}`);
+    if (patientUser.heightCm) parts.push(`Height: ${patientUser.heightCm}cm`);
+    if (patientUser.weightKg) parts.push(`Weight: ${patientUser.weightKg}kg`);
+    return parts.join(', ');
+  }, [patientUser]);
+
   useEffect(() => { setTimeout(() => setInitDelay(false), 500); }, []);
   
   useEffect(() => {
@@ -70,7 +85,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
   useEffect(() => {
     if (patientUser && messages.length === 0) {
-      setMessages([{ role: 'assistant', content: `আসসালামু আলাইকুম ${patientUser.name}! 👋 কেমন আছেন? কোনো শারীরিক সমস্যা থাকলে বলুন।` }]);
+      setMessages([{ role: 'assistant', content: `আসসালামু আলাইকুম ${patientUser.name}! 👋\n\nআমি নির্ণয় এআই। আপনার স্বাস্থ্য সমস্যা বলুন, আমি বুঝতে সাহায্য করব।\n\n⚠️ আমি ওষুধ দিতে পারি না, শুধু সমস্যা বুঝতে সাহায্য করব।` }]);
     }
   }, [patientUser, messages.length]);
 
@@ -82,6 +97,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
   const handleLogout = () => { logout(); onLogout?.(); navigate('/', { replace: true }); };
 
+  // Real Gemini AI chat
   const handleSend = async () => {
     if (!chatInput.trim() || isTyping) return;
     const msg = chatInput.trim();
@@ -89,62 +105,60 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     setMessages(prev => [...prev, { role: 'user', content: msg }]);
     setIsTyping(true);
     
-    await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
-    
-    const m = msg.toLowerCase();
-    let reply = '';
-    
-    if (m.includes('মাথা') || m.includes('headache') || m.includes('head')) {
-      reply = `ওহ, মাথা ব্যথা! 😔 কতক্ষণ ধরে হচ্ছে? আর কোন পাশে বেশি?`;
-    } else if (m.includes('জ্বর') || m.includes('fever') || m.includes('তাপ')) {
-      reply = `জ্বর হয়েছে? 🤒 কত ডিগ্রি মাপলেন? সাথে সর্দি-কাশি আছে?`;
-    } else if (m.includes('পেট') || m.includes('stomach') || m.includes('বমি')) {
-      reply = `পেটে সমস্যা? 😣 ব্যথা কোথায়? বমি বা পাতলা পায়খানা হচ্ছে?`;
-    } else if (m.includes('সর্দি') || m.includes('কাশি') || m.includes('cold') || m.includes('cough')) {
-      reply = `সর্দি-কাশি হয়েছে? 🤧 কতদিন হলো? শ্বাস নিতে কষ্ট হচ্ছে?`;
-    } else if (m.includes('ডাক্তার') || m.includes('doctor') || m.includes('অ্যাপয়েন্টমেন্ট')) {
-      reply = `ডাক্তার দেখাতে চান? 👨‍⚕️ হোম পেজ থেকে "অ্যাপয়েন্টমেন্ট" এ গিয়ে বুক করুন।`;
-    } else if (m.includes('ধন্যবাদ') || m.includes('thank')) {
-      reply = `আপনাকেও ধন্যবাদ! 😊 ভালো থাকবেন।`;
-    } else if (m.includes('ভালো') || m.includes('good') || m.includes('fine')) {
-      reply = `ভালো শুনে খুশি হলাম! 😊 কোনো সমস্যা হলে জানাবেন।`;
-    } else if (m.match(/\d+/) && (m.includes('দিন') || m.includes('ঘণ্টা'))) {
-      reply = `এত দিন ধরে? একজন ডাক্তার দেখানো ভালো হবে। নির্ণয় থেকে অ্যাপয়েন্টমেন্ট নিন।`;
-    } else if (m.length < 10) {
-      reply = `আরেকটু বিস্তারিত বলবেন? কি সমস্যা, কতদিন ধরে?`;
-    } else {
-      reply = `বুঝলাম। এটা নিয়ে ডাক্তারের সাথে কথা বলা ভালো হবে। নির্ণয় থেকে অ্যাপয়েন্টমেন্ট নিন।`;
+    try {
+      // Build chat history for context
+      const history = messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
+      
+      // Call real Gemini AI with patient context
+      const reply = await chatWithHealthAssistant(msg, history, patientContext);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch (error) {
+      console.error('[AI] Error:', error);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'দুঃখিত, একটু সমস্যা হয়েছে। আবার চেষ্টা করুন।' }]);
     }
     
-    setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     setIsTyping(false);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  // Handle Enter (send) and Shift+Enter (new line)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
+    // Shift+Enter allows new line naturally
   };
 
   const handleSaveProfile = async () => {
     if (!patientUser || !updateProfile) return;
     setSaving(true);
-    const success = await updateProfile({
-      name: editForm.name, email: editForm.email || undefined, dateOfBirth: editForm.dateOfBirth || undefined,
-      gender: editForm.gender as any || undefined, bloodGroup: editForm.bloodGroup || undefined,
+    setSaveMsg('');
+    
+    const updates = {
+      name: editForm.name,
+      email: editForm.email || undefined,
+      dateOfBirth: editForm.dateOfBirth || undefined,
+      gender: editForm.gender as any || undefined,
+      bloodGroup: editForm.bloodGroup || undefined,
       heightCm: editForm.heightCm ? parseInt(editForm.heightCm) : undefined,
       weightKg: editForm.weightKg ? parseFloat(editForm.weightKg) : undefined,
       chronicConditions: editForm.chronicConditions ? editForm.chronicConditions.split(',').map(s => s.trim()).filter(Boolean) : [],
       allergies: editForm.allergies ? editForm.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
       emergencyContactName: editForm.emergencyContactName || undefined,
       emergencyContactPhone: editForm.emergencyContactPhone || undefined
-    });
-    setSaveMsg(success ? '✓' : '✗');
+    };
+    
+    console.log('[Dashboard] Saving profile:', updates);
+    
+    const success = await updateProfile(updates);
+    
+    console.log('[Dashboard] Profile save result:', success);
+    
+    setSaveMsg(success ? '✅ সংরক্ষিত!' : '❌ ব্যর্থ');
     if (success) setIsEditing(false);
     setSaving(false);
-    setTimeout(() => setSaveMsg(''), 2000);
+    setTimeout(() => setSaveMsg(''), 3000);
   };
 
   const submitFeedback = async () => {
@@ -232,31 +246,31 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           <div className="bg-white rounded-lg border overflow-hidden h-[calc(100vh-180px)] flex flex-col">
             <div className="bg-blue-600 p-3 text-white">
               <div className="font-semibold">🤖 নির্ণয় এআই</div>
-              <div className="text-xs text-blue-100">সমস্যা বলুন (ওষুধ দিতে পারব না)</div>
+              <div className="text-xs text-blue-100">সমস্যা বলুন • Shift+Enter = নতুন লাইন</div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-2.5 rounded-lg text-sm ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
+                  <div className={`max-w-[80%] p-2.5 rounded-lg text-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
                     {m.content}
                   </div>
                 </div>
               ))}
-              {isTyping && <div className="flex justify-start"><div className="bg-gray-100 p-2.5 rounded-lg text-sm animate-pulse">●●●</div></div>}
+              {isTyping && <div className="flex justify-start"><div className="bg-gray-100 p-2.5 rounded-lg text-sm animate-pulse">চিন্তা করছি...</div></div>}
               <div ref={chatEndRef} />
             </div>
             <div className="border-t p-3 flex gap-2">
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="আপনার সমস্যা লিখুন..."
-                className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="আপনার সমস্যা লিখুন... (Shift+Enter = নতুন লাইন)"
+                className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                rows={2}
                 disabled={isTyping}
               />
-              <button onClick={handleSend} disabled={isTyping || !chatInput.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:bg-gray-300">পাঠান</button>
+              <button onClick={handleSend} disabled={isTyping || !chatInput.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:bg-gray-300 self-end">পাঠান</button>
             </div>
           </div>
         )}
@@ -349,11 +363,11 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold">👤 প্রোফাইল</h2>
                 <div className="flex items-center gap-2">
-                  {saveMsg && <span className={saveMsg === '✓' ? 'text-green-600' : 'text-red-600'}>{saveMsg}</span>}
+                  {saveMsg && <span className="text-sm font-medium">{saveMsg}</span>}
                   {isEditing ? (
                     <>
                       <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-gray-600 text-sm">বাতিল</button>
-                      <button onClick={handleSaveProfile} disabled={saving} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">{saving ? '...' : 'সংরক্ষণ'}</button>
+                      <button onClick={handleSaveProfile} disabled={saving} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">{saving ? 'সংরক্ষণ হচ্ছে...' : 'সংরক্ষণ'}</button>
                     </>
                   ) : (
                     <button onClick={() => setIsEditing(true)} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">সম্পাদনা</button>
@@ -362,32 +376,32 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-gray-500 uppercase">মৌলিক</h3>
+                  <h3 className="text-xs font-medium text-gray-500 uppercase">মৌলিক তথ্য</h3>
                   {[
                     { k: 'name', l: 'নাম' }, { k: 'phone', l: 'ফোন', ro: true, v: patientUser.phone },
-                    { k: 'email', l: 'ইমেইল' }, { k: 'dateOfBirth', l: 'জন্ম', t: 'date' },
-                    { k: 'gender', l: 'লিঙ্গ', sel: ['', 'male', 'female'] }, { k: 'bloodGroup', l: 'রক্ত', sel: ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] }
+                    { k: 'email', l: 'ইমেইল' }, { k: 'dateOfBirth', l: 'জন্ম তারিখ', t: 'date' },
+                    { k: 'gender', l: 'লিঙ্গ', sel: ['', 'male', 'female'] }, { k: 'bloodGroup', l: 'রক্তের গ্রুপ', sel: ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] }
                   ].map(f => (
                     <div key={f.k} className="flex items-center text-sm">
-                      <span className="w-20 text-gray-500">{f.l}</span>
-                      {f.ro ? <span>{f.v}</span> : isEditing ? (
+                      <span className="w-24 text-gray-500">{f.l}</span>
+                      {f.ro ? <span className="font-medium">{f.v}</span> : isEditing ? (
                         f.sel ? <select value={(editForm as any)[f.k]} onChange={e => setEditForm({ ...editForm, [f.k]: e.target.value })} className="flex-1 px-2 py-1 border rounded text-sm">{f.sel.map(o => <option key={o} value={o}>{o || '-'}</option>)}</select>
                           : <input type={f.t || 'text'} value={(editForm as any)[f.k]} onChange={e => setEditForm({ ...editForm, [f.k]: e.target.value })} className="flex-1 px-2 py-1 border rounded text-sm" />
-                      ) : <span>{(patientUser as any)[f.k] || '-'}</span>}
+                      ) : <span className="font-medium">{(patientUser as any)[f.k] || '-'}</span>}
                     </div>
                   ))}
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-gray-500 uppercase">স্বাস্থ্য</h3>
+                  <h3 className="text-xs font-medium text-gray-500 uppercase">স্বাস্থ্য তথ্য</h3>
                   {[
-                    { k: 'heightCm', l: 'উচ্চতা', t: 'number' }, { k: 'weightKg', l: 'ওজন', t: 'number' },
-                    { k: 'chronicConditions', l: 'রোগ' }, { k: 'allergies', l: 'এলার্জি' },
-                    { k: 'emergencyContactName', l: 'জরুরি নাম' }, { k: 'emergencyContactPhone', l: 'জরুরি ফোন', t: 'tel' }
+                    { k: 'heightCm', l: 'উচ্চতা (cm)', t: 'number' }, { k: 'weightKg', l: 'ওজন (kg)', t: 'number' },
+                    { k: 'chronicConditions', l: 'দীর্ঘমেয়াদী রোগ' }, { k: 'allergies', l: 'এলার্জি' },
+                    { k: 'emergencyContactName', l: 'জরুরি যোগাযোগ' }, { k: 'emergencyContactPhone', l: 'জরুরি ফোন', t: 'tel' }
                   ].map(f => (
                     <div key={f.k} className="flex items-center text-sm">
-                      <span className="w-20 text-gray-500">{f.l}</span>
-                      {isEditing ? <input type={f.t || 'text'} value={(editForm as any)[f.k]} onChange={e => setEditForm({ ...editForm, [f.k]: e.target.value })} className="flex-1 px-2 py-1 border rounded text-sm" />
-                        : <span>{['chronicConditions', 'allergies'].includes(f.k) ? ((patientUser as any)[f.k] || []).join(', ') || '-' : (patientUser as any)[f.k] || '-'}</span>}
+                      <span className="w-24 text-gray-500">{f.l}</span>
+                      {isEditing ? <input type={f.t || 'text'} value={(editForm as any)[f.k]} onChange={e => setEditForm({ ...editForm, [f.k]: e.target.value })} className="flex-1 px-2 py-1 border rounded text-sm" placeholder={f.k.includes('Conditions') || f.k.includes('allergies') ? 'কমা দিয়ে আলাদা করুন' : ''} />
+                        : <span className="font-medium">{['chronicConditions', 'allergies'].includes(f.k) ? ((patientUser as any)[f.k] || []).join(', ') || '-' : (patientUser as any)[f.k] || '-'}</span>}
                     </div>
                   ))}
                 </div>
