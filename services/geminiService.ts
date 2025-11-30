@@ -4,6 +4,23 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
+// Usage tracking for finance war room
+const USAGE_KEYS = {
+  AI_CONVERSATIONS: 'nirnoy_ai_conversations',
+  AI_TOKENS: 'nirnoy_ai_tokens_used',
+};
+
+const trackAIUsage = (estimatedTokens: number = 500) => {
+  try {
+    const currentConvs = parseInt(localStorage.getItem(USAGE_KEYS.AI_CONVERSATIONS) || '0');
+    const currentTokens = parseInt(localStorage.getItem(USAGE_KEYS.AI_TOKENS) || '0');
+    localStorage.setItem(USAGE_KEYS.AI_CONVERSATIONS, (currentConvs + 1).toString());
+    localStorage.setItem(USAGE_KEYS.AI_TOKENS, (currentTokens + estimatedTokens).toString());
+  } catch (e) {
+    console.warn('Could not track AI usage:', e);
+  }
+};
+
 // Use the most capable model for medical queries
 const MEDICAL_MODEL = 'gemini-2.0-flash-exp';
 const FAST_MODEL = 'gemini-2.0-flash-exp';
@@ -53,7 +70,7 @@ CONVERSATION MODE: Clinical consultation support. Provide evidence-based recomme
       }
     });
 
-    return response.text || "Unable to process query.";
+    trackAIUsage(800); return response.text || "Unable to process query.";
   } catch (error) {
     console.error("Error in doctor chat:", error);
     return "Connection error. Please try again.";
@@ -156,7 +173,7 @@ Patient Context: ${patientContext || 'General health query'}`;
       config: { systemInstruction }
     });
 
-    return response.text || "I couldn't understand that.";
+    trackAIUsage(500); return response.text || "I couldn't understand that.";
   } catch (error) {
     console.error("Error in chat:", error);
     return "Connection issue. Please try again.";

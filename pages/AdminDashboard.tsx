@@ -998,91 +998,209 @@ export const AdminDashboard: React.FC = () => {
               </div>
             )}
 
-            {/* Finance & Accounts Tab */}
+            {/* Finance & Accounts Tab - Automated War Room */}
             {activeTab === 'finance' && (
               <div className="space-y-6">
+                {/* Header with Auto-Refresh */}
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-white">{isBn ? 'অর্থ ও হিসাব' : 'Finance & Accounts'}</h2>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                      <i className="fas fa-chart-line text-green-400"></i>
+                      {isBn ? 'আর্থিক ওয়ার রুম' : 'Financial War Room'}
+                    </h2>
+                    <p className="text-slate-400 text-sm mt-1">
+                      {isBn ? 'স্বয়ংক্রিয়ভাবে আপডেট হচ্ছে' : 'Auto-synced from all sources'} • 
+                      {isBn ? ' সর্বশেষ: ' : ' Last: '}{lastRefresh.toLocaleTimeString()}
+                    </p>
+                  </div>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => loadAllData()}
+                      className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition text-sm flex items-center gap-2"
+                    >
+                      <i className="fas fa-sync-alt"></i>
+                      {isBn ? 'রিফ্রেশ' : 'Refresh'}
+                    </button>
                     <button
                       onClick={() => setEditingExpenses(!editingExpenses)}
                       className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition text-sm"
                     >
                       <i className={`fas ${editingExpenses ? 'fa-times' : 'fa-cog'} mr-2`}></i>
-                      {editingExpenses ? (isBn ? 'বন্ধ' : 'Close') : (isBn ? 'খরচ সেটিংস' : 'Expense Settings')}
+                      {editingExpenses ? (isBn ? 'বন্ধ' : 'Close') : (isBn ? 'খরচ সেটিংস' : 'Cost Settings')}
                     </button>
                   </div>
                 </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl p-5 border border-green-500/30">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-green-400/80 text-xs uppercase">{isBn ? 'মোট আয়' : 'Total Income'}</p>
-                        <p className="text-3xl font-black text-green-400 mt-1">৳{financeData.totalIncome.toLocaleString()}</p>
+                {/* Main Financial Summary - War Room Style */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {/* Total Income */}
+                  <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-2xl p-6 border border-green-500/30 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full -mr-16 -mt-16"></div>
+                    <div className="relative">
+                      <div className="flex items-center gap-2 mb-2">
+                        <i className="fas fa-arrow-trend-up text-green-400"></i>
+                        <span className="text-green-400/80 text-sm uppercase font-bold">{isBn ? 'মোট আয়' : 'Total Income'}</span>
                       </div>
-                      <i className="fas fa-arrow-trend-up text-green-400/50 text-2xl"></i>
+                      <p className="text-4xl font-black text-green-400">৳{financeData.totalIncome.toLocaleString()}</p>
+                      <div className="mt-3 space-y-1 text-sm">
+                        <div className="flex justify-between text-green-300/70">
+                          <span>{isBn ? 'সাবস্ক্রিপশন' : 'Subscriptions'}</span>
+                          <span>৳{financeData.incomeBreakdown.subscriptions.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-green-300/70">
+                          <span>{isBn ? 'পরামর্শ' : 'Consultations'}</span>
+                          <span>৳{financeData.incomeBreakdown.consultations.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-green-300/70">
+                          <span>{isBn ? 'অন্যান্য' : 'Other'}</span>
+                          <span>৳{financeData.incomeBreakdown.other.toLocaleString()}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="bg-gradient-to-br from-red-500/20 to-rose-500/20 rounded-2xl p-5 border border-red-500/30">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-red-400/80 text-xs uppercase">{isBn ? 'মোট খরচ' : 'Total Expenses'}</p>
-                        <p className="text-3xl font-black text-red-400 mt-1">৳{financeData.totalExpenses.toLocaleString()}</p>
+
+                  {/* Total Expenses */}
+                  <div className="bg-gradient-to-br from-red-500/20 to-rose-500/20 rounded-2xl p-6 border border-red-500/30 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full -mr-16 -mt-16"></div>
+                    <div className="relative">
+                      <div className="flex items-center gap-2 mb-2">
+                        <i className="fas fa-arrow-trend-down text-red-400"></i>
+                        <span className="text-red-400/80 text-sm uppercase font-bold">{isBn ? 'মোট খরচ' : 'Total Expenses'}</span>
                       </div>
-                      <i className="fas fa-arrow-trend-down text-red-400/50 text-2xl"></i>
+                      <p className="text-4xl font-black text-red-400">৳{financeData.totalExpenses.toLocaleString()}</p>
+                      <div className="mt-3 space-y-1 text-sm">
+                        <div className="flex justify-between text-red-300/70">
+                          <span>AI (Gemini)</span>
+                          <span>৳{financeData.expenseBreakdown.geminiApi.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-red-300/70">
+                          <span>SMS (Twilio)</span>
+                          <span>৳{financeData.expenseBreakdown.twilio.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-red-300/70">
+                          <span>{isBn ? 'ইনফ্রা' : 'Infrastructure'}</span>
+                          <span>৳{(financeData.expenseBreakdown.supabase + financeData.expenseBreakdown.vercel + financeData.expenseBreakdown.hosting + financeData.expenseBreakdown.domain).toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className={`bg-gradient-to-br ${financeData.netProfit >= 0 ? 'from-blue-500/20 to-indigo-500/20 border-blue-500/30' : 'from-orange-500/20 to-amber-500/20 border-orange-500/30'} rounded-2xl p-5 border`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className={`${financeData.netProfit >= 0 ? 'text-blue-400/80' : 'text-orange-400/80'} text-xs uppercase`}>{isBn ? 'নিট লাভ/ক্ষতি' : 'Net Profit/Loss'}</p>
-                        <p className={`text-3xl font-black ${financeData.netProfit >= 0 ? 'text-blue-400' : 'text-orange-400'} mt-1`}>
-                          {financeData.netProfit >= 0 ? '+' : ''}৳{financeData.netProfit.toLocaleString()}
-                        </p>
+
+                  {/* Net Profit/Loss */}
+                  <div className={`bg-gradient-to-br ${financeData.netProfit >= 0 ? 'from-blue-500/20 to-indigo-500/20 border-blue-500/30' : 'from-orange-500/20 to-amber-500/20 border-orange-500/30'} rounded-2xl p-6 border relative overflow-hidden`}>
+                    <div className={`absolute top-0 right-0 w-32 h-32 ${financeData.netProfit >= 0 ? 'bg-blue-500/10' : 'bg-orange-500/10'} rounded-full -mr-16 -mt-16`}></div>
+                    <div className="relative">
+                      <div className="flex items-center gap-2 mb-2">
+                        <i className={`fas ${financeData.netProfit >= 0 ? 'fa-chart-pie text-blue-400' : 'fa-exclamation-triangle text-orange-400'}`}></i>
+                        <span className={`${financeData.netProfit >= 0 ? 'text-blue-400/80' : 'text-orange-400/80'} text-sm uppercase font-bold`}>
+                          {isBn ? 'নিট লাভ/ক্ষতি' : 'Net Profit/Loss'}
+                        </span>
                       </div>
-                      <i className={`fas ${financeData.netProfit >= 0 ? 'fa-chart-pie' : 'fa-exclamation-triangle'} ${financeData.netProfit >= 0 ? 'text-blue-400/50' : 'text-orange-400/50'} text-2xl`}></i>
+                      <p className={`text-4xl font-black ${financeData.netProfit >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>
+                        {financeData.netProfit >= 0 ? '+' : ''}৳{financeData.netProfit.toLocaleString()}
+                      </p>
+                      <div className="mt-3">
+                        <div className={`text-sm ${financeData.netProfit >= 0 ? 'text-blue-300/70' : 'text-orange-300/70'}`}>
+                          {financeData.netProfit >= 0 
+                            ? (isBn ? '✅ লাভজনক অবস্থায় আছেন' : '✅ Operating at profit')
+                            : (isBn ? '⚠️ খরচ আয়ের চেয়ে বেশি' : '⚠️ Expenses exceed income')}
+                        </div>
+                        <div className={`text-xs mt-1 ${financeData.netProfit >= 0 ? 'text-blue-300/50' : 'text-orange-300/50'}`}>
+                          {isBn ? 'মার্জিন: ' : 'Margin: '}
+                          {financeData.totalIncome > 0 ? ((financeData.netProfit / financeData.totalIncome) * 100).toFixed(1) : 0}%
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="bg-gradient-to-br from-purple-500/20 to-violet-500/20 rounded-2xl p-5 border border-purple-500/30">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-purple-400/80 text-xs uppercase">{isBn ? 'প্রতি ইউজার খরচ' : 'Cost Per User'}</p>
-                        <p className="text-3xl font-black text-purple-400 mt-1">৳{financeData.perUserCost.toFixed(2)}</p>
-                      </div>
-                      <i className="fas fa-user-tag text-purple-400/50 text-2xl"></i>
+                </div>
+
+                {/* Live Usage Stats */}
+                <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    {isBn ? 'লাইভ ব্যবহার পরিসংখ্যান' : 'Live Usage Statistics'}
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <div className="bg-white/5 rounded-xl p-4 text-center">
+                      <i className="fas fa-users text-blue-400 text-xl mb-2"></i>
+                      <p className="text-2xl font-black text-white">{usageStats.activeUsers}</p>
+                      <p className="text-xs text-slate-400">{isBn ? 'মোট ইউজার' : 'Total Users'}</p>
                     </div>
+                    <div className="bg-white/5 rounded-xl p-4 text-center">
+                      <i className="fas fa-user-plus text-green-400 text-xl mb-2"></i>
+                      <p className="text-2xl font-black text-white">{usageStats.newUsersThisMonth}</p>
+                      <p className="text-xs text-slate-400">{isBn ? 'এই মাসে নতুন' : 'New This Month'}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4 text-center">
+                      <i className="fas fa-robot text-purple-400 text-xl mb-2"></i>
+                      <p className="text-2xl font-black text-white">{usageStats.aiConversations}</p>
+                      <p className="text-xs text-slate-400">{isBn ? 'AI কথোপকথন' : 'AI Chats'}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4 text-center">
+                      <i className="fas fa-microchip text-indigo-400 text-xl mb-2"></i>
+                      <p className="text-2xl font-black text-white">{(usageStats.aiTokensUsed / 1000).toFixed(1)}K</p>
+                      <p className="text-xs text-slate-400">{isBn ? 'টোকেন ব্যবহৃত' : 'Tokens Used'}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4 text-center">
+                      <i className="fas fa-sms text-cyan-400 text-xl mb-2"></i>
+                      <p className="text-2xl font-black text-white">{usageStats.smsSent}</p>
+                      <p className="text-xs text-slate-400">{isBn ? 'SMS পাঠানো' : 'SMS Sent'}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4 text-center">
+                      <i className="fas fa-calendar-check text-amber-400 text-xl mb-2"></i>
+                      <p className="text-2xl font-black text-white">{usageStats.totalAppointments}</p>
+                      <p className="text-xs text-slate-400">{isBn ? 'অ্যাপয়েন্টমেন্ট' : 'Appointments'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per User Economics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-white/5 backdrop-blur rounded-xl p-5 border border-white/10">
+                    <p className="text-slate-400 text-xs uppercase mb-1">{isBn ? 'প্রতি ইউজার আয়' : 'Revenue/User'}</p>
+                    <p className="text-2xl font-black text-green-400">৳{financeData.perUserRevenue.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white/5 backdrop-blur rounded-xl p-5 border border-white/10">
+                    <p className="text-slate-400 text-xs uppercase mb-1">{isBn ? 'প্রতি ইউজার খরচ' : 'Cost/User'}</p>
+                    <p className="text-2xl font-black text-red-400">৳{financeData.perUserCost.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white/5 backdrop-blur rounded-xl p-5 border border-white/10">
+                    <p className="text-slate-400 text-xs uppercase mb-1">{isBn ? 'প্রতি ইউজার লাভ' : 'Profit/User'}</p>
+                    <p className={`text-2xl font-black ${financeData.perUserRevenue - financeData.perUserCost >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>
+                      ৳{(financeData.perUserRevenue - financeData.perUserCost).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="bg-white/5 backdrop-blur rounded-xl p-5 border border-white/10">
+                    <p className="text-slate-400 text-xs uppercase mb-1">{isBn ? 'LTV অনুমান' : 'Est. LTV'}</p>
+                    <p className="text-2xl font-black text-purple-400">৳{(financeData.perUserRevenue * 12).toFixed(0)}</p>
+                    <p className="text-xs text-slate-500">{isBn ? '12 মাস' : '12 months'}</p>
                   </div>
                 </div>
 
                 {/* Expense Configuration Panel */}
                 {editingExpenses && (
                   <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
-                    <h3 className="text-lg font-bold text-white mb-4">{isBn ? 'মাসিক খরচ কনফিগারেশন' : 'Monthly Expense Configuration'}</h3>
+                    <h3 className="text-lg font-bold text-white mb-4">{isBn ? 'খরচ কনফিগারেশন (মাসিক)' : 'Expense Configuration (Monthly)'}</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
-                        { key: 'supabase', label: 'Supabase', icon: 'fa-database' },
-                        { key: 'vercel', label: 'Vercel', icon: 'fa-cloud' },
-                        { key: 'twilio', label: 'Twilio (per SMS)', icon: 'fa-sms' },
-                        { key: 'geminiApi', label: 'Gemini API (per 1K tokens)', icon: 'fa-robot' },
-                        { key: 'hosting', label: 'Hosting', icon: 'fa-server' },
-                        { key: 'domain', label: 'Domain', icon: 'fa-globe' },
-                        { key: 'other', label: 'Other', icon: 'fa-ellipsis-h' },
+                        { key: 'supabase', label: 'Supabase', icon: 'fa-database', hint: isBn ? 'ডাটাবেস' : 'Database' },
+                        { key: 'vercel', label: 'Vercel', icon: 'fa-cloud', hint: isBn ? 'হোস্টিং' : 'Hosting' },
+                        { key: 'twilio', label: 'Twilio/SMS', icon: 'fa-sms', hint: isBn ? 'প্রতি SMS' : 'Per SMS' },
+                        { key: 'geminiApi', label: 'Gemini API', icon: 'fa-robot', hint: isBn ? 'প্রতি 1K টোকেন' : 'Per 1K tokens' },
+                        { key: 'hosting', label: 'Other Hosting', icon: 'fa-server', hint: isBn ? 'অন্যান্য' : 'Other' },
+                        { key: 'domain', label: 'Domain', icon: 'fa-globe', hint: 'nirnoy.ai' },
+                        { key: 'other', label: 'Misc', icon: 'fa-ellipsis-h', hint: isBn ? 'বিবিধ' : 'Miscellaneous' },
                       ].map((item) => (
                         <div key={item.key}>
                           <label className="block text-xs text-slate-400 mb-1">
                             <i className={`fas ${item.icon} mr-1`}></i>{item.label}
+                            <span className="text-slate-500 ml-1">({item.hint})</span>
                           </label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">৳</span>
                             <input
                               type="number"
                               value={expenseConfig[item.key as keyof ExpenseConfig]}
-                              onChange={(e) => {
-                                const updated = { ...expenseConfig, [item.key]: parseFloat(e.target.value) || 0 };
-                                setExpenseConfig(updated);
-                              }}
+                              onChange={(e) => setExpenseConfig({ ...expenseConfig, [item.key]: parseFloat(e.target.value) || 0 })}
                               className="w-full pl-7 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
                               min="0"
                               step="0.01"
@@ -1094,110 +1212,72 @@ export const AdminDashboard: React.FC = () => {
                     <button
                       onClick={() => {
                         saveExpenseConfig(expenseConfig);
-                        // Recalculate finance data
-                        const totalUsers = allPatients.length + allDoctors.length;
-                        const monthlyExpenses = expenseConfig.supabase + expenseConfig.vercel + expenseConfig.hosting + expenseConfig.domain + expenseConfig.other;
-                        const smsExpenses = financeData.smsUsage.totalSent * expenseConfig.twilio;
-                        const aiExpenses = (financeData.aiUsage.totalTokens / 1000) * expenseConfig.geminiApi;
-                        const totalExpenses = monthlyExpenses + smsExpenses + aiExpenses;
-                        const perUserCost = totalUsers > 0 ? totalExpenses / totalUsers : 0;
-                        
-                        const updated = {
-                          ...financeData,
-                          totalExpenses,
-                          netProfit: financeData.totalIncome - totalExpenses,
-                          perUserCost,
-                          expenseBreakdown: {
-                            supabase: expenseConfig.supabase,
-                            vercel: expenseConfig.vercel,
-                            twilio: smsExpenses,
-                            geminiApi: aiExpenses,
-                            hosting: expenseConfig.hosting,
-                            domain: expenseConfig.domain,
-                            other: expenseConfig.other,
-                          },
-                        };
-                        setFinanceData(updated);
-                        saveFinanceData(updated);
+                        loadAllData();
                         setEditingExpenses(false);
-                        alert(isBn ? '✅ খরচ সংরক্ষিত!' : '✅ Expenses saved!');
                       }}
                       className="mt-4 px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition"
                     >
                       <i className="fas fa-save mr-2"></i>
-                      {isBn ? 'সংরক্ষণ করুন' : 'Save Configuration'}
+                      {isBn ? 'সংরক্ষণ ও রিক্যালকুলেট' : 'Save & Recalculate'}
                     </button>
                   </div>
                 )}
 
-                {/* Income & Expense Entry */}
+                {/* Manual Transaction Entry */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Add Income */}
                   <div className="bg-green-500/10 backdrop-blur rounded-2xl p-6 border border-green-500/20">
                     <h3 className="text-lg font-bold text-green-400 mb-4">
                       <i className="fas fa-plus-circle mr-2"></i>
-                      {isBn ? 'আয় যোগ করুন' : 'Add Income'}
+                      {isBn ? 'ম্যানুয়াল আয় যোগ' : 'Add Manual Income'}
                     </h3>
                     <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">{isBn ? 'ধরন' : 'Type'}</label>
-                        <select
-                          value={incomeEntry.type}
-                          onChange={(e) => setIncomeEntry({ ...incomeEntry, type: e.target.value })}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                        >
-                          <option value="subscriptions">{isBn ? 'সাবস্ক্রিপশন' : 'Subscriptions'}</option>
-                          <option value="consultations">{isBn ? 'পরামর্শ ফি' : 'Consultation Fees'}</option>
-                          <option value="other">{isBn ? 'অন্যান্য' : 'Other'}</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">{isBn ? 'পরিমাণ' : 'Amount'}</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">৳</span>
-                          <input
-                            type="number"
-                            value={incomeEntry.amount}
-                            onChange={(e) => setIncomeEntry({ ...incomeEntry, amount: parseFloat(e.target.value) || 0 })}
-                            className="w-full pl-7 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">{isBn ? 'বিবরণ' : 'Description'}</label>
+                      <select
+                        value={incomeEntry.type}
+                        onChange={(e) => setIncomeEntry({ ...incomeEntry, type: e.target.value })}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                      >
+                        <option value="subscriptions">{isBn ? 'সাবস্ক্রিপশন' : 'Subscription'}</option>
+                        <option value="consultations">{isBn ? 'পরামর্শ ফি' : 'Consultation Fee'}</option>
+                        <option value="other">{isBn ? 'অন্যান্য' : 'Other'}</option>
+                      </select>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">৳</span>
                         <input
-                          type="text"
-                          value={incomeEntry.description}
-                          onChange={(e) => setIncomeEntry({ ...incomeEntry, description: e.target.value })}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                          placeholder={isBn ? 'ঐচ্ছিক' : 'Optional'}
+                          type="number"
+                          value={incomeEntry.amount || ''}
+                          onChange={(e) => setIncomeEntry({ ...incomeEntry, amount: parseFloat(e.target.value) || 0 })}
+                          className="w-full pl-7 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                          placeholder="0"
                         />
                       </div>
+                      <input
+                        type="text"
+                        value={incomeEntry.description}
+                        onChange={(e) => setIncomeEntry({ ...incomeEntry, description: e.target.value })}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                        placeholder={isBn ? 'বিবরণ (ঐচ্ছিক)' : 'Description (optional)'}
+                      />
                       <button
                         onClick={() => {
                           if (incomeEntry.amount > 0) {
-                            const updated = {
-                              ...financeData,
-                              totalIncome: financeData.totalIncome + incomeEntry.amount,
-                              netProfit: financeData.netProfit + incomeEntry.amount,
-                              incomeBreakdown: {
-                                ...financeData.incomeBreakdown,
-                                [incomeEntry.type]: financeData.incomeBreakdown[incomeEntry.type as keyof typeof financeData.incomeBreakdown] + incomeEntry.amount,
-                              },
+                            const tx: Transaction = {
+                              id: Date.now().toString(),
+                              type: 'income',
+                              category: incomeEntry.type,
+                              amount: incomeEntry.amount,
+                              description: incomeEntry.description,
+                              timestamp: new Date().toISOString(),
+                              auto: false,
                             };
-                            const totalUsers = allPatients.length + allDoctors.length;
-                            updated.perUserRevenue = totalUsers > 0 ? updated.totalIncome / totalUsers : 0;
-                            setFinanceData(updated);
-                            saveFinanceData(updated);
+                            saveTransaction(tx);
                             setIncomeEntry({ type: 'subscriptions', amount: 0, description: '' });
-                            alert(isBn ? '✅ আয় যোগ হয়েছে!' : '✅ Income added!');
+                            loadAllData();
                           }
                         }}
                         className="w-full py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition"
                       >
-                        <i className="fas fa-plus mr-2"></i>
-                        {isBn ? 'যোগ করুন' : 'Add Income'}
+                        <i className="fas fa-plus mr-2"></i>{isBn ? 'যোগ করুন' : 'Add'}
                       </button>
                     </div>
                   </div>
@@ -1206,337 +1286,129 @@ export const AdminDashboard: React.FC = () => {
                   <div className="bg-red-500/10 backdrop-blur rounded-2xl p-6 border border-red-500/20">
                     <h3 className="text-lg font-bold text-red-400 mb-4">
                       <i className="fas fa-minus-circle mr-2"></i>
-                      {isBn ? 'খরচ যোগ করুন' : 'Add Expense'}
+                      {isBn ? 'ম্যানুয়াল খরচ যোগ' : 'Add Manual Expense'}
                     </h3>
                     <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">{isBn ? 'ধরন' : 'Type'}</label>
-                        <select
-                          value={expenseEntry.type}
-                          onChange={(e) => setExpenseEntry({ ...expenseEntry, type: e.target.value })}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                        >
-                          <option value="supabase">Supabase</option>
-                          <option value="vercel">Vercel</option>
-                          <option value="twilio">Twilio SMS</option>
-                          <option value="geminiApi">Gemini API</option>
-                          <option value="hosting">Hosting</option>
-                          <option value="domain">Domain</option>
-                          <option value="other">{isBn ? 'অন্যান্য' : 'Other'}</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">{isBn ? 'পরিমাণ' : 'Amount'}</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">৳</span>
-                          <input
-                            type="number"
-                            value={expenseEntry.amount}
-                            onChange={(e) => setExpenseEntry({ ...expenseEntry, amount: parseFloat(e.target.value) || 0 })}
-                            className="w-full pl-7 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">{isBn ? 'বিবরণ' : 'Description'}</label>
+                      <select
+                        value={expenseEntry.type}
+                        onChange={(e) => setExpenseEntry({ ...expenseEntry, type: e.target.value })}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                      >
+                        <option value="supabase">Supabase</option>
+                        <option value="vercel">Vercel</option>
+                        <option value="twilio">Twilio</option>
+                        <option value="geminiApi">Gemini API</option>
+                        <option value="other">{isBn ? 'অন্যান্য' : 'Other'}</option>
+                      </select>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">৳</span>
                         <input
-                          type="text"
-                          value={expenseEntry.description}
-                          onChange={(e) => setExpenseEntry({ ...expenseEntry, description: e.target.value })}
-                          className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                          placeholder={isBn ? 'ঐচ্ছিক' : 'Optional'}
+                          type="number"
+                          value={expenseEntry.amount || ''}
+                          onChange={(e) => setExpenseEntry({ ...expenseEntry, amount: parseFloat(e.target.value) || 0 })}
+                          className="w-full pl-7 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                          placeholder="0"
                         />
                       </div>
+                      <input
+                        type="text"
+                        value={expenseEntry.description}
+                        onChange={(e) => setExpenseEntry({ ...expenseEntry, description: e.target.value })}
+                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
+                        placeholder={isBn ? 'বিবরণ (ঐচ্ছিক)' : 'Description (optional)'}
+                      />
                       <button
                         onClick={() => {
                           if (expenseEntry.amount > 0) {
-                            const updated = {
-                              ...financeData,
-                              totalExpenses: financeData.totalExpenses + expenseEntry.amount,
-                              netProfit: financeData.netProfit - expenseEntry.amount,
-                              expenseBreakdown: {
-                                ...financeData.expenseBreakdown,
-                                [expenseEntry.type]: financeData.expenseBreakdown[expenseEntry.type as keyof typeof financeData.expenseBreakdown] + expenseEntry.amount,
-                              },
+                            const tx: Transaction = {
+                              id: Date.now().toString(),
+                              type: 'expense',
+                              category: expenseEntry.type,
+                              amount: expenseEntry.amount,
+                              description: expenseEntry.description,
+                              timestamp: new Date().toISOString(),
+                              auto: false,
                             };
-                            const totalUsers = allPatients.length + allDoctors.length;
-                            updated.perUserCost = totalUsers > 0 ? updated.totalExpenses / totalUsers : 0;
-                            setFinanceData(updated);
-                            saveFinanceData(updated);
+                            saveTransaction(tx);
                             setExpenseEntry({ type: 'other', amount: 0, description: '' });
-                            alert(isBn ? '✅ খরচ যোগ হয়েছে!' : '✅ Expense added!');
+                            loadAllData();
                           }
                         }}
                         className="w-full py-2 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition"
                       >
-                        <i className="fas fa-plus mr-2"></i>
-                        {isBn ? 'যোগ করুন' : 'Add Expense'}
+                        <i className="fas fa-plus mr-2"></i>{isBn ? 'যোগ করুন' : 'Add'}
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Breakdown Charts */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Income Breakdown */}
+                {/* Recent Transactions */}
+                {transactions.length > 0 && (
                   <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
                     <h3 className="text-lg font-bold text-white mb-4">
-                      <i className="fas fa-chart-pie text-green-400 mr-2"></i>
-                      {isBn ? 'আয়ের বিভাজন' : 'Income Breakdown'}
+                      <i className="fas fa-history mr-2 text-slate-400"></i>
+                      {isBn ? 'সাম্প্রতিক লেনদেন' : 'Recent Transactions'}
                     </h3>
-                    <div className="space-y-3">
-                      {[
-                        { key: 'subscriptions', label: isBn ? 'সাবস্ক্রিপশন' : 'Subscriptions', color: 'green' },
-                        { key: 'consultations', label: isBn ? 'পরামর্শ ফি' : 'Consultations', color: 'blue' },
-                        { key: 'other', label: isBn ? 'অন্যান্য' : 'Other', color: 'purple' },
-                      ].map((item) => {
-                        const value = financeData.incomeBreakdown[item.key as keyof typeof financeData.incomeBreakdown];
-                        const percentage = financeData.totalIncome > 0 ? (value / financeData.totalIncome) * 100 : 0;
-                        return (
-                          <div key={item.key}>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="text-slate-300">{item.label}</span>
-                              <span className={`text-${item.color}-400 font-bold`}>৳{value.toLocaleString()}</span>
-                            </div>
-                            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full bg-${item.color}-500 rounded-full transition-all duration-500`}
-                                style={{ width: `${percentage}%` }}
-                              ></div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {transactions.slice(-10).reverse().map((tx) => (
+                        <div key={tx.id} className={`flex items-center justify-between p-3 rounded-lg ${tx.type === 'income' ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                          <div className="flex items-center gap-3">
+                            <i className={`fas ${tx.type === 'income' ? 'fa-arrow-down text-green-400' : 'fa-arrow-up text-red-400'}`}></i>
+                            <div>
+                              <p className="text-white text-sm font-medium">{tx.category} {tx.description && `- ${tx.description}`}</p>
+                              <p className="text-slate-400 text-xs">{new Date(tx.timestamp).toLocaleString()}</p>
                             </div>
                           </div>
-                        );
-                      })}
+                          <span className={`font-bold ${tx.type === 'income' ? 'text-green-400' : 'text-red-400'}`}>
+                            {tx.type === 'income' ? '+' : '-'}৳{tx.amount}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                )}
 
-                  {/* Expense Breakdown */}
-                  <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
-                    <h3 className="text-lg font-bold text-white mb-4">
-                      <i className="fas fa-chart-pie text-red-400 mr-2"></i>
-                      {isBn ? 'খরচের বিভাজন' : 'Expense Breakdown'}
-                    </h3>
-                    <div className="space-y-3">
-                      {[
-                        { key: 'supabase', label: 'Supabase', color: 'emerald' },
-                        { key: 'vercel', label: 'Vercel', color: 'slate' },
-                        { key: 'twilio', label: 'Twilio SMS', color: 'red' },
-                        { key: 'geminiApi', label: 'Gemini API', color: 'blue' },
-                        { key: 'hosting', label: 'Hosting', color: 'amber' },
-                        { key: 'domain', label: 'Domain', color: 'purple' },
-                        { key: 'other', label: isBn ? 'অন্যান্য' : 'Other', color: 'gray' },
-                      ].map((item) => {
-                        const value = financeData.expenseBreakdown[item.key as keyof typeof financeData.expenseBreakdown];
-                        const percentage = financeData.totalExpenses > 0 ? (value / financeData.totalExpenses) * 100 : 0;
-                        return (
-                          <div key={item.key}>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="text-slate-300">{item.label}</span>
-                              <span className="text-slate-400 font-medium">৳{value.toLocaleString()}</span>
-                            </div>
-                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-red-500/70 rounded-full transition-all duration-500"
-                                style={{ width: `${percentage}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Usage Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* AI Usage */}
-                  <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-2xl p-6 border border-indigo-500/20">
-                    <h3 className="text-lg font-bold text-white mb-4">
-                      <i className="fas fa-robot text-indigo-400 mr-2"></i>
-                      {isBn ? 'AI ব্যবহার' : 'AI Usage'}
-                    </h3>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <p className="text-2xl font-black text-indigo-400">{financeData.aiUsage.totalConversations}</p>
-                        <p className="text-xs text-slate-400">{isBn ? 'কথোপকথন' : 'Conversations'}</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-black text-purple-400">{(financeData.aiUsage.totalTokens / 1000).toFixed(1)}K</p>
-                        <p className="text-xs text-slate-400">{isBn ? 'টোকেন' : 'Tokens'}</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-black text-pink-400">৳{financeData.aiUsage.cost.toFixed(2)}</p>
-                        <p className="text-xs text-slate-400">{isBn ? 'খরচ' : 'Cost'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex gap-2">
-                      <input
-                        type="number"
-                        placeholder={isBn ? 'কথোপকথন সংখ্যা' : 'Conversations'}
-                        className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                        id="aiConvInput"
-                      />
-                      <input
-                        type="number"
-                        placeholder={isBn ? 'টোকেন (K)' : 'Tokens (K)'}
-                        className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                        id="aiTokenInput"
-                      />
-                      <button
-                        onClick={() => {
-                          const convInput = document.getElementById('aiConvInput') as HTMLInputElement;
-                          const tokenInput = document.getElementById('aiTokenInput') as HTMLInputElement;
-                          const convs = parseInt(convInput.value) || 0;
-                          const tokens = (parseFloat(tokenInput.value) || 0) * 1000;
-                          const cost = (tokens / 1000) * expenseConfig.geminiApi;
-                          
-                          const updated = {
-                            ...financeData,
-                            totalExpenses: financeData.totalExpenses + cost,
-                            netProfit: financeData.netProfit - cost,
-                            aiUsage: {
-                              totalConversations: financeData.aiUsage.totalConversations + convs,
-                              totalTokens: financeData.aiUsage.totalTokens + tokens,
-                              cost: financeData.aiUsage.cost + cost,
-                            },
-                            expenseBreakdown: {
-                              ...financeData.expenseBreakdown,
-                              geminiApi: financeData.expenseBreakdown.geminiApi + cost,
-                            },
-                          };
-                          const totalUsers = allPatients.length + allDoctors.length;
-                          updated.perUserCost = totalUsers > 0 ? updated.totalExpenses / totalUsers : 0;
-                          setFinanceData(updated);
-                          saveFinanceData(updated);
-                          convInput.value = '';
-                          tokenInput.value = '';
-                        }}
-                        className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition"
-                      >
-                        <i className="fas fa-plus"></i>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* SMS Usage */}
-                  <div className="bg-gradient-to-br from-cyan-500/10 to-teal-500/10 rounded-2xl p-6 border border-cyan-500/20">
-                    <h3 className="text-lg font-bold text-white mb-4">
-                      <i className="fas fa-sms text-cyan-400 mr-2"></i>
-                      {isBn ? 'SMS ব্যবহার' : 'SMS Usage'}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                      <div>
-                        <p className="text-2xl font-black text-cyan-400">{financeData.smsUsage.totalSent}</p>
-                        <p className="text-xs text-slate-400">{isBn ? 'পাঠানো SMS' : 'SMS Sent'}</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-black text-teal-400">৳{financeData.smsUsage.cost.toFixed(2)}</p>
-                        <p className="text-xs text-slate-400">{isBn ? 'খরচ' : 'Cost'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex gap-2">
-                      <input
-                        type="number"
-                        placeholder={isBn ? 'SMS সংখ্যা' : 'Number of SMS'}
-                        className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm"
-                        id="smsCountInput"
-                      />
-                      <button
-                        onClick={() => {
-                          const smsInput = document.getElementById('smsCountInput') as HTMLInputElement;
-                          const count = parseInt(smsInput.value) || 0;
-                          const cost = count * expenseConfig.twilio;
-                          
-                          const updated = {
-                            ...financeData,
-                            totalExpenses: financeData.totalExpenses + cost,
-                            netProfit: financeData.netProfit - cost,
-                            smsUsage: {
-                              totalSent: financeData.smsUsage.totalSent + count,
-                              cost: financeData.smsUsage.cost + cost,
-                            },
-                            expenseBreakdown: {
-                              ...financeData.expenseBreakdown,
-                              twilio: financeData.expenseBreakdown.twilio + cost,
-                            },
-                          };
-                          const totalUsers = allPatients.length + allDoctors.length;
-                          updated.perUserCost = totalUsers > 0 ? updated.totalExpenses / totalUsers : 0;
-                          setFinanceData(updated);
-                          saveFinanceData(updated);
-                          smsInput.value = '';
-                        }}
-                        className="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition"
-                      >
-                        <i className="fas fa-plus"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Per User Analysis */}
-                <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                {/* Data Sources Info */}
+                <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
                   <h3 className="text-lg font-bold text-white mb-4">
-                    <i className="fas fa-user-chart text-amber-400 mr-2"></i>
-                    {isBn ? 'প্রতি ইউজার বিশ্লেষণ' : 'Per User Analysis'}
+                    <i className="fas fa-database mr-2 text-blue-400"></i>
+                    {isBn ? 'ডেটা সোর্স' : 'Data Sources'}
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white/5 rounded-xl p-4 text-center">
-                      <p className="text-xs text-slate-400 mb-1">{isBn ? 'মোট ইউজার' : 'Total Users'}</p>
-                      <p className="text-2xl font-black text-white">{allPatients.length + allDoctors.length}</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      <span className="text-slate-300">{isBn ? 'রোগী ডাটাবেস' : 'Patient Database'}</span>
                     </div>
-                    <div className="bg-green-500/10 rounded-xl p-4 text-center border border-green-500/20">
-                      <p className="text-xs text-slate-400 mb-1">{isBn ? 'প্রতি ইউজার আয়' : 'Revenue/User'}</p>
-                      <p className="text-2xl font-black text-green-400">৳{financeData.perUserRevenue?.toFixed(2) || '0.00'}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      <span className="text-slate-300">{isBn ? 'ডাক্তার ডাটাবেস' : 'Doctor Database'}</span>
                     </div>
-                    <div className="bg-red-500/10 rounded-xl p-4 text-center border border-red-500/20">
-                      <p className="text-xs text-slate-400 mb-1">{isBn ? 'প্রতি ইউজার খরচ' : 'Cost/User'}</p>
-                      <p className="text-2xl font-black text-red-400">৳{financeData.perUserCost.toFixed(2)}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      <span className="text-slate-300">{isBn ? 'সাবস্ক্রিপশন' : 'Subscriptions'}</span>
                     </div>
-                    <div className={`${financeData.perUserRevenue - financeData.perUserCost >= 0 ? 'bg-blue-500/10 border-blue-500/20' : 'bg-orange-500/10 border-orange-500/20'} rounded-xl p-4 text-center border`}>
-                      <p className="text-xs text-slate-400 mb-1">{isBn ? 'প্রতি ইউজার লাভ' : 'Profit/User'}</p>
-                      <p className={`text-2xl font-black ${financeData.perUserRevenue - financeData.perUserCost >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>
-                        ৳{((financeData.perUserRevenue || 0) - financeData.perUserCost).toFixed(2)}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      <span className="text-slate-300">{isBn ? 'AI ব্যবহার' : 'AI Usage'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      <span className="text-slate-300">{isBn ? 'SMS লগ' : 'SMS Logs'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      <span className="text-slate-300">{isBn ? 'অ্যাপয়েন্টমেন্ট' : 'Appointments'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                      <span className="text-slate-300">{isBn ? 'ম্যানুয়াল এন্ট্রি' : 'Manual Entries'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                      <span className="text-slate-300">{isBn ? 'খরচ কনফিগ' : 'Cost Config'}</span>
                     </div>
                   </div>
                 </div>
-
-                {/* Reset Finance Data */}
-                <details className="group">
-                  <summary className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer hover:text-slate-400 py-2">
-                    <i className="fas fa-chevron-right text-[10px] group-open:rotate-90 transition-transform"></i>
-                    <span>{isBn ? 'ফিন্যান্স ডেটা রিসেট' : 'Reset Finance Data'}</span>
-                  </summary>
-                  <div className="mt-2 p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                    <p className="text-amber-400 text-sm mb-3">{isBn ? 'এটি সব আয়-ব্যয় ডেটা মুছে ফেলবে' : 'This will clear all income/expense data'}</p>
-                    <button
-                      onClick={() => {
-                        if (confirm(isBn ? 'আপনি কি নিশ্চিত?' : 'Are you sure?')) {
-                          const resetData: FinanceData = {
-                            totalIncome: 0,
-                            totalExpenses: 0,
-                            netProfit: 0,
-                            incomeBreakdown: { subscriptions: 0, consultations: 0, other: 0 },
-                            expenseBreakdown: { supabase: 0, vercel: 0, twilio: 0, geminiApi: 0, hosting: 0, domain: 0, other: 0 },
-                            perUserCost: 0,
-                            perUserRevenue: 0,
-                            aiUsage: { totalTokens: 0, totalConversations: 0, cost: 0 },
-                            smsUsage: { totalSent: 0, cost: 0 },
-                          };
-                          setFinanceData(resetData);
-                          saveFinanceData(resetData);
-                          alert(isBn ? '✅ রিসেট সম্পন্ন!' : '✅ Reset complete!');
-                        }
-                      }}
-                      className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 transition text-sm"
-                    >
-                      <i className="fas fa-redo mr-2"></i>
-                      {isBn ? 'রিসেট করুন' : 'Reset'}
-                    </button>
-                  </div>
-                </details>
               </div>
             )}
 

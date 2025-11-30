@@ -116,6 +116,9 @@ class SMSGatewayService {
 
       if (data.sid) {
         console.log('✅ SMS sent successfully:', data.sid);
+        // Track SMS for finance war room
+        const smsCount = parseInt(localStorage.getItem('nirnoy_sms_sent_count') || '0');
+        localStorage.setItem('nirnoy_sms_sent_count', (smsCount + 1).toString());
         return { success: true, messageId: data.sid };
       }
       
