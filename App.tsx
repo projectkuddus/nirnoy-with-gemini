@@ -30,19 +30,27 @@ const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.N
 // Protected Route Component using AuthContext
 const ProtectedRoute: React.FC<{ 
   children: React.ReactNode; 
-  allowedRoles: ('PATIENT' | 'DOCTOR' | 'ADMIN')[]; 
+  allowedRoles: string[]; 
   redirectTo?: string;
 }> = ({ children, allowedRoles, redirectTo = '/login' }) => {
-  const { user, isLoading } = useAuth();
+  const { user, role, isLoading } = useAuth();
+  
+  console.log('[ProtectedRoute] Checking:', { hasUser: !!user, role, allowedRoles, isLoading });
   
   if (isLoading) {
     return <PageLoading message="Loading..." />;
   }
   
-  if (!user || !allowedRoles.includes(user.role as any)) {
+  // Use role from context (lowercase) and compare case-insensitively
+  const userRole = role?.toUpperCase() || '';
+  const allowed = allowedRoles.map(r => r.toUpperCase());
+  
+  if (!user || !allowed.includes(userRole)) {
+    console.log('[ProtectedRoute] Access denied, redirecting to:', redirectTo);
     return <Navigate to={redirectTo} replace />;
   }
   
+  console.log('[ProtectedRoute] Access granted');
   return <>{children}</>;
 };
 
