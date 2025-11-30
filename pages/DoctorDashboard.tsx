@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { chatWithDoctorAssistant, getMedicalNews, searchMedicalGuidelines } from '../services/geminiService';
 import { ChatMessage, PrescriptionItem } from '../types';
+import { useAuth, DoctorProfile } from "../contexts/AuthContext";
 import { openPrescriptionWindow, PrescriptionData } from '../utils/prescriptionPDF';
 
 // ============ TYPES ============
@@ -175,19 +176,97 @@ const PRESCRIPTION_TEMPLATES = [
 
 // ============ MAIN COMPONENT ============
 interface DoctorDashboardProps {
-  onLogout: () => void;
+  onLogout?: () => void;
 }
 
 export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) => {
   const navigate = useNavigate();
+  const { user, logout, isLoading } = useAuth();
+  
+  // Debug: Log user state
+  console.log('DoctorDashboard - user:', user);
+  console.log('DoctorDashboard - isLoading:', isLoading);
+  
+  // Redirect if not logged in as doctor (after loading completes)
+  useEffect(() => {
+    if (!isLoading && (!user || user.role !== 'DOCTOR')) {
+      console.log('Redirecting to doctor-registration - no valid doctor user');
+      navigate('/doctor-registration');
+    }
+  }, [user, isLoading, navigate]);
+  
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-400">লোড হচ্ছে...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // If no user after loading, show nothing (will redirect)
+  if (!user || user.role !== 'DOCTOR') {
+    return null;
+  }
+  
+  // Check if doctor is approved
+  const doctorUser = user as DoctorProfile;
+  if (doctorUser.status !== 'approved') {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-slate-800 rounded-2xl p-8 max-w-md text-center border border-slate-700">
+          <div className="text-6xl mb-4">{doctorUser.status === 'pending' ? '⏳' : '❌'}</div>
+          <h2 className="text-2xl font-bold text-white mb-2">
+            {doctorUser.status === 'pending' ? 'অনুমোদনের অপেক্ষায়' : 'আবেদন প্রত্যাখ্যান করা হয়েছে'}
+          </h2>
+          <p className="text-slate-400 mb-4">
+            {doctorUser.status === 'pending' 
+              ? 'আপনার ডাক্তার অ্যাকাউন্ট এখনো অনুমোদিত হয়নি। অনুগ্রহ করে অপেক্ষা করুন।'
+              : doctorUser.rejectionReason || 'আপনার আবেদন প্রত্যাখ্যান করা হয়েছে।'}
+          </p>
+          <button onClick={() => { logout(); navigate('/'); }} className="px-6 py-3 bg-teal-500 text-white rounded-xl font-bold hover:bg-teal-600 transition">
+            হোমে ফিরে যান
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  // Use real doctor data - NO DEMO DATA
+  const doctorProfile = {
+    id: user.id,
+    name: user.name,
+    nameBn: user.nameBn || user.name,
+    specialty: doctorUser.specializations[0] || 'General',
+    specialtyBn: doctorUser.specializations[0] || 'সাধারণ চিকিৎসা',
+    degrees: doctorUser.qualifications.map(q => q.degree).join(', ') || 'MBBS',
+    image: user.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=0d9488&color=fff&size=200',
+    hospital: doctorUser.chambers[0]?.name || 'Chamber',
+    hospitalBn: doctorUser.chambers[0]?.name || 'চেম্বার',
+    experience: doctorUser.experienceYears || 0,
+    bmdcNo: doctorUser.bmdcNumber || '',
+    chamberAddress: doctorUser.chambers[0]?.address || '',
+    chamberPhone: user.phone,
+    consultationFee: doctorUser.consultationFee || 500,
+  };
+  
+  const handleLogout = () => {
+    logout();
+    if (onLogout) onLogout();
+    navigate('/');
+  };
   
   // State
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [appointments, setAppointments] = useState<Appointment[]>(generateTodayAppointments());
+  const [appointments, setAppointments] = useState<Appointment[]>([]); // Empty - real appointments will come from backend
   const [schedule, setSchedule] = useState<Schedule[]>(DEFAULT_SCHEDULE);
-  const [holidays, setHolidays] = useState<Holiday[]>(HOLIDAYS);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+
   
   // Consultation state
   const [soapNote, setSoapNote] = useState<SOAPNote>({ subjective: '', objective: '', assessment: '', plan: '' });
@@ -302,14 +381,14 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     followUpDate.setDate(followUpDate.getDate() + followUpDays);
 
     const data: PrescriptionData = {
-      doctorName: DOCTOR_PROFILE.name,
-      doctorNameBn: DOCTOR_PROFILE.nameBn,
-      doctorDegrees: DOCTOR_PROFILE.degrees,
-      doctorSpecialty: DOCTOR_PROFILE.specialtyBn,
-      doctorBmdcNo: DOCTOR_PROFILE.bmdcNo,
-      chamberName: DOCTOR_PROFILE.hospitalBn,
-      chamberAddress: DOCTOR_PROFILE.chamberAddress,
-      chamberPhone: DOCTOR_PROFILE.chamberPhone,
+      doctorName: doctorProfile.name,
+      doctorNameBn: doctorProfile.nameBn,
+      doctorDegrees: doctorProfile.degrees,
+      doctorSpecialty: doctorProfile.specialtyBn,
+      doctorBmdcNo: doctorProfile.bmdcNo,
+      chamberName: doctorProfile.hospitalBn,
+      chamberAddress: doctorProfile.chamberAddress,
+      chamberPhone: doctorProfile.chamberPhone,
       patientName: selectedPatient.nameBn,
       patientAge: selectedPatient.age,
       patientGender: selectedPatient.gender === 'Male' ? 'পুরুষ' : 'মহিলা',
@@ -395,10 +474,10 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       <div className="bg-gradient-to-r from-teal-500 to-cyan-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{DOCTOR_PROFILE.nameBn}</h1>
-            <p className="opacity-90">{DOCTOR_PROFILE.specialtyBn} • {DOCTOR_PROFILE.hospital}</p>
+            <h1 className="text-2xl font-bold">{doctorProfile.nameBn}</h1>
+            <p className="opacity-90">{doctorProfile.specialtyBn} • {doctorProfile.hospital}</p>
           </div>
-          <img src={DOCTOR_PROFILE.image} alt="" className="w-16 h-16 rounded-full border-4 border-white/30" />
+          <img src={doctorProfile.image} alt="" className="w-16 h-16 rounded-full border-4 border-white/30" />
         </div>
         
         {/* Today's Summary */}
@@ -1580,20 +1659,20 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
   // ============ SETTINGS STATE ============
   const [profileForm, setProfileForm] = useState({
-    name: DOCTOR_PROFILE.name,
-    nameBn: DOCTOR_PROFILE.nameBn,
+    name: doctorProfile.name,
+    nameBn: doctorProfile.nameBn,
     email: 'dr.kashem@nirnoy.health',
     phone: '01700-123456',
-    specialty: DOCTOR_PROFILE.specialty,
-    degrees: DOCTOR_PROFILE.degrees,
-    bmdcNo: DOCTOR_PROFILE.bmdcNo,
-    experience: DOCTOR_PROFILE.experience,
+    specialty: doctorProfile.specialty,
+    degrees: doctorProfile.degrees,
+    bmdcNo: doctorProfile.bmdcNo,
+    experience: doctorProfile.experience,
     bio: 'Experienced cardiologist with 15+ years of practice. Specialized in interventional cardiology and heart failure management.',
-    consultationFee: DOCTOR_PROFILE.consultationFee,
+    consultationFee: doctorProfile.consultationFee,
     followUpFee: 500,
   });
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
-  const [profileImage, setProfileImage] = useState(DOCTOR_PROFILE.image);
+  const [profileImage, setProfileImage] = useState(doctorProfile.image);
   const [settingsTab, setSettingsTab] = useState<'profile' | 'security' | 'billing' | 'notifications'>('profile');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -1886,10 +1965,10 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         {/* Doctor Profile */}
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <img src={DOCTOR_PROFILE.image} alt="" className="w-12 h-12 rounded-full" />
+            <img src={doctorProfile.image} alt="" className="w-12 h-12 rounded-full" />
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-slate-800 truncate">{DOCTOR_PROFILE.nameBn}</div>
-              <div className="text-xs text-slate-500">{DOCTOR_PROFILE.specialtyBn}</div>
+              <div className="font-medium text-slate-800 truncate">{doctorProfile.nameBn}</div>
+              <div className="text-xs text-slate-500">{doctorProfile.specialtyBn}</div>
             </div>
           </div>
         </div>
@@ -1920,7 +1999,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         {/* Logout */}
         <div className="p-4 border-t border-slate-200">
           <button
-            onClick={onLogout}
+            onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition"
           >
             <span className="text-xl">🚪</span>

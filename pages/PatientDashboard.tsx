@@ -6,24 +6,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth, PatientProfile } from '../contexts/AuthContext';
 
 // ============ TYPES ============
-interface HealthProfile {
-  id: string;
-  name: string;
-  nameBn: string;
-  phone: string;
-  dateOfBirth: string;
-  gender: 'male' | 'female';
-  bloodGroup: string;
-  height: number;
-  weight: number;
-  profileImage: string;
-  emergencyContact: { name: string; relation: string; phone: string };
-  allergies: string[];
-  chronicConditions: string[];
-  currentMedications: string[];
-  familyHistory: { condition: string; relation: string }[];
-}
-
 interface BodyPartHealth {
   id: string;
   name: string;
@@ -49,65 +31,14 @@ interface ConsultationRecord {
   bodyParts: string[];
 }
 
-// ============ MOCK DATA ============
-const PATIENT: HealthProfile = {
-  id: 'P-98234',
-  name: 'Rahim Uddin',
-  nameBn: 'রহিম উদ্দিন',
-  phone: '০১৭১২-৩৪৫৬৭৮',
-  dateOfBirth: '1993-05-15',
-  gender: 'male',
-  bloodGroup: 'A+',
-  height: 175,
-  weight: 72,
-  profileImage: 'https://randomuser.me/api/portraits/men/32.jpg',
-  emergencyContact: { name: 'করিম উদ্দিন', relation: 'ভাই', phone: '০১৮১২-৩৪৫৬৭৮' },
-  allergies: ['পেনিসিলিন', 'ধুলাবালি'],
-  chronicConditions: ['হালকা উচ্চ রক্তচাপ'],
-  currentMedications: ['এমলোডিপিন ৫মিগ্রা'],
-  familyHistory: [
-    { condition: 'ডায়াবেটিস', relation: 'বাবা' },
-    { condition: 'উচ্চ রক্তচাপ', relation: 'মা' },
-    { condition: 'হৃদরোগ', relation: 'দাদা' },
-  ],
-};
-
-const BODY_HEALTH: BodyPartHealth[] = [
-  { id: 'head', name: 'Head', nameBn: 'মাথা', status: 'ভালো', score: 90, issues: [] },
-  { id: 'heart', name: 'Heart', nameBn: 'হৃদযন্ত্র', status: 'সতর্ক', score: 78, issues: ['হালকা উচ্চ রক্তচাপ'], lastDoctor: 'ডা. আবুল কাশেম', lastDate: '২০ নভেম্বর ২০২৪' },
-  { id: 'lungs', name: 'Lungs', nameBn: 'ফুসফুস', status: 'ভালো', score: 88, issues: [] },
-  { id: 'stomach', name: 'Stomach', nameBn: 'পেট', status: 'ভালো', score: 85, issues: [] },
-  { id: 'skin', name: 'Skin', nameBn: 'ত্বক', status: 'সতর্ক', score: 75, issues: ['এলার্জি'], lastDoctor: 'ডা. সারা রহমান', lastDate: '১৫ সেপ্টেম্বর ২০২৪' },
-  { id: 'bones', name: 'Bones', nameBn: 'হাড়', status: 'ভালো', score: 82, issues: [] },
-];
-
-const CONSULTATIONS: ConsultationRecord[] = [
-  {
-    id: 'c1',
-    date: '2024-11-20',
-    doctorId: 'd1',
-    doctorName: 'ডা. আবুল কাশেম',
-    doctorImage: 'https://randomuser.me/api/portraits/men/85.jpg',
-    specialty: 'Cardiology',
-    specialtyBn: 'হৃদরোগ বিশেষজ্ঞ',
-    diagnosis: 'Controlled Hypertension',
-    diagnosisBn: 'নিয়ন্ত্রিত উচ্চ রক্তচাপ',
-    prescription: [{ medicine: 'এমলোডিপিন ৫মিগ্রা', dosage: '০+০+১', duration: '৯০ দিন', instruction: 'রাতে খাবারের পর' }],
-    bodyParts: ['heart'],
-  },
-  {
-    id: 'c2',
-    date: '2024-09-15',
-    doctorId: 'd2',
-    doctorName: 'ডা. সারা রহমান',
-    doctorImage: 'https://randomuser.me/api/portraits/women/65.jpg',
-    specialty: 'Dermatology',
-    specialtyBn: 'চর্মরোগ বিশেষজ্ঞ',
-    diagnosis: 'Contact Dermatitis',
-    diagnosisBn: 'ত্বকের এলার্জি',
-    prescription: [{ medicine: 'বেটনোভেট-এন ক্রিম', dosage: 'দিনে ২ বার', duration: '১৪ দিন', instruction: 'আক্রান্ত স্থানে' }],
-    bodyParts: ['skin'],
-  },
+// ============ DEFAULT BODY HEALTH (New user starts fresh) ============
+const DEFAULT_BODY_HEALTH: BodyPartHealth[] = [
+  { id: 'head', name: 'Head', nameBn: 'মাথা', status: 'ভালো', score: 100, issues: [] },
+  { id: 'heart', name: 'Heart', nameBn: 'হৃদযন্ত্র', status: 'ভালো', score: 100, issues: [] },
+  { id: 'lungs', name: 'Lungs', nameBn: 'ফুসফুস', status: 'ভালো', score: 100, issues: [] },
+  { id: 'stomach', name: 'Stomach', nameBn: 'পেট', status: 'ভালো', score: 100, issues: [] },
+  { id: 'skin', name: 'Skin', nameBn: 'ত্বক', status: 'ভালো', score: 100, issues: [] },
+  { id: 'bones', name: 'Bones', nameBn: 'হাড়', status: 'ভালো', score: 100, issues: [] },
 ];
 
 // ============ BODY VISUALIZATION ============
@@ -215,7 +146,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
     return null;
   }
   
-  // Use real user data - NO FALLBACK TO DEMO DATA
+  // Use real user data - NO DEMO DATA
   const patientData = {
     id: user.id,
     name: user.name,
@@ -232,21 +163,23 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
     chronicConditions: (user as PatientProfile).chronicConditions || [],
     currentMedications: (user as PatientProfile).currentMedications || [],
     familyHistory: (user as PatientProfile).familyHistory || [],
-    healthScore: (user as PatientProfile).healthScore || 50,
+    healthScore: (user as PatientProfile).healthScore || 100,
     credits: (user as PatientProfile).credits || 0,
     badges: (user as PatientProfile).badges || [],
     streak: (user as PatientProfile).streak || 0,
     subscription: (user as PatientProfile).subscription || { tier: 'free', features: [] },
   };
   
+  // State for real user - starts fresh
   const [activeTab, setActiveTab] = useState<'home' | 'doctors' | 'chat' | 'profile'>('home');
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'model', text: `আসসালামু আলাইকুম ${patientData.nameBn}! 👋\n\nআমি নির্ণয় - আপনার স্বাস্থ্য সহকারী।\n\n📊 সারসংক্ষেপ:\n• সামগ্রিক: ভালো ✅\n• হৃদযন্ত্র: নজরদারি ⚠️\n\nকোথাও সমস্যা হচ্ছে? 🩺`, timestamp: Date.now() }
+    { role: 'model', text: `আসসালামু আলাইকুম ${patientData.nameBn}! 👋\n\nআমি নির্ণয় - আপনার স্বাস্থ্য সহকারী।\n\n🎉 স্বাগতম! আপনার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে।\n\nকোনো স্বাস্থ্য সমস্যা থাকলে জানান। 🩺`, timestamp: Date.now() }
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
-  const [bodyHealth, setBodyHealth] = useState<BodyPartHealth[]>(BODY_HEALTH);
+  const [bodyHealth, setBodyHealth] = useState<BodyPartHealth[]>(DEFAULT_BODY_HEALTH);
+  const [consultations, setConsultations] = useState<ConsultationRecord[]>([]); // Empty - real consultations will come from backend
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const overallScore = useMemo(() => Math.round(bodyHealth.reduce((sum, p) => sum + p.score, 0) / bodyHealth.length), [bodyHealth]);
@@ -254,14 +187,14 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  const buildContext = () => `রোগী: ${patientData.nameBn}, ${age} বছর\nসমস্যা: ${patientData.chronicConditions.join(', ')}\nপরিবার: ${patientData.familyHistory.map(h => `${h.relation}-${h.condition}`).join(', ')}\nনির্দেশ: সহজ বাংলায় উত্তর দিন।`;
+  const buildContext = () => `রোগী: ${patientData.nameBn}, ${age} বছর\nসমস্যা: ${patientData.chronicConditions.length > 0 ? patientData.chronicConditions.join(', ') : 'কোনো সমস্যা নেই'}\nপরিবার: ${patientData.familyHistory.length > 0 ? patientData.familyHistory.map(h => h.relation + '-' + h.condition).join(', ') : 'কোনো তথ্য নেই'}\nনির্দেশ: সহজ বাংলায় উত্তর দিন।`;
 
   const handleBodyPartClick = (partId: string) => {
     setSelectedBodyPart(partId);
     const part = bodyHealth.find(p => p.id === partId);
     if (part) {
-      let msg = `📍 **${part.nameBn}**\n\n${part.status === 'ভালো' ? '✅ ভালো আছে' : `⚠️ ${part.issues.join(', ')}`}`;
-      if (part.lastDoctor) msg += `\n\n🩺 ${part.lastDoctor} (${part.lastDate})`;
+      let msg = `📍 **${part.nameBn}**\n\n${part.status === 'ভালো' ? '✅ ভালো আছে' : '⚠️ ' + part.issues.join(', ')}`;
+      if (part.lastDoctor) msg += '\n\n🩺 ' + part.lastDoctor + ' (' + part.lastDate + ')';
       setMessages(prev => [...prev, { role: 'model', text: msg, timestamp: Date.now() }]);
       setActiveTab('chat');
     }
@@ -273,12 +206,18 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
     setChatInput('');
     setIsTyping(true);
     try {
-      const resp = await chatWithHealthAssistant(`${buildContext()}\n\nবার্তা: "${chatInput}"`, messages.map(m => m.text), '');
+      const resp = await chatWithHealthAssistant(buildContext() + '\n\nবার্তা: "' + chatInput + '"', messages.map(m => m.text), '');
       setMessages(prev => [...prev, { role: 'model', text: resp, timestamp: Date.now() }]);
     } catch {
       setMessages(prev => [...prev, { role: 'model', text: 'দুঃখিত, সমস্যা হয়েছে। 🙏', timestamp: Date.now() }]);
     }
     setIsTyping(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    if (onLogout) onLogout();
+    navigate('/');
   };
 
   const tabs = [
@@ -302,7 +241,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
-          {[{ v: overallScore, l: 'স্কোর' }, { v: CONSULTATIONS.length, l: 'পরামর্শ' }, { v: bodyHealth.filter(p => p.status === 'ভালো').length, l: 'ভালো' }].map((s, i) => (
+          {[{ v: overallScore, l: 'স্কোর' }, { v: consultations.length, l: 'পরামর্শ' }, { v: bodyHealth.filter(p => p.status === 'ভালো').length, l: 'ভালো' }].map((s, i) => (
             <div key={i} className="bg-white/15 rounded-xl p-2 text-center">
               <p className="text-xl font-bold">{s.v}</p>
               <p className="text-xs text-white/70">{s.l}</p>
@@ -322,17 +261,28 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
         </div>
       </div>
 
-      {/* Alerts */}
-      <div className="space-y-3">
+      {/* Alerts - Only show if user has data */}
+      {patientData.familyHistory.length > 0 && (
         <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 flex items-start gap-3">
           <span className="text-xl">👨‍👩‍👧‍👦</span>
-          <div><h3 className="font-bold text-purple-900 text-sm">পারিবারিক ইতিহাস</h3><p className="text-xs text-purple-700 mt-1">{patientData.familyHistory.map(h => `${h.relation}: ${h.condition}`).join(' • ')}</p></div>
+          <div><h3 className="font-bold text-purple-900 text-sm">পারিবারিক ইতিহাস</h3><p className="text-xs text-purple-700 mt-1">{patientData.familyHistory.map(h => h.relation + ': ' + h.condition).join(' • ')}</p></div>
         </div>
+      )}
+      
+      {patientData.currentMedications.length > 0 && (
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
           <span className="text-xl">💊</span>
           <div><h3 className="font-bold text-blue-900 text-sm">বর্তমান ওষুধ</h3><p className="text-xs text-blue-700 mt-1">{patientData.currentMedications.join(', ')}</p></div>
         </div>
-      </div>
+      )}
+
+      {/* Welcome message for new users */}
+      {consultations.length === 0 && (
+        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-xl p-4">
+          <h3 className="font-bold text-teal-800 text-sm mb-2">🎉 স্বাগতম!</h3>
+          <p className="text-xs text-teal-700">আপনার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে। এখন আপনি ডাক্তার খুঁজতে পারবেন এবং AI সহকারীর সাথে কথা বলতে পারবেন।</p>
+        </div>
+      )}
 
       <button onClick={() => setActiveTab('chat')} className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
         🤖 নির্ণয় AI এর সাথে কথা বলুন
@@ -343,16 +293,26 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
   const renderDoctors = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between"><h2 className="font-bold text-slate-800">আমার ডাক্তারগণ</h2><button onClick={() => navigate('/search')} className="text-sm text-teal-600 font-bold">+ নতুন</button></div>
-      {CONSULTATIONS.map((c) => (
-        <div key={c.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-          <div className="flex items-center gap-3 mb-3">
-            <img src={c.doctorImage} alt="" className="w-12 h-12 rounded-xl" />
-            <div className="flex-1"><h3 className="font-bold text-slate-800">{c.doctorName}</h3><p className="text-sm text-slate-500">{c.specialtyBn}</p></div>
-          </div>
-          <div className="bg-slate-50 rounded-lg p-3 mb-3 text-sm"><strong>রোগ:</strong> {c.diagnosisBn}</div>
-          <button onClick={() => navigate(`/doctors/${c.doctorId}`)} className="w-full py-2 bg-teal-500 text-white rounded-lg font-medium text-sm">আবার বুক করুন</button>
+      
+      {consultations.length === 0 ? (
+        <div className="bg-white rounded-xl p-8 shadow-sm border border-slate-100 text-center">
+          <div className="text-4xl mb-4">👨‍⚕️</div>
+          <h3 className="font-bold text-slate-800 mb-2">এখনো কোনো ডাক্তার নেই</h3>
+          <p className="text-sm text-slate-500 mb-4">আপনি এখনো কোনো ডাক্তারের কাছে যাননি। নতুন অ্যাপয়েন্টমেন্ট নিন।</p>
+          <button onClick={() => navigate('/search')} className="px-6 py-3 bg-teal-500 text-white rounded-xl font-bold">ডাক্তার খুঁজুন</button>
         </div>
-      ))}
+      ) : (
+        consultations.map((c) => (
+          <div key={c.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 mb-3">
+              <img src={c.doctorImage} alt="" className="w-12 h-12 rounded-xl" />
+              <div className="flex-1"><h3 className="font-bold text-slate-800">{c.doctorName}</h3><p className="text-sm text-slate-500">{c.specialtyBn}</p></div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 mb-3 text-sm"><strong>রোগ:</strong> {c.diagnosisBn}</div>
+            <button onClick={() => navigate('/doctors/' + c.doctorId)} className="w-full py-2 bg-teal-500 text-white rounded-lg font-medium text-sm">আবার বুক করুন</button>
+          </div>
+        ))
+      )}
     </div>
   );
 
@@ -396,14 +356,21 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
         </div>
       </div>
       <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 space-y-3">
-        {[{ l: 'ফোন', v: patientData.phone }, { l: 'উচ্চতা', v: `${patientData.height} সেমি` }, { l: 'ওজন', v: `${patientData.weight} কেজি` }].map((r, i) => (
+        {[{ l: 'ফোন', v: patientData.phone }, { l: 'উচ্চতা', v: patientData.height + ' সেমি' }, { l: 'ওজন', v: patientData.weight + ' কেজি' }].map((r, i) => (
           <div key={i} className="flex justify-between text-sm"><span className="text-slate-500">{r.l}</span><span className="font-medium">{r.v}</span></div>
         ))}
       </div>
-      <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-        <h3 className="font-bold text-red-800 text-sm mb-2">⚠️ এলার্জি</h3>
-        <div className="flex gap-2">{patientData.allergies.map((a, i) => <span key={i} className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">{a}</span>)}</div>
-      </div>
+      {patientData.allergies.length > 0 && (
+        <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+          <h3 className="font-bold text-red-800 text-sm mb-2">⚠️ এলার্জি</h3>
+          <div className="flex gap-2 flex-wrap">{patientData.allergies.map((a, i) => <span key={i} className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">{a}</span>)}</div>
+        </div>
+      )}
+      
+      {/* Logout button */}
+      <button onClick={handleLogout} className="w-full py-3 bg-red-500 text-white rounded-xl font-bold mt-4">
+        লগআউট
+      </button>
     </div>
   );
 
@@ -420,7 +387,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
         </div>
         <div className="p-4 mx-4 mt-4 bg-gradient-to-r from-teal-50 to-emerald-50 rounded-xl border border-teal-100">
           <div className="flex justify-between items-center"><span className="text-xs font-bold text-teal-700">স্বাস্থ্য স্কোর</span><span className="text-2xl font-bold text-teal-600">{overallScore}</span></div>
-          <div className="mt-2 h-2 bg-teal-200 rounded-full"><div className="h-full bg-teal-500 rounded-full" style={{ width: `${overallScore}%` }}></div></div>
+          <div className="mt-2 h-2 bg-teal-200 rounded-full"><div className="h-full bg-teal-500 rounded-full" style={{ width: overallScore + '%' }}></div></div>
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {tabs.map((t) => (
@@ -430,7 +397,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
           ))}
         </nav>
         <div className="p-4 border-t border-slate-100">
-          <button onClick={() => { onLogout?.(); navigate('/'); }} className="w-full text-left px-4 py-2 text-sm text-slate-500 hover:text-slate-700 flex items-center gap-2"><i className="fas fa-sign-out-alt"></i>লগআউট</button>
+          <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:text-red-700 flex items-center gap-2"><i className="fas fa-sign-out-alt"></i>লগআউট</button>
         </div>
       </div>
 
