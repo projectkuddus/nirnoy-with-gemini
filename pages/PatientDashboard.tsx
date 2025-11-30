@@ -1,7 +1,6 @@
 /**
  * NIRNOY PATIENT DASHBOARD - PRODUCTION READY
- * Clean UI with 60-30-10 color rule
- * Data persists forever - migrations only, no deletions
+ * Clean UI, Conversational AI, Data persists forever
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -10,42 +9,19 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth, PatientProfile } from '../contexts/AuthContext';
 import { saveFeedback } from '../components/FeedbackWidget';
 
-// ============ TYPES ============
-interface QuizQuestion {
-  id: string;
-  question: string;
-  questionBn: string;
-  options: { text: string; textBn: string; points: number }[];
-}
-
 // ============ SUBSCRIPTION PLANS ============
 const PLANS = [
-  { id: 'free', name: 'Free', nameBn: 'ফ্রি', price: 0, priceBn: '০', features: ['Basic AI Chat', 'View Profile', '2 Quizzes/month'], featuresBn: ['বেসিক এআই চ্যাট', 'প্রোফাইল দেখুন', 'মাসে ২টি কুইজ'] },
-  { id: 'basic', name: 'Basic', nameBn: 'বেসিক', price: 99, priceBn: '৯৯', features: ['Unlimited AI Chat', '10 Quizzes/month', 'Health Records'], featuresBn: ['আনলিমিটেড এআই চ্যাট', 'মাসে ১০টি কুইজ', 'স্বাস্থ্য রেকর্ড'] },
-  { id: 'premium', name: 'Premium', nameBn: 'প্রিমিয়াম', price: 299, priceBn: '২৯৯', features: ['Everything in Basic', 'Priority Support', 'Family Sharing (2)'], featuresBn: ['বেসিকের সব কিছু', 'অগ্রাধিকার সাপোর্ট', 'পরিবার শেয়ারিং (২)'], popular: true },
-  { id: 'family', name: 'Family', nameBn: 'ফ্যামিলি', price: 499, priceBn: '৪৯৯', features: ['Up to 5 Members', 'Dedicated Manager', 'Emergency Hotline'], featuresBn: ['৫ জন সদস্য', 'ডেডিকেটেড ম্যানেজার', 'জরুরি হটলাইন'] }
+  { id: 'free', nameBn: 'ফ্রি', price: 0, featuresBn: ['বেসিক এআই চ্যাট', 'প্রোফাইল দেখুন'] },
+  { id: 'basic', nameBn: 'বেসিক', price: 99, featuresBn: ['আনলিমিটেড এআই', 'স্বাস্থ্য রেকর্ড'] },
+  { id: 'premium', nameBn: 'প্রিমিয়াম', price: 299, featuresBn: ['সব কিছু', 'অগ্রাধিকার সাপোর্ট'], popular: true },
+  { id: 'family', nameBn: 'ফ্যামিলি', price: 499, featuresBn: ['৫ জন সদস্য', 'জরুরি হটলাইন'] }
 ];
 
-// ============ SAMPLE QUIZZES ============
-const DAILY_QUIZ: QuizQuestion[] = [
-  { id: '1', question: 'How did you sleep last night?', questionBn: 'গতরাতে কেমন ঘুম হয়েছে?', options: [
-    { text: 'Very well', textBn: 'খুব ভালো', points: 10 },
-    { text: 'Okay', textBn: 'ঠিকঠাক', points: 7 },
-    { text: 'Not good', textBn: 'ভালো না', points: 3 },
-    { text: 'Terrible', textBn: 'খুব খারাপ', points: 0 }
-  ]},
-  { id: '2', question: 'How is your energy level today?', questionBn: 'আজ আপনার এনার্জি লেভেল কেমন?', options: [
-    { text: 'High', textBn: 'উচ্চ', points: 10 },
-    { text: 'Normal', textBn: 'স্বাভাবিক', points: 7 },
-    { text: 'Low', textBn: 'কম', points: 3 },
-    { text: 'Very low', textBn: 'খুব কম', points: 0 }
-  ]},
-  { id: '3', question: 'Did you drink enough water today?', questionBn: 'আজ পর্যাপ্ত পানি পান করেছেন?', options: [
-    { text: '8+ glasses', textBn: '৮+ গ্লাস', points: 10 },
-    { text: '5-7 glasses', textBn: '৫-৭ গ্লাস', points: 7 },
-    { text: '2-4 glasses', textBn: '২-৪ গ্লাস', points: 3 },
-    { text: 'Less than 2', textBn: '২ এর কম', points: 0 }
-  ]}
+// ============ QUIZ ============
+const QUIZ = [
+  { q: 'গতরাতে কেমন ঘুম হয়েছে?', opts: [{ t: 'খুব ভালো', p: 10 }, { t: 'ঠিকঠাক', p: 7 }, { t: 'ভালো না', p: 3 }] },
+  { q: 'আজ এনার্জি কেমন?', opts: [{ t: 'উচ্চ', p: 10 }, { t: 'স্বাভাবিক', p: 7 }, { t: 'কম', p: 3 }] },
+  { q: 'পর্যাপ্ত পানি খেয়েছেন?', opts: [{ t: '৮+ গ্লাস', p: 10 }, { t: '৫-৭ গ্লাস', p: 7 }, { t: '২-৪ গ্লাস', p: 3 }] }
 ];
 
 // ============ MAIN COMPONENT ============
@@ -53,7 +29,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { user, role, logout, isLoading, updateProfile } = useAuth();
-  const isBn = language === 'bn';
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // State
   const [initDelay, setInitDelay] = useState(true);
@@ -63,430 +39,256 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
-  // Health insights from AI
-  const [healthInsights, setHealthInsights] = useState<string[]>([]);
-  
-  // Profile & Pricing
+  // Profile
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
   const [showPricing, setShowPricing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: '', email: '', dateOfBirth: '', gender: '', bloodGroup: '',
-    heightCm: '', weightKg: '', chronicConditions: '', allergies: '',
-    emergencyContactName: '', emergencyContactPhone: ''
-  });
+  const [editForm, setEditForm] = useState({ name: '', email: '', dateOfBirth: '', gender: '', bloodGroup: '', heightCm: '', weightKg: '', chronicConditions: '', allergies: '', emergencyContactName: '', emergencyContactPhone: '' });
   
-  // Quiz state
-  const [currentQuiz, setCurrentQuiz] = useState<QuizQuestion[] | null>(null);
-  const [quizIndex, setQuizIndex] = useState(0);
+  // Quiz
+  const [quizActive, setQuizActive] = useState(false);
+  const [quizIdx, setQuizIdx] = useState(0);
   const [quizScore, setQuizScore] = useState(0);
-  const [quizComplete, setQuizComplete] = useState(false);
+  const [quizDone, setQuizDone] = useState(false);
   
-  // Feedback state
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackCategory, setFeedbackCategory] = useState<'general' | 'bug' | 'feature' | 'complaint'>('general');
-  const [feedbackSent, setFeedbackSent] = useState(false);
+  // Feedback
+  const [fbText, setFbText] = useState('');
+  const [fbCat, setFbCat] = useState<'general' | 'bug' | 'feature' | 'complaint'>('general');
+  const [fbSent, setFbSent] = useState(false);
   
-  // Safe user data
-  const patientUser = useMemo(() => {
-    if (user && role === 'patient') return user as PatientProfile;
-    return null;
-  }, [user, role]);
+  const patientUser = useMemo(() => (user && role === 'patient') ? user as PatientProfile : null, [user, role]);
 
-  // Effects
-  useEffect(() => {
-    const timer = setTimeout(() => setInitDelay(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
+  useEffect(() => { setTimeout(() => setInitDelay(false), 500); }, []);
   
   useEffect(() => {
-    if (!initDelay && !isLoading && (!user || role !== 'patient')) {
-      navigate('/patient-auth', { replace: true });
-    }
+    if (!initDelay && !isLoading && (!user || role !== 'patient')) navigate('/patient-auth', { replace: true });
   }, [user, role, isLoading, initDelay, navigate]);
 
   useEffect(() => {
-    if (patientUser) {
-      setEditForm({
-        name: patientUser.name || '',
-        email: patientUser.email || '',
-        dateOfBirth: patientUser.dateOfBirth || '',
-        gender: patientUser.gender || '',
-        bloodGroup: patientUser.bloodGroup || '',
-        heightCm: patientUser.heightCm ? String(patientUser.heightCm) : '',
-        weightKg: patientUser.weightKg ? String(patientUser.weightKg) : '',
-        chronicConditions: (patientUser.chronicConditions || []).join(', '),
-        allergies: (patientUser.allergies || []).join(', '),
-        emergencyContactName: patientUser.emergencyContactName || '',
-        emergencyContactPhone: patientUser.emergencyContactPhone || ''
-      });
-    }
+    if (patientUser) setEditForm({
+      name: patientUser.name || '', email: patientUser.email || '', dateOfBirth: patientUser.dateOfBirth || '',
+      gender: patientUser.gender || '', bloodGroup: patientUser.bloodGroup || '',
+      heightCm: patientUser.heightCm ? String(patientUser.heightCm) : '', weightKg: patientUser.weightKg ? String(patientUser.weightKg) : '',
+      chronicConditions: (patientUser.chronicConditions || []).join(', '), allergies: (patientUser.allergies || []).join(', '),
+      emergencyContactName: patientUser.emergencyContactName || '', emergencyContactPhone: patientUser.emergencyContactPhone || ''
+    });
   }, [patientUser]);
 
   useEffect(() => {
     if (patientUser && messages.length === 0) {
-      setMessages([{ 
-        role: 'assistant', 
-        content: `আসসালামু আলাইকুম ${patientUser.name}! 👋\n\nআমি নির্ণয় এআই। আপনার শারীরিক সমস্যা বলুন, আমি সমস্যা চিহ্নিত করতে সাহায্য করব এবং প্রয়োজনে সঠিক ডাক্তারের কাছে যেতে বলব।\n\n⚠️ দ্রষ্টব্য: আমি কোনো ওষুধ বা প্রেসক্রিপশন দিতে পারি না। শুধুমাত্র সমস্যা বুঝতে সাহায্য করব।`
-      }]);
+      setMessages([{ role: 'assistant', content: `আসসালামু আলাইকুম ${patientUser.name}! 👋 কেমন আছেন? কোনো শারীরিক সমস্যা থাকলে বলুন।` }]);
     }
   }, [patientUser, messages.length]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  // Handlers
-  const handleLogout = () => {
-    logout();
-    if (onLogout) onLogout();
-    navigate('/', { replace: true });
-  };
+  const handleLogout = () => { logout(); onLogout?.(); navigate('/', { replace: true }); };
 
-  // BANGLA AI - No prescriptions, only identify problems
-  const handleSendMessage = async () => {
+  // Conversational AI - Short, human-like responses
+  const handleSend = async () => {
     if (!chatInput.trim() || isTyping) return;
-    
-    const userMessage = chatInput.trim();
+    const msg = chatInput.trim();
     setChatInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setMessages(prev => [...prev, { role: 'user', content: msg }]);
     setIsTyping(true);
     
-    await new Promise(r => setTimeout(r, 1500));
+    // Keep focus on input
+    setTimeout(() => inputRef.current?.focus(), 50);
     
-    const msgLower = userMessage.toLowerCase();
-    let response = '';
-    let detectedCondition = '';
+    await new Promise(r => setTimeout(r, 800 + Math.random() * 500));
     
-    if (msgLower.includes('headache') || msgLower.includes('মাথা') || msgLower.includes('ব্যথা') || msgLower.includes('মাথাব্যথা')) {
-      detectedCondition = 'মাথাব্যথা';
-      response = `${patientUser?.name}, আপনার মাথাব্যথার কথা শুনে দুঃখিত। 😔\n\n🔍 সমস্যা চিহ্নিতকরণ:\nমাথাব্যথা বিভিন্ন কারণে হতে পারে:\n• টেনশন বা স্ট্রেস\n• ঘুমের অভাব\n• পানিশূন্যতা\n• চোখের সমস্যা\n• মাইগ্রেন\n\n❓ আরো জানতে বলুন:\n• কতক্ষণ ধরে ব্যথা হচ্ছে?\n• মাথার কোন অংশে ব্যথা?\n• আগেও এরকম হয়েছে?\n\n👨‍⚕️ যদি ব্যথা তীব্র হয় বা ২-৩ দিনের বেশি থাকে, নির্ণয়ের একজন নিউরোলজিস্ট দেখান।\n\n📝 আপনার প্রোফাইলে "মাথাব্যথা" যোগ করা হয়েছে।`;
-    } else if (msgLower.includes('fever') || msgLower.includes('জ্বর') || msgLower.includes('তাপ')) {
-      detectedCondition = 'জ্বর';
-      response = `${patientUser?.name}, জ্বরের কথা জানালেন। 🤒\n\n🔍 সমস্যা চিহ্নিতকরণ:\nজ্বর সাধারণত শরীরের প্রতিরক্ষা ব্যবস্থার অংশ। কারণ হতে পারে:\n• ভাইরাল ইনফেকশন\n• ব্যাকটেরিয়াল ইনফেকশন\n• সর্দি-কাশি\n• ডেঙ্গু (মশার কামড় থাকলে)\n\n❓ আরো জানতে বলুন:\n• কত ডিগ্রি জ্বর?\n• কতদিন ধরে?\n• অন্য কোনো লক্ষণ আছে?\n\n👨‍⚕️ ১০২°F এর বেশি হলে বা ৩ দিনের বেশি থাকলে নির্ণয়ের মেডিসিন বিশেষজ্ঞ দেখান।\n\n📝 আপনার প্রোফাইলে "জ্বর" যোগ করা হয়েছে।`;
-    } else if (msgLower.includes('stomach') || msgLower.includes('পেট') || msgLower.includes('বমি') || msgLower.includes('ডায়রিয়া')) {
-      detectedCondition = 'পেটের সমস্যা';
-      response = `${patientUser?.name}, পেটের সমস্যার কথা বললেন। 😣\n\n🔍 সমস্যা চিহ্নিতকরণ:\nপেটের সমস্যার কারণ হতে পারে:\n• খাবারে সমস্যা\n• গ্যাস্ট্রিক\n• ফুড পয়জনিং\n• ইনফেকশন\n\n❓ আরো জানতে বলুন:\n• ব্যথা কোথায়?\n• বমি বা ডায়রিয়া আছে?\n• কি খেয়েছিলেন?\n\n👨‍⚕️ রক্ত গেলে বা তীব্র ব্যথা হলে জরুরি ভিত্তিতে নির্ণয়ের গ্যাস্ট্রোএন্টেরোলজিস্ট দেখান।\n\n📝 আপনার প্রোফাইলে "পেটের সমস্যা" যোগ করা হয়েছে।`;
-    } else if (msgLower.includes('cold') || msgLower.includes('সর্দি') || msgLower.includes('কাশি') || msgLower.includes('cough')) {
-      detectedCondition = 'সর্দি-কাশি';
-      response = `${patientUser?.name}, সর্দি-কাশির কথা বললেন। 🤧\n\n🔍 সমস্যা চিহ্নিতকরণ:\nসর্দি-কাশি সাধারণত ভাইরাল ইনফেকশন। লক্ষণ:\n• নাক দিয়ে পানি পড়া\n• গলা ব্যথা\n• হাঁচি\n• কাশি\n\n❓ আরো জানতে বলুন:\n• কতদিন ধরে?\n• জ্বর আছে?\n• শ্বাসকষ্ট আছে?\n\n👨‍⚕️ শ্বাসকষ্ট হলে বা ৭ দিনের বেশি থাকলে নির্ণয়ের ENT বা মেডিসিন বিশেষজ্ঞ দেখান।\n\n📝 আপনার প্রোফাইলে "সর্দি-কাশি" যোগ করা হয়েছে।`;
-    } else if (msgLower.includes('doctor') || msgLower.includes('ডাক্তার') || msgLower.includes('অ্যাপয়েন্টমেন্ট')) {
-      response = `অবশ্যই ${patientUser?.name}! 👨‍⚕️\n\nনির্ণয়তে ৫০০+ বিশেষজ্ঞ ডাক্তার আছেন।\n\n📋 কিভাবে অ্যাপয়েন্টমেন্ট নিবেন:\n১. হোম পেজে যান\n২. "অ্যাপয়েন্টমেন্ট" এ ক্লিক করুন\n৩. বিশেষত্ব বা এলাকা দিয়ে খুঁজুন\n৪. সময় নির্বাচন করুন\n\nআপনার কোন ধরনের ডাক্তার দরকার? বলুন, আমি সাহায্য করি।`;
-    } else if (msgLower.includes('thank') || msgLower.includes('ধন্যবাদ') || msgLower.includes('শুকরিয়া')) {
-      response = `আপনাকেও ধন্যবাদ ${patientUser?.name}! 😊\n\nআপনার স্বাস্থ্য ভালো থাকুক। যেকোনো সমস্যায় আবার জানাবেন।\n\n💙 নির্ণয় সবসময় আপনার পাশে।`;
+    const m = msg.toLowerCase();
+    let reply = '';
+    
+    if (m.includes('মাথা') || m.includes('headache')) {
+      reply = `ওহ, মাথা ব্যথা! 😔 কতক্ষণ ধরে হচ্ছে? আর কোন পাশে বেশি - সামনে, পেছনে নাকি এক পাশে?`;
+    } else if (m.includes('জ্বর') || m.includes('fever')) {
+      reply = `জ্বর হয়েছে? 🤒 কত ডিগ্রি মাপলেন? সাথে সর্দি-কাশি বা গলা ব্যথা আছে?`;
+    } else if (m.includes('পেট') || m.includes('stomach')) {
+      reply = `পেটে সমস্যা? 😣 ব্যথা কোথায় - উপরে, নিচে নাকি চারপাশে? বমি বা পাতলা পায়খানা হচ্ছে?`;
+    } else if (m.includes('সর্দি') || m.includes('কাশি') || m.includes('cold')) {
+      reply = `সর্দি-কাশি হয়েছে? 🤧 কতদিন হলো? শ্বাস নিতে কষ্ট হচ্ছে কি?`;
+    } else if (m.includes('ডাক্তার') || m.includes('doctor') || m.includes('অ্যাপয়েন্টমেন্ট')) {
+      reply = `ডাক্তার দেখাতে চান? 👨‍⚕️ নির্ণয়তে অনেক ভালো ডাক্তার আছেন। হোম পেজ থেকে "অ্যাপয়েন্টমেন্ট" এ গিয়ে বুক করতে পারবেন।`;
+    } else if (m.includes('ধন্যবাদ') || m.includes('thank')) {
+      reply = `আপনাকেও ধন্যবাদ! 😊 ভালো থাকবেন। কোনো সমস্যা হলে আবার বলবেন।`;
+    } else if (m.includes('ভালো') || m.includes('good') || m.includes('fine')) {
+      reply = `ভালো শুনে খুশি হলাম! 😊 নিয়মিত পানি খাবেন, বিশ্রাম নিবেন। কোনো সমস্যা হলে জানাবেন।`;
+    } else if (m.match(/\d+/) && (m.includes('দিন') || m.includes('ঘণ্টা') || m.includes('বছর'))) {
+      reply = `বুঝলাম। এত দিন ধরে হচ্ছে তাহলে একজন ডাক্তার দেখানো ভালো হবে। নির্ণয় থেকে অ্যাপয়েন্টমেন্ট নিতে পারেন।`;
+    } else if (m.length < 10) {
+      reply = `আরেকটু বিস্তারিত বলবেন? কি সমস্যা হচ্ছে, কতদিন ধরে?`;
     } else {
-      response = `${patientUser?.name}, আপনার কথা শুনলাম। 🤔\n\nআরেকটু বিস্তারিত বলুন:\n• কোথায় সমস্যা হচ্ছে?\n• কতদিন ধরে?\n• কি ধরনের অনুভূতি?\n\nআমি সমস্যা চিহ্নিত করে সঠিক ডাক্তারের কাছে যেতে সাহায্য করব।\n\n💡 আপনি বলতে পারেন:\n• মাথা ব্যথা করছে\n• জ্বর হয়েছে\n• পেটে সমস্যা\n• সর্দি-কাশি\n• ডাক্তার দেখাতে চাই`;
+      reply = `বুঝলাম ${patientUser?.name}। আপনার সমস্যাটা শুনলাম। এটা নিয়ে একজন ডাক্তারের সাথে কথা বলা ভালো হবে। চাইলে নির্ণয় থেকে অ্যাপয়েন্টমেন্ট নিতে পারেন।`;
     }
     
-    // Add detected condition to health insights
-    if (detectedCondition) {
-      setHealthInsights(prev => {
-        const updated = [...prev, `${new Date().toLocaleDateString('bn-BD')}: ${detectedCondition}`];
-        return updated.slice(-10); // Keep last 10
-      });
-    }
-    
-    setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     setIsTyping(false);
   };
 
   const handleSaveProfile = async () => {
     if (!patientUser || !updateProfile) return;
     setSaving(true);
-    setSaveMessage('');
-    
-    try {
-      const updates: Partial<PatientProfile> = {
-        name: editForm.name,
-        email: editForm.email || undefined,
-        dateOfBirth: editForm.dateOfBirth || undefined,
-        gender: editForm.gender as any || undefined,
-        bloodGroup: editForm.bloodGroup || undefined,
-        heightCm: editForm.heightCm ? parseInt(editForm.heightCm) : undefined,
-        weightKg: editForm.weightKg ? parseFloat(editForm.weightKg) : undefined,
-        chronicConditions: editForm.chronicConditions ? editForm.chronicConditions.split(',').map(s => s.trim()).filter(Boolean) : [],
-        allergies: editForm.allergies ? editForm.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
-        emergencyContactName: editForm.emergencyContactName || undefined,
-        emergencyContactPhone: editForm.emergencyContactPhone || undefined
-      };
-      
-      const success = await updateProfile(updates);
-      if (success) {
-        setSaveMessage('✓ সংরক্ষিত');
-        setIsEditing(false);
-      } else {
-        setSaveMessage('✗ ব্যর্থ');
-      }
-    } catch (e) {
-      setSaveMessage('✗ ত্রুটি');
-    }
-    
+    const success = await updateProfile({
+      name: editForm.name, email: editForm.email || undefined, dateOfBirth: editForm.dateOfBirth || undefined,
+      gender: editForm.gender as any || undefined, bloodGroup: editForm.bloodGroup || undefined,
+      heightCm: editForm.heightCm ? parseInt(editForm.heightCm) : undefined,
+      weightKg: editForm.weightKg ? parseFloat(editForm.weightKg) : undefined,
+      chronicConditions: editForm.chronicConditions ? editForm.chronicConditions.split(',').map(s => s.trim()).filter(Boolean) : [],
+      allergies: editForm.allergies ? editForm.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
+      emergencyContactName: editForm.emergencyContactName || undefined,
+      emergencyContactPhone: editForm.emergencyContactPhone || undefined
+    });
+    setSaveMsg(success ? '✓' : '✗');
+    if (success) setIsEditing(false);
     setSaving(false);
-    setTimeout(() => setSaveMessage(''), 3000);
-  };
-
-  const startQuiz = () => {
-    setCurrentQuiz(DAILY_QUIZ);
-    setQuizIndex(0);
-    setQuizScore(0);
-    setQuizComplete(false);
-  };
-
-  const answerQuiz = (points: number) => {
-    setQuizScore(prev => prev + points);
-    if (quizIndex < DAILY_QUIZ.length - 1) {
-      setQuizIndex(prev => prev + 1);
-    } else {
-      setQuizComplete(true);
-    }
+    setTimeout(() => setSaveMsg(''), 2000);
   };
 
   const submitFeedback = () => {
-    if (!feedbackText.trim() || !patientUser) return;
-    
-    // Use the proper saveFeedback function from FeedbackWidget
+    if (!fbText.trim() || !patientUser) return;
     saveFeedback({
-      id: Date.now().toString(),
-      type: feedbackCategory,
-      mood: 'neutral',
-      message: feedbackText,
-      page: '/patient-dashboard',
-      userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString(),
-      userId: patientUser.id,
-      userRole: 'patient',
-      userName: patientUser.name,
-      status: 'new'
+      id: Date.now().toString(), type: fbCat, mood: 'neutral', message: fbText,
+      page: '/patient-dashboard', userAgent: navigator.userAgent, timestamp: new Date().toISOString(),
+      userId: patientUser.id, userRole: 'patient', userName: patientUser.name, status: 'new'
     });
-    
-    setFeedbackSent(true);
-    setFeedbackText('');
-    setTimeout(() => setFeedbackSent(false), 3000);
+    setFbSent(true);
+    setFbText('');
+    setTimeout(() => setFbSent(false), 3000);
   };
 
-  // Loading
-  if (isLoading || initDelay) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">লোড হচ্ছে...</p>
-        </div>
-      </div>
-    );
+  if (isLoading || initDelay || !patientUser) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>;
   }
 
-  if (!patientUser) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">লগইন পেজে যাচ্ছে...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ============ RENDER ============
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-blue-600">নির্ণয়</span>
-            <span className="bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-xs font-medium">
-              {(patientUser.subscriptionTier || 'free').toUpperCase()}
-            </span>
-          </Link>
+      <header className="bg-white border-b sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link to="/" className="text-xl font-bold text-blue-600">নির্ণয়</Link>
           <div className="flex items-center gap-3">
-            <span className="text-gray-700 text-sm hidden sm:block">{patientUser.name}</span>
-            <button onClick={handleLogout} className="text-red-500 hover:text-red-600 text-sm font-medium">
-              লগআউট
-            </button>
+            <span className="text-sm text-gray-600">{patientUser.name}</span>
+            <button onClick={handleLogout} className="text-red-500 text-sm">লগআউট</button>
           </div>
         </div>
       </header>
 
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex gap-4 overflow-x-auto">
-            {[
-              { id: 'home', icon: '🏠', label: 'হোম' },
-              { id: 'ai', icon: '🤖', label: 'এআই সহকারী' },
-              { id: 'quiz', icon: '🎯', label: 'কুইজ' },
-              { id: 'feedback', icon: '💬', label: 'মতামত' },
-              { id: 'profile', icon: '👤', label: 'প্রোফাইল' },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={'py-3 px-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ' + (
-                  activeTab === tab.id 
-                    ? 'border-blue-500 text-blue-600' 
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                )}
-              >
-                <span className="mr-1">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* Nav */}
+      <nav className="bg-white border-b">
+        <div className="max-w-5xl mx-auto px-4 flex gap-4">
+          {[
+            { id: 'home', icon: '🏠', label: 'হোম' },
+            { id: 'ai', icon: '🤖', label: 'এআই' },
+            { id: 'quiz', icon: '🎯', label: 'কুইজ' },
+            { id: 'feedback', icon: '💬', label: 'মতামত' },
+            { id: 'profile', icon: '👤', label: 'প্রোফাইল' },
+          ].map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id as any)}
+              className={`py-3 px-1 text-sm border-b-2 ${activeTab === t.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>
+              {t.icon} {t.label}
+            </button>
+          ))}
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6">
-        
-        {/* HOME TAB */}
+      <main className="max-w-5xl mx-auto px-4 py-5">
+        {/* HOME */}
         {activeTab === 'home' && (
-          <div className="space-y-6">
-            <div className="bg-blue-600 rounded-xl p-6 text-white">
-              <h1 className="text-xl font-semibold mb-1">স্বাগতম, {patientUser.name}!</h1>
+          <div className="space-y-5">
+            <div className="bg-blue-600 rounded-xl p-5 text-white">
+              <h1 className="text-lg font-semibold">স্বাগতম, {patientUser.name}!</h1>
               <p className="text-blue-100 text-sm">আপনার স্বাস্থ্য ড্যাশবোর্ড</p>
             </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { icon: '❤️', value: patientUser.healthScore || 85, label: 'স্বাস্থ্য স্কোর' },
-                { icon: '🏆', value: patientUser.quizPoints || 0, label: 'পয়েন্ট' },
-                { icon: '🔥', value: patientUser.streakDays || 0, label: 'স্ট্রিক' },
-                { icon: '📅', value: 0, label: 'অ্যাপয়েন্টমেন্ট' },
-              ].map((stat, i) => (
-                <div key={i} className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="text-2xl mb-1">{stat.icon}</div>
-                  <div className="text-2xl font-bold text-gray-800">{stat.value}</div>
-                  <div className="text-xs text-gray-500">{stat.label}</div>
+            <div className="grid grid-cols-4 gap-3">
+              {[{ i: '❤️', v: 85, l: 'স্কোর' }, { i: '🏆', v: patientUser.quizPoints || 0, l: 'পয়েন্ট' }, { i: '🔥', v: 0, l: 'স্ট্রিক' }, { i: '📅', v: 0, l: 'অ্যাপয়েন্টমেন্ট' }].map((s, i) => (
+                <div key={i} className="bg-white rounded-lg p-3 border text-center">
+                  <div className="text-xl">{s.i}</div>
+                  <div className="text-xl font-bold">{s.v}</div>
+                  <div className="text-xs text-gray-500">{s.l}</div>
                 </div>
               ))}
             </div>
-
-            {/* Health Insights */}
-            {healthInsights.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-5">
-                <h2 className="font-semibold text-gray-800 mb-3">📋 সাম্প্রতিক স্বাস্থ্য সমস্যা</h2>
-                <div className="space-y-2">
-                  {healthInsights.map((insight, i) => (
-                    <div key={i} className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded">{insight}</div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <h2 className="font-semibold text-gray-800 mb-4">দ্রুত অ্যাকশন</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <button onClick={() => setActiveTab('ai')} className="p-4 bg-gray-50 hover:bg-blue-50 rounded-lg text-center transition-colors">
-                  <span className="text-2xl block mb-1">🤖</span>
-                  <span className="text-xs text-gray-600">এআই সহকারী</span>
+            <div className="bg-white rounded-lg border p-4">
+              <div className="grid grid-cols-4 gap-2">
+                <button onClick={() => setActiveTab('ai')} className="p-3 bg-gray-50 hover:bg-blue-50 rounded-lg text-center">
+                  <span className="text-xl block">🤖</span><span className="text-xs">এআই</span>
                 </button>
-                <Link to="/my-appointments" className="p-4 bg-gray-50 hover:bg-blue-50 rounded-lg text-center transition-colors">
-                  <span className="text-2xl block mb-1">📅</span>
-                  <span className="text-xs text-gray-600">অ্যাপয়েন্টমেন্ট</span>
+                <Link to="/my-appointments" className="p-3 bg-gray-50 hover:bg-blue-50 rounded-lg text-center">
+                  <span className="text-xl block">📅</span><span className="text-xs">অ্যাপয়েন্টমেন্ট</span>
                 </Link>
-                <button onClick={() => setActiveTab('quiz')} className="p-4 bg-gray-50 hover:bg-blue-50 rounded-lg text-center transition-colors">
-                  <span className="text-2xl block mb-1">🎯</span>
-                  <span className="text-xs text-gray-600">কুইজ খেলুন</span>
+                <button onClick={() => setActiveTab('quiz')} className="p-3 bg-gray-50 hover:bg-blue-50 rounded-lg text-center">
+                  <span className="text-xl block">🎯</span><span className="text-xs">কুইজ</span>
                 </button>
-                <button onClick={() => setActiveTab('feedback')} className="p-4 bg-gray-50 hover:bg-blue-50 rounded-lg text-center transition-colors">
-                  <span className="text-2xl block mb-1">💬</span>
-                  <span className="text-xs text-gray-600">মতামত দিন</span>
+                <button onClick={() => setActiveTab('feedback')} className="p-3 bg-gray-50 hover:bg-blue-50 rounded-lg text-center">
+                  <span className="text-xl block">💬</span><span className="text-xs">মতামত</span>
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* AI ASSISTANT TAB */}
+        {/* AI */}
         {activeTab === 'ai' && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden h-[calc(100vh-200px)] flex flex-col">
-            <div className="bg-blue-600 p-4 text-white">
-              <h2 className="font-semibold">🤖 নির্ণয় এআই সহকারী</h2>
-              <p className="text-sm text-blue-100">সমস্যা বলুন, সমাধান খুঁজি (ওষুধ দিতে পারব না)</p>
+          <div className="bg-white rounded-lg border overflow-hidden h-[calc(100vh-180px)] flex flex-col">
+            <div className="bg-blue-600 p-3 text-white">
+              <div className="font-semibold">🤖 নির্ণয় এআই</div>
+              <div className="text-xs text-blue-100">সমস্যা বলুন (ওষুধ দিতে পারব না)</div>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.map((msg, i) => (
-                <div key={i} className={'flex ' + (msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                  <div className={'max-w-[85%] p-3 rounded-lg text-sm ' + (
-                    msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
-                  )} style={{ whiteSpace: 'pre-wrap' }}>
-                    {msg.content}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {messages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] p-2.5 rounded-lg text-sm ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`} style={{ whiteSpace: 'pre-wrap' }}>
+                    {m.content}
                   </div>
                 </div>
               ))}
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-gray-100 text-gray-800 p-3 rounded-lg text-sm">
-                    <span className="animate-pulse">●●●</span>
-                  </div>
-                </div>
-              )}
+              {isTyping && <div className="flex justify-start"><div className="bg-gray-100 p-2.5 rounded-lg text-sm animate-pulse">●●●</div></div>}
               <div ref={chatEndRef} />
             </div>
-            
-            <div className="border-t border-gray-200 p-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="আপনার সমস্যা লিখুন..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  disabled={isTyping}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={isTyping || !chatInput.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-5 py-2 rounded-lg text-sm font-medium"
-                >
-                  পাঠান
-                </button>
-              </div>
+            <div className="border-t p-3 flex gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSend()}
+                placeholder="আপনার সমস্যা লিখুন..."
+                className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                disabled={isTyping}
+                autoFocus
+              />
+              <button onClick={handleSend} disabled={isTyping || !chatInput.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:bg-gray-300">পাঠান</button>
             </div>
           </div>
         )}
 
-        {/* QUIZ TAB */}
+        {/* QUIZ */}
         {activeTab === 'quiz' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">🎯 স্বাস্থ্য কুইজ</h2>
-            
-            {!currentQuiz ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-                <div className="text-5xl mb-4">🎯</div>
-                <h3 className="font-semibold text-gray-800 mb-2">দৈনিক স্বাস্থ্য কুইজ</h3>
-                <p className="text-gray-500 text-sm mb-4">আপনার স্বাস্থ্য সম্পর্কে জানুন এবং পয়েন্ট অর্জন করুন</p>
-                <button onClick={startQuiz} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium">
-                  কুইজ শুরু করুন
-                </button>
+          <div className="bg-white rounded-lg border p-5">
+            {!quizActive ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-3">🎯</div>
+                <h3 className="font-semibold mb-2">দৈনিক স্বাস্থ্য কুইজ</h3>
+                <p className="text-gray-500 text-sm mb-4">পয়েন্ট অর্জন করুন</p>
+                <button onClick={() => { setQuizActive(true); setQuizIdx(0); setQuizScore(0); setQuizDone(false); }} className="bg-blue-600 text-white px-5 py-2 rounded-lg">শুরু করুন</button>
               </div>
-            ) : quizComplete ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
-                <div className="text-5xl mb-4">🎉</div>
-                <h3 className="font-semibold text-gray-800 mb-2">কুইজ সম্পন্ন!</h3>
-                <p className="text-3xl font-bold text-blue-600 mb-2">{quizScore}/{DAILY_QUIZ.length * 10}</p>
-                <p className="text-gray-500 text-sm mb-4">পয়েন্ট অর্জিত</p>
-                <button onClick={() => setCurrentQuiz(null)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium">
-                  ফিরে যান
-                </button>
+            ) : quizDone ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-3">🎉</div>
+                <h3 className="font-semibold mb-2">সম্পন্ন!</h3>
+                <p className="text-2xl font-bold text-blue-600 mb-4">{quizScore}/{QUIZ.length * 10}</p>
+                <button onClick={() => setQuizActive(false)} className="bg-gray-100 px-5 py-2 rounded-lg">ফিরে যান</button>
               </div>
             ) : (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="text-sm text-gray-500 mb-2">প্রশ্ন {quizIndex + 1}/{DAILY_QUIZ.length}</div>
-                <h3 className="font-semibold text-gray-800 mb-4">{currentQuiz[quizIndex].questionBn}</h3>
+              <div>
+                <div className="text-sm text-gray-500 mb-2">প্রশ্ন {quizIdx + 1}/{QUIZ.length}</div>
+                <h3 className="font-semibold mb-4">{QUIZ[quizIdx].q}</h3>
                 <div className="space-y-2">
-                  {currentQuiz[quizIndex].options.map((opt, i) => (
-                    <button
-                      key={i}
-                      onClick={() => answerQuiz(opt.points)}
-                      className="w-full text-left p-3 bg-gray-50 hover:bg-blue-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
-                    >
-                      {opt.textBn}
-                    </button>
+                  {QUIZ[quizIdx].opts.map((o, i) => (
+                    <button key={i} onClick={() => { setQuizScore(s => s + o.p); quizIdx < QUIZ.length - 1 ? setQuizIdx(i => i + 1) : setQuizDone(true); }}
+                      className="w-full text-left p-3 bg-gray-50 hover:bg-blue-50 rounded-lg border">{o.t}</button>
                   ))}
                 </div>
               </div>
@@ -494,88 +296,58 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           </div>
         )}
 
-        {/* FEEDBACK TAB */}
+        {/* FEEDBACK */}
         {activeTab === 'feedback' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">💬 মতামত দিন</h2>
-            
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              {feedbackSent ? (
-                <div className="text-center py-8">
-                  <div className="text-5xl mb-4">✅</div>
-                  <h3 className="font-semibold text-gray-800">ধন্যবাদ!</h3>
-                  <p className="text-gray-500 text-sm">আপনার মতামত পাঠানো হয়েছে</p>
+          <div className="bg-white rounded-lg border p-5">
+            {fbSent ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-3">✅</div>
+                <h3 className="font-semibold">ধন্যবাদ!</h3>
+                <p className="text-gray-500 text-sm">মতামত পাঠানো হয়েছে</p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <label className="text-sm text-gray-600 block mb-1">বিভাগ</label>
+                  <select value={fbCat} onChange={e => setFbCat(e.target.value as any)} className="w-full px-3 py-2 border rounded-lg text-sm">
+                    <option value="general">সাধারণ</option>
+                    <option value="bug">সমস্যা</option>
+                    <option value="feature">নতুন ফিচার</option>
+                    <option value="complaint">অভিযোগ</option>
+                  </select>
                 </div>
-              ) : (
-                <>
-                  <div className="mb-4">
-                    <label className="text-sm text-gray-600 block mb-2">বিভাগ</label>
-                    <select
-                      value={feedbackCategory}
-                      onChange={(e) => setFeedbackCategory(e.target.value as any)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    >
-                      <option value="general">সাধারণ</option>
-                      <option value="bug">সমস্যা রিপোর্ট</option>
-                      <option value="feature">নতুন ফিচার</option>
-                      <option value="complaint">অভিযোগ</option>
-                    </select>
-                  </div>
-                  <div className="mb-4">
-                    <label className="text-sm text-gray-600 block mb-2">আপনার মতামত</label>
-                    <textarea
-                      value={feedbackText}
-                      onChange={(e) => setFeedbackText(e.target.value)}
-                      placeholder="আপনার মতামত লিখুন..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-32 resize-none"
-                    />
-                  </div>
-                  <button
-                    onClick={submitFeedback}
-                    disabled={!feedbackText.trim()}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-6 py-2 rounded-lg font-medium"
-                  >
-                    পাঠান
-                  </button>
-                </>
-              )}
-            </div>
+                <div className="mb-4">
+                  <label className="text-sm text-gray-600 block mb-1">মতামত</label>
+                  <textarea value={fbText} onChange={e => setFbText(e.target.value)} placeholder="লিখুন..." className="w-full px-3 py-2 border rounded-lg text-sm h-28 resize-none" />
+                </div>
+                <button onClick={submitFeedback} disabled={!fbText.trim()} className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm disabled:bg-gray-300">পাঠান</button>
+              </>
+            )}
           </div>
         )}
 
-        {/* PROFILE TAB */}
+        {/* PROFILE */}
         {activeTab === 'profile' && (
           <div className="space-y-4">
-            {/* Pricing Section */}
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <div className="flex items-center justify-between mb-4">
+            {/* Pricing */}
+            <div className="bg-white rounded-lg border p-4">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="font-semibold text-gray-800">💎 সাবস্ক্রিপশন</h3>
-                  <p className="text-sm text-gray-500">বর্তমান প্ল্যান: <span className="font-medium text-blue-600">{(patientUser.subscriptionTier || 'free').toUpperCase()}</span></p>
+                  <h3 className="font-semibold">💎 সাবস্ক্রিপশন</h3>
+                  <p className="text-sm text-gray-500">বর্তমান: <span className="text-blue-600 font-medium">{(patientUser.subscriptionTier || 'free').toUpperCase()}</span></p>
                 </div>
-                <button onClick={() => setShowPricing(!showPricing)} className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                  {showPricing ? 'বন্ধ করুন' : 'প্ল্যান দেখুন'}
-                </button>
+                <button onClick={() => setShowPricing(!showPricing)} className="text-blue-600 text-sm">{showPricing ? 'বন্ধ' : 'প্ল্যান দেখুন'}</button>
               </div>
-              
               {showPricing && (
-                <div className="grid md:grid-cols-4 gap-3 pt-4 border-t border-gray-200">
-                  {PLANS.map(plan => (
-                    <div key={plan.id} className={'p-4 rounded-lg border-2 ' + (plan.popular ? 'border-blue-500 bg-blue-50' : 'border-gray-200')}>
-                      {plan.popular && <div className="text-xs text-blue-600 font-medium mb-1">জনপ্রিয়</div>}
-                      <div className="font-semibold text-gray-800">{plan.nameBn}</div>
-                      <div className="text-2xl font-bold text-gray-800">৳{plan.priceBn}<span className="text-sm font-normal text-gray-500">/মাস</span></div>
-                      <ul className="mt-2 space-y-1">
-                        {plan.featuresBn.map((f, i) => (
-                          <li key={i} className="text-xs text-gray-600">✓ {f}</li>
-                        ))}
-                      </ul>
-                      <button className={'w-full mt-3 py-1.5 rounded text-sm font-medium ' + (
-                        patientUser.subscriptionTier === plan.id 
-                          ? 'bg-gray-100 text-gray-500 cursor-default' 
-                          : 'bg-blue-600 hover:bg-blue-700 text-white'
-                      )}>
-                        {patientUser.subscriptionTier === plan.id ? 'বর্তমান' : 'আপগ্রেড'}
+                <div className="grid grid-cols-4 gap-2 pt-3 border-t">
+                  {PLANS.map(p => (
+                    <div key={p.id} className={`p-3 rounded-lg border-2 ${p.popular ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                      {p.popular && <div className="text-xs text-blue-600 mb-1">জনপ্রিয়</div>}
+                      <div className="font-semibold text-sm">{p.nameBn}</div>
+                      <div className="text-lg font-bold">৳{p.price}</div>
+                      <ul className="mt-1 space-y-0.5">{p.featuresBn.map((f, i) => <li key={i} className="text-xs text-gray-600">✓ {f}</li>)}</ul>
+                      <button className={`w-full mt-2 py-1 rounded text-xs ${patientUser.subscriptionTier === p.id ? 'bg-gray-100 text-gray-500' : 'bg-blue-600 text-white'}`}>
+                        {patientUser.subscriptionTier === p.id ? 'বর্তমান' : 'আপগ্রেড'}
                       </button>
                     </div>
                   ))}
@@ -583,76 +355,50 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               )}
             </div>
 
-            {/* Profile Info */}
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="font-semibold text-gray-800">👤 প্রোফাইল</h2>
+            {/* Profile */}
+            <div className="bg-white rounded-lg border p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold">👤 প্রোফাইল</h2>
                 <div className="flex items-center gap-2">
-                  {saveMessage && <span className={saveMessage.includes('✓') ? 'text-green-600 text-sm' : 'text-red-600 text-sm'}>{saveMessage}</span>}
+                  {saveMsg && <span className={saveMsg === '✓' ? 'text-green-600' : 'text-red-600'}>{saveMsg}</span>}
                   {isEditing ? (
                     <>
-                      <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded text-sm">বাতিল</button>
-                      <button onClick={handleSaveProfile} disabled={saving} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm disabled:opacity-50">
-                        {saving ? '...' : 'সংরক্ষণ'}
-                      </button>
+                      <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-gray-600 text-sm">বাতিল</button>
+                      <button onClick={handleSaveProfile} disabled={saving} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">{saving ? '...' : 'সংরক্ষণ'}</button>
                     </>
                   ) : (
-                    <button onClick={() => setIsEditing(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">সম্পাদনা</button>
+                    <button onClick={() => setIsEditing(true)} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">সম্পাদনা</button>
                   )}
                 </div>
               </div>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <h3 className="text-xs font-medium text-gray-500 uppercase">মৌলিক তথ্য</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h3 className="text-xs font-medium text-gray-500 uppercase">মৌলিক</h3>
                   {[
-                    { key: 'name', label: 'নাম', type: 'text' },
-                    { key: 'phone', label: 'ফোন', readonly: true, value: patientUser.phone },
-                    { key: 'email', label: 'ইমেইল', type: 'email' },
-                    { key: 'dateOfBirth', label: 'জন্ম তারিখ', type: 'date' },
-                    { key: 'gender', label: 'লিঙ্গ', type: 'select', options: ['', 'male', 'female', 'other'] },
-                    { key: 'bloodGroup', label: 'রক্তের গ্রুপ', type: 'select', options: ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] },
-                  ].map(field => (
-                    <div key={field.key} className="flex items-center">
-                      <label className="text-xs text-gray-500 w-24">{field.label}</label>
-                      {field.readonly ? (
-                        <span className="text-gray-800 text-sm">{field.value}</span>
-                      ) : isEditing ? (
-                        field.type === 'select' ? (
-                          <select value={(editForm as any)[field.key]} onChange={(e) => setEditForm({...editForm, [field.key]: e.target.value})} className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm">
-                            {field.options?.map(opt => <option key={opt} value={opt}>{opt || '-'}</option>)}
-                          </select>
-                        ) : (
-                          <input type={field.type} value={(editForm as any)[field.key]} onChange={(e) => setEditForm({...editForm, [field.key]: e.target.value})} className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm" />
-                        )
-                      ) : (
-                        <span className="text-gray-800 text-sm">{(patientUser as any)[field.key] || '-'}</span>
-                      )}
+                    { k: 'name', l: 'নাম' }, { k: 'phone', l: 'ফোন', ro: true, v: patientUser.phone },
+                    { k: 'email', l: 'ইমেইল' }, { k: 'dateOfBirth', l: 'জন্ম', t: 'date' },
+                    { k: 'gender', l: 'লিঙ্গ', sel: ['', 'male', 'female'] }, { k: 'bloodGroup', l: 'রক্ত', sel: ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] }
+                  ].map(f => (
+                    <div key={f.k} className="flex items-center text-sm">
+                      <span className="w-20 text-gray-500">{f.l}</span>
+                      {f.ro ? <span>{f.v}</span> : isEditing ? (
+                        f.sel ? <select value={(editForm as any)[f.k]} onChange={e => setEditForm({ ...editForm, [f.k]: e.target.value })} className="flex-1 px-2 py-1 border rounded text-sm">{f.sel.map(o => <option key={o} value={o}>{o || '-'}</option>)}</select>
+                          : <input type={f.t || 'text'} value={(editForm as any)[f.k]} onChange={e => setEditForm({ ...editForm, [f.k]: e.target.value })} className="flex-1 px-2 py-1 border rounded text-sm" />
+                      ) : <span>{(patientUser as any)[f.k] || '-'}</span>}
                     </div>
                   ))}
                 </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-xs font-medium text-gray-500 uppercase">স্বাস্থ্য তথ্য</h3>
+                <div className="space-y-2">
+                  <h3 className="text-xs font-medium text-gray-500 uppercase">স্বাস্থ্য</h3>
                   {[
-                    { key: 'heightCm', label: 'উচ্চতা', type: 'number', suffix: 'cm' },
-                    { key: 'weightKg', label: 'ওজন', type: 'number', suffix: 'kg' },
-                    { key: 'chronicConditions', label: 'রোগ', type: 'text' },
-                    { key: 'allergies', label: 'এলার্জি', type: 'text' },
-                    { key: 'emergencyContactName', label: 'জরুরি নাম', type: 'text' },
-                    { key: 'emergencyContactPhone', label: 'জরুরি ফোন', type: 'tel' },
-                  ].map(field => (
-                    <div key={field.key} className="flex items-center">
-                      <label className="text-xs text-gray-500 w-24">{field.label}</label>
-                      {isEditing ? (
-                        <input type={field.type} value={(editForm as any)[field.key]} onChange={(e) => setEditForm({...editForm, [field.key]: e.target.value})} className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm" />
-                      ) : (
-                        <span className="text-gray-800 text-sm">
-                          {field.key === 'chronicConditions' || field.key === 'allergies'
-                            ? ((patientUser as any)[field.key] || []).join(', ') || '-'
-                            : ((patientUser as any)[field.key] || '-') + (field.suffix && (patientUser as any)[field.key] ? ' ' + field.suffix : '')}
-                        </span>
-                      )}
+                    { k: 'heightCm', l: 'উচ্চতা', t: 'number' }, { k: 'weightKg', l: 'ওজন', t: 'number' },
+                    { k: 'chronicConditions', l: 'রোগ' }, { k: 'allergies', l: 'এলার্জি' },
+                    { k: 'emergencyContactName', l: 'জরুরি নাম' }, { k: 'emergencyContactPhone', l: 'জরুরি ফোন', t: 'tel' }
+                  ].map(f => (
+                    <div key={f.k} className="flex items-center text-sm">
+                      <span className="w-20 text-gray-500">{f.l}</span>
+                      {isEditing ? <input type={f.t || 'text'} value={(editForm as any)[f.k]} onChange={e => setEditForm({ ...editForm, [f.k]: e.target.value })} className="flex-1 px-2 py-1 border rounded text-sm" />
+                        : <span>{['chronicConditions', 'allergies'].includes(f.k) ? ((patientUser as any)[f.k] || []).join(', ') || '-' : (patientUser as any)[f.k] || '-'}</span>}
                     </div>
                   ))}
                 </div>
