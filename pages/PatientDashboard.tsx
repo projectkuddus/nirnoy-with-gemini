@@ -1,6 +1,6 @@
 /**
  * NIRNOY PATIENT DASHBOARD - PRODUCTION READY
- * Clean UI, Conversational AI, Data persists forever
+ * Conversational AI, Supabase backend, 1000+ users
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -9,7 +9,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth, PatientProfile } from '../contexts/AuthContext';
 import { saveFeedback } from '../components/FeedbackWidget';
 
-// ============ SUBSCRIPTION PLANS ============
 const PLANS = [
   { id: 'free', nameBn: 'ফ্রি', price: 0, featuresBn: ['বেসিক এআই চ্যাট', 'প্রোফাইল দেখুন'] },
   { id: 'basic', nameBn: 'বেসিক', price: 99, featuresBn: ['আনলিমিটেড এআই', 'স্বাস্থ্য রেকর্ড'] },
@@ -17,21 +16,18 @@ const PLANS = [
   { id: 'family', nameBn: 'ফ্যামিলি', price: 499, featuresBn: ['৫ জন সদস্য', 'জরুরি হটলাইন'] }
 ];
 
-// ============ QUIZ ============
 const QUIZ = [
   { q: 'গতরাতে কেমন ঘুম হয়েছে?', opts: [{ t: 'খুব ভালো', p: 10 }, { t: 'ঠিকঠাক', p: 7 }, { t: 'ভালো না', p: 3 }] },
   { q: 'আজ এনার্জি কেমন?', opts: [{ t: 'উচ্চ', p: 10 }, { t: 'স্বাভাবিক', p: 7 }, { t: 'কম', p: 3 }] },
   { q: 'পর্যাপ্ত পানি খেয়েছেন?', opts: [{ t: '৮+ গ্লাস', p: 10 }, { t: '৫-৭ গ্লাস', p: 7 }, { t: '২-৪ গ্লাস', p: 3 }] }
 ];
 
-// ============ MAIN COMPONENT ============
 export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { user, role, logout, isLoading, updateProfile } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   
-  // State
   const [initDelay, setInitDelay] = useState(true);
   const [activeTab, setActiveTab] = useState<'home' | 'ai' | 'quiz' | 'feedback' | 'profile'>('home');
   const [chatInput, setChatInput] = useState('');
@@ -39,20 +35,17 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
-  // Profile
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
   const [showPricing, setShowPricing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', email: '', dateOfBirth: '', gender: '', bloodGroup: '', heightCm: '', weightKg: '', chronicConditions: '', allergies: '', emergencyContactName: '', emergencyContactPhone: '' });
   
-  // Quiz
   const [quizActive, setQuizActive] = useState(false);
   const [quizIdx, setQuizIdx] = useState(0);
   const [quizScore, setQuizScore] = useState(0);
   const [quizDone, setQuizDone] = useState(false);
   
-  // Feedback
   const [fbText, setFbText] = useState('');
   const [fbCat, setFbCat] = useState<'general' | 'bug' | 'feature' | 'complaint'>('general');
   const [fbSent, setFbSent] = useState(false);
@@ -82,10 +75,13 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   }, [patientUser, messages.length]);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  
+  useEffect(() => {
+    if (activeTab === 'ai') setTimeout(() => inputRef.current?.focus(), 200);
+  }, [activeTab]);
 
   const handleLogout = () => { logout(); onLogout?.(); navigate('/', { replace: true }); };
 
-  // Conversational AI - Short, human-like responses
   const handleSend = async () => {
     if (!chatInput.trim() || isTyping) return;
     const msg = chatInput.trim();
@@ -93,38 +89,43 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     setMessages(prev => [...prev, { role: 'user', content: msg }]);
     setIsTyping(true);
     
-    // Keep focus on input
-    setTimeout(() => inputRef.current?.focus(), 50);
-    
-    await new Promise(r => setTimeout(r, 800 + Math.random() * 500));
+    await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
     
     const m = msg.toLowerCase();
     let reply = '';
     
-    if (m.includes('মাথা') || m.includes('headache')) {
-      reply = `ওহ, মাথা ব্যথা! 😔 কতক্ষণ ধরে হচ্ছে? আর কোন পাশে বেশি - সামনে, পেছনে নাকি এক পাশে?`;
-    } else if (m.includes('জ্বর') || m.includes('fever')) {
-      reply = `জ্বর হয়েছে? 🤒 কত ডিগ্রি মাপলেন? সাথে সর্দি-কাশি বা গলা ব্যথা আছে?`;
-    } else if (m.includes('পেট') || m.includes('stomach')) {
-      reply = `পেটে সমস্যা? 😣 ব্যথা কোথায় - উপরে, নিচে নাকি চারপাশে? বমি বা পাতলা পায়খানা হচ্ছে?`;
-    } else if (m.includes('সর্দি') || m.includes('কাশি') || m.includes('cold')) {
-      reply = `সর্দি-কাশি হয়েছে? 🤧 কতদিন হলো? শ্বাস নিতে কষ্ট হচ্ছে কি?`;
+    if (m.includes('মাথা') || m.includes('headache') || m.includes('head')) {
+      reply = `ওহ, মাথা ব্যথা! 😔 কতক্ষণ ধরে হচ্ছে? আর কোন পাশে বেশি?`;
+    } else if (m.includes('জ্বর') || m.includes('fever') || m.includes('তাপ')) {
+      reply = `জ্বর হয়েছে? 🤒 কত ডিগ্রি মাপলেন? সাথে সর্দি-কাশি আছে?`;
+    } else if (m.includes('পেট') || m.includes('stomach') || m.includes('বমি')) {
+      reply = `পেটে সমস্যা? 😣 ব্যথা কোথায়? বমি বা পাতলা পায়খানা হচ্ছে?`;
+    } else if (m.includes('সর্দি') || m.includes('কাশি') || m.includes('cold') || m.includes('cough')) {
+      reply = `সর্দি-কাশি হয়েছে? 🤧 কতদিন হলো? শ্বাস নিতে কষ্ট হচ্ছে?`;
     } else if (m.includes('ডাক্তার') || m.includes('doctor') || m.includes('অ্যাপয়েন্টমেন্ট')) {
-      reply = `ডাক্তার দেখাতে চান? 👨‍⚕️ নির্ণয়তে অনেক ভালো ডাক্তার আছেন। হোম পেজ থেকে "অ্যাপয়েন্টমেন্ট" এ গিয়ে বুক করতে পারবেন।`;
+      reply = `ডাক্তার দেখাতে চান? 👨‍⚕️ হোম পেজ থেকে "অ্যাপয়েন্টমেন্ট" এ গিয়ে বুক করুন।`;
     } else if (m.includes('ধন্যবাদ') || m.includes('thank')) {
-      reply = `আপনাকেও ধন্যবাদ! 😊 ভালো থাকবেন। কোনো সমস্যা হলে আবার বলবেন।`;
+      reply = `আপনাকেও ধন্যবাদ! 😊 ভালো থাকবেন।`;
     } else if (m.includes('ভালো') || m.includes('good') || m.includes('fine')) {
-      reply = `ভালো শুনে খুশি হলাম! 😊 নিয়মিত পানি খাবেন, বিশ্রাম নিবেন। কোনো সমস্যা হলে জানাবেন।`;
-    } else if (m.match(/\d+/) && (m.includes('দিন') || m.includes('ঘণ্টা') || m.includes('বছর'))) {
-      reply = `বুঝলাম। এত দিন ধরে হচ্ছে তাহলে একজন ডাক্তার দেখানো ভালো হবে। নির্ণয় থেকে অ্যাপয়েন্টমেন্ট নিতে পারেন।`;
+      reply = `ভালো শুনে খুশি হলাম! 😊 কোনো সমস্যা হলে জানাবেন।`;
+    } else if (m.match(/\d+/) && (m.includes('দিন') || m.includes('ঘণ্টা'))) {
+      reply = `এত দিন ধরে? একজন ডাক্তার দেখানো ভালো হবে। নির্ণয় থেকে অ্যাপয়েন্টমেন্ট নিন।`;
     } else if (m.length < 10) {
-      reply = `আরেকটু বিস্তারিত বলবেন? কি সমস্যা হচ্ছে, কতদিন ধরে?`;
+      reply = `আরেকটু বিস্তারিত বলবেন? কি সমস্যা, কতদিন ধরে?`;
     } else {
-      reply = `বুঝলাম ${patientUser?.name}। আপনার সমস্যাটা শুনলাম। এটা নিয়ে একজন ডাক্তারের সাথে কথা বলা ভালো হবে। চাইলে নির্ণয় থেকে অ্যাপয়েন্টমেন্ট নিতে পারেন।`;
+      reply = `বুঝলাম। এটা নিয়ে ডাক্তারের সাথে কথা বলা ভালো হবে। নির্ণয় থেকে অ্যাপয়েন্টমেন্ট নিন।`;
     }
     
     setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     setIsTyping(false);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -146,9 +147,10 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     setTimeout(() => setSaveMsg(''), 2000);
   };
 
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
     if (!fbText.trim() || !patientUser) return;
-    saveFeedback({
+    console.log('[Dashboard] Submitting feedback:', fbText.substring(0, 30));
+    await saveFeedback({
       id: Date.now().toString(), type: fbCat, mood: 'neutral', message: fbText,
       page: '/patient-dashboard', userAgent: navigator.userAgent, timestamp: new Date().toISOString(),
       userId: patientUser.id, userRole: 'patient', userName: patientUser.name, status: 'new'
@@ -164,7 +166,6 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="text-xl font-bold text-blue-600">নির্ণয়</Link>
@@ -175,9 +176,8 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         </div>
       </header>
 
-      {/* Nav */}
       <nav className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-4 flex gap-4">
+        <div className="max-w-5xl mx-auto px-4 flex gap-4 overflow-x-auto">
           {[
             { id: 'home', icon: '🏠', label: 'হোম' },
             { id: 'ai', icon: '🤖', label: 'এআই' },
@@ -186,7 +186,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             { id: 'profile', icon: '👤', label: 'প্রোফাইল' },
           ].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id as any)}
-              className={`py-3 px-1 text-sm border-b-2 ${activeTab === t.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>
+              className={`py-3 px-1 text-sm border-b-2 whitespace-nowrap ${activeTab === t.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>
               {t.icon} {t.label}
             </button>
           ))}
@@ -194,7 +194,6 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       </nav>
 
       <main className="max-w-5xl mx-auto px-4 py-5">
-        {/* HOME */}
         {activeTab === 'home' && (
           <div className="space-y-5">
             <div className="bg-blue-600 rounded-xl p-5 text-white">
@@ -202,7 +201,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               <p className="text-blue-100 text-sm">আপনার স্বাস্থ্য ড্যাশবোর্ড</p>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {[{ i: '❤️', v: 85, l: 'স্কোর' }, { i: '🏆', v: patientUser.quizPoints || 0, l: 'পয়েন্ট' }, { i: '🔥', v: 0, l: 'স্ট্রিক' }, { i: '📅', v: 0, l: 'অ্যাপয়েন্টমেন্ট' }].map((s, i) => (
+              {[{ i: '❤️', v: 85, l: 'স্কোর' }, { i: '🏆', v: 0, l: 'পয়েন্ট' }, { i: '🔥', v: 0, l: 'স্ট্রিক' }, { i: '📅', v: 0, l: 'অ্যাপয়েন্টমেন্ট' }].map((s, i) => (
                 <div key={i} className="bg-white rounded-lg p-3 border text-center">
                   <div className="text-xl">{s.i}</div>
                   <div className="text-xl font-bold">{s.v}</div>
@@ -229,7 +228,6 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           </div>
         )}
 
-        {/* AI */}
         {activeTab === 'ai' && (
           <div className="bg-white rounded-lg border overflow-hidden h-[calc(100vh-180px)] flex flex-col">
             <div className="bg-blue-600 p-3 text-white">
@@ -239,7 +237,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-2.5 rounded-lg text-sm ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`} style={{ whiteSpace: 'pre-wrap' }}>
+                  <div className={`max-w-[80%] p-2.5 rounded-lg text-sm ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}>
                     {m.content}
                   </div>
                 </div>
@@ -253,18 +251,16 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                 type="text"
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSend()}
+                onKeyDown={handleKeyDown}
                 placeholder="আপনার সমস্যা লিখুন..."
-                className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isTyping}
-                autoFocus
               />
               <button onClick={handleSend} disabled={isTyping || !chatInput.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:bg-gray-300">পাঠান</button>
             </div>
           </div>
         )}
 
-        {/* QUIZ */}
         {activeTab === 'quiz' && (
           <div className="bg-white rounded-lg border p-5">
             {!quizActive ? (
@@ -287,7 +283,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                 <h3 className="font-semibold mb-4">{QUIZ[quizIdx].q}</h3>
                 <div className="space-y-2">
                   {QUIZ[quizIdx].opts.map((o, i) => (
-                    <button key={i} onClick={() => { setQuizScore(s => s + o.p); quizIdx < QUIZ.length - 1 ? setQuizIdx(i => i + 1) : setQuizDone(true); }}
+                    <button key={i} onClick={() => { setQuizScore(s => s + o.p); quizIdx < QUIZ.length - 1 ? setQuizIdx(idx => idx + 1) : setQuizDone(true); }}
                       className="w-full text-left p-3 bg-gray-50 hover:bg-blue-50 rounded-lg border">{o.t}</button>
                   ))}
                 </div>
@@ -296,7 +292,6 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           </div>
         )}
 
-        {/* FEEDBACK */}
         {activeTab === 'feedback' && (
           <div className="bg-white rounded-lg border p-5">
             {fbSent ? (
@@ -326,10 +321,8 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           </div>
         )}
 
-        {/* PROFILE */}
         {activeTab === 'profile' && (
           <div className="space-y-4">
-            {/* Pricing */}
             <div className="bg-white rounded-lg border p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -346,16 +339,12 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                       <div className="font-semibold text-sm">{p.nameBn}</div>
                       <div className="text-lg font-bold">৳{p.price}</div>
                       <ul className="mt-1 space-y-0.5">{p.featuresBn.map((f, i) => <li key={i} className="text-xs text-gray-600">✓ {f}</li>)}</ul>
-                      <button className={`w-full mt-2 py-1 rounded text-xs ${patientUser.subscriptionTier === p.id ? 'bg-gray-100 text-gray-500' : 'bg-blue-600 text-white'}`}>
-                        {patientUser.subscriptionTier === p.id ? 'বর্তমান' : 'আপগ্রেড'}
-                      </button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Profile */}
             <div className="bg-white rounded-lg border p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold">👤 প্রোফাইল</h2>
