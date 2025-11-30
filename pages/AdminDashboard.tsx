@@ -76,6 +76,12 @@ export const AdminDashboard: React.FC = () => {
   const [editingSettings, setEditingSettings] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Danger zone protection state
+  const [showDangerConfirm, setShowDangerConfirm] = useState(false);
+  const [dangerOtp1, setDangerOtp1] = useState('');
+  const [dangerOtp2, setDangerOtp2] = useState('');
+  const [generatedDangerOtp, setGeneratedDangerOtp] = useState('');
 
   // Check admin auth
   useEffect(() => {
@@ -1023,23 +1029,107 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Danger Zone */}
-                <div className="bg-red-500/10 backdrop-blur rounded-2xl p-6 border border-red-500/30">
-                  <h3 className="text-lg font-bold text-red-400 mb-4">{isBn ? 'বিপদ অঞ্চল' : 'Danger Zone'}</h3>
-                  <p className="text-slate-400 text-sm mb-4">{isBn ? 'এই অ্যাকশনগুলো পূর্বাবস্থায় ফেরানো যাবে না' : 'These actions cannot be undone'}</p>
-                  <button
-                    onClick={() => {
-                      if (confirm(isBn ? 'আপনি কি নিশ্চিত? সব ডেটা মুছে যাবে!' : 'Are you sure? All data will be deleted!')) {
-                        localStorage.clear();
-                        window.location.reload();
-                      }
-                    }}
-                    className="px-6 py-3 bg-red-500/20 text-red-400 font-bold rounded-xl hover:bg-red-500/30 transition"
-                  >
-                    <i className="fas fa-trash mr-2"></i>
-                    {isBn ? 'সব ডেটা মুছুন' : 'Clear All Data'}
-                  </button>
-                </div>
+                {/* Danger Zone - Small, Collapsible, Double OTP Protected */}
+                <details className="group mt-8">
+                  <summary className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer hover:text-slate-400 py-2">
+                    <i className="fas fa-chevron-right text-[10px] group-open:rotate-90 transition-transform"></i>
+                    <i className="fas fa-exclamation-triangle text-red-400/40 text-[10px]"></i>
+                    <span>{isBn ? 'বিপদ অঞ্চল' : 'Danger Zone'}</span>
+                  </summary>
+                  
+                  <div className="mt-3 p-4 bg-red-500/5 rounded-lg border border-red-500/20">
+                    {!showDangerConfirm ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-slate-400">{isBn ? 'সব ডেটা মুছে ফেলুন' : 'Delete all data'}</p>
+                          <p className="text-[10px] text-slate-500">{isBn ? 'এটি পূর্বাবস্থায় ফেরানো যাবে না' : 'This cannot be undone'}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                            setGeneratedDangerOtp(otp);
+                            setShowDangerConfirm(true);
+                            setDangerOtp1('');
+                            setDangerOtp2('');
+                          }}
+                          className="text-[10px] px-2 py-1 text-red-400/60 border border-red-500/20 rounded hover:bg-red-500/10 transition"
+                        >
+                          <i className="fas fa-trash text-[8px] mr-1"></i>
+                          {isBn ? 'মুছুন' : 'Delete'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="bg-red-500/20 rounded p-2 border border-red-500/30">
+                          <p className="text-red-400 text-xs font-bold">⚠️ {isBn ? 'সতর্কতা!' : 'Warning!'}</p>
+                          <p className="text-red-300 text-[10px]">{isBn ? 'এই অ্যাকশন সব ইউজার, ডাক্তার এবং ডেটা মুছে ফেলবে।' : 'This will delete ALL users, doctors, and data.'}</p>
+                        </div>
+                        
+                        <div className="bg-amber-500/10 rounded p-2 border border-amber-500/30">
+                          <p className="text-amber-400 text-[10px] font-medium">🔐 {isBn ? 'ডাবল OTP ভেরিফিকেশন' : 'Double OTP Verification'}</p>
+                          <p className="text-amber-300 text-sm font-mono font-bold tracking-widest mt-1">{generatedDangerOtp}</p>
+                          <p className="text-amber-400/60 text-[9px] mt-1">{isBn ? 'এই কোডটি দুইবার লিখুন' : 'Enter this code twice'}</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] text-slate-500 mb-1">{isBn ? 'প্রথম OTP' : 'First OTP'}</label>
+                            <input
+                              type="text"
+                              value={dangerOtp1}
+                              onChange={(e) => setDangerOtp1(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              className="w-full px-2 py-1.5 bg-white/5 border border-white/20 rounded text-white text-center font-mono text-xs tracking-widest"
+                              placeholder="000000"
+                              maxLength={6}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-500 mb-1">{isBn ? 'দ্বিতীয় OTP' : 'Second OTP'}</label>
+                            <input
+                              type="text"
+                              value={dangerOtp2}
+                              onChange={(e) => setDangerOtp2(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              className="w-full px-2 py-1.5 bg-white/5 border border-white/20 rounded text-white text-center font-mono text-xs tracking-widest"
+                              placeholder="000000"
+                              maxLength={6}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setShowDangerConfirm(false);
+                              setDangerOtp1('');
+                              setDangerOtp2('');
+                              setGeneratedDangerOtp('');
+                            }}
+                            className="flex-1 py-1.5 text-[10px] text-slate-400 border border-slate-600 rounded hover:bg-white/5 transition"
+                          >
+                            {isBn ? 'বাতিল' : 'Cancel'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (dangerOtp1 === generatedDangerOtp && dangerOtp2 === generatedDangerOtp && dangerOtp1 === dangerOtp2) {
+                                if (confirm(isBn ? 'শেষ সতর্কতা! আপনি কি ১০০% নিশ্চিত?' : 'FINAL WARNING! Are you 100% sure?')) {
+                                  localStorage.clear();
+                                  window.location.reload();
+                                }
+                              } else {
+                                alert(isBn ? 'OTP মিলছে না! দুটি OTP একই এবং সঠিক হতে হবে।' : 'OTP mismatch! Both OTPs must be the same and correct.');
+                              }
+                            }}
+                            disabled={dangerOtp1.length !== 6 || dangerOtp2.length !== 6}
+                            className="flex-1 py-1.5 text-[10px] bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <i className="fas fa-trash mr-1 text-[8px]"></i>
+                            {isBn ? 'নিশ্চিত' : 'Confirm'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </details>
               </div>
             )}
           </main>
