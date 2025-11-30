@@ -7,6 +7,125 @@ import { MOCK_DOCTORS } from '../data/mockData';
 import Navbar from '../components/Navbar';
 import HomeVoiceSection from '../components/HomeVoiceSection';
 
+
+// Health Trivia Data - Changes every hour
+const HEALTH_TRIVIA = [
+  // AI & Future Health
+  { icon: '🤖', category: 'AI Health', en: 'AI can detect diabetic retinopathy with 94% accuracy - faster than most specialists!', bn: 'AI ৯৪% নির্ভুলতায় ডায়াবেটিক রেটিনোপ্যাথি শনাক্ত করতে পারে!' },
+  { icon: '🧬', category: 'Future', en: 'By 2030, AI will help diagnose 80% of diseases before symptoms appear.', bn: '২০৩০ সালে AI লক্ষণ দেখা দেওয়ার আগেই ৮০% রোগ নির্ণয় করবে।' },
+  { icon: '📱', category: 'Digital Health', en: 'Your smartphone can now detect heart arrhythmias using just the camera!', bn: 'আপনার স্মার্টফোন ক্যামেরা দিয়েই হার্টের অনিয়ম ধরতে পারে!' },
+  { icon: '🔬', category: 'Innovation', en: 'Nanobots smaller than blood cells will deliver medicine directly to tumors by 2035.', bn: '২০৩৫ সালে রক্তকণিকার চেয়ে ছোট ন্যানোবট সরাসরি টিউমারে ওষুধ পৌঁছাবে।' },
+  
+  // Bangladesh Health Facts
+  { icon: '🇧🇩', category: 'Bangladesh', en: 'Bangladesh reduced child mortality by 73% since 1990 - a global success story!', bn: 'বাংলাদেশ ১৯৯০ থেকে শিশু মৃত্যু ৭৩% কমিয়েছে - বিশ্ব সাফল্য!' },
+  { icon: '💉', category: 'Bangladesh', en: 'Bangladesh has one of the highest vaccination rates in South Asia at 98%!', bn: 'বাংলাদেশে টিকাদান হার দক্ষিণ এশিয়ায় সর্বোচ্চ - ৯৮%!' },
+  { icon: '🏥', category: 'Healthcare', en: 'Bangladesh has 1 doctor per 1,581 people. Nirnoy is here to bridge this gap!', bn: 'বাংলাদেশে প্রতি ১,৫৮১ জনে ১ জন ডাক্তার। নির্ণয় এই ফারাক কমাতে এসেছে!' },
+  
+  // Fun Health Facts
+  { icon: '❤️', category: 'Heart', en: 'Your heart beats about 100,000 times per day - that\'s 35 million times a year!', bn: 'আপনার হৃদপিণ্ড দিনে প্রায় ১ লক্ষ বার স্পন্দিত হয়!' },
+  { icon: '🧠', category: 'Brain', en: 'Your brain uses 20% of your body\'s energy but is only 2% of your weight.', bn: 'মস্তিষ্ক শরীরের মাত্র ২% কিন্তু ২০% শক্তি খরচ করে!' },
+  { icon: '😴', category: 'Sleep', en: 'During sleep, your brain cleans itself of toxins. 7-8 hours is essential!', bn: 'ঘুমের সময় মস্তিষ্ক বিষাক্ত পদার্থ পরিষ্কার করে। ৭-৮ ঘণ্টা ঘুম জরুরি!' },
+  { icon: '🚶', category: 'Exercise', en: 'Walking 30 minutes daily reduces heart disease risk by 35%.', bn: 'প্রতিদিন ৩০ মিনিট হাঁটলে হৃদরোগের ঝুঁকি ৩৫% কমে!' },
+  { icon: '💧', category: 'Hydration', en: 'Drinking 8 glasses of water daily can boost your metabolism by 30%.', bn: 'দিনে ৮ গ্লাস পানি বিপাক ক্রিয়া ৩০% বাড়ায়!' },
+  { icon: '🥗', category: 'Nutrition', en: 'Eating colorful vegetables gives you different vitamins - eat the rainbow!', bn: 'রঙিন সবজি বিভিন্ন ভিটামিন দেয় - রংধনু খান!' },
+  { icon: '😊', category: 'Mental Health', en: 'Laughing 15 minutes a day burns 40 calories and boosts immunity!', bn: 'দিনে ১৫ মিনিট হাসলে ৪০ ক্যালোরি খরচ হয় ও রোগ প্রতিরোধ বাড়ে!' },
+  { icon: '🧘', category: 'Wellness', en: 'Just 10 minutes of meditation can reduce stress hormones by 25%.', bn: 'মাত্র ১০ মিনিট ধ্যান স্ট্রেস হরমোন ২৫% কমায়!' },
+  
+  // Surprising Facts
+  { icon: '👁️', category: 'Eyes', en: 'Your eyes can distinguish about 10 million different colors!', bn: 'আপনার চোখ প্রায় ১ কোটি রঙ আলাদা করতে পারে!' },
+  { icon: '🦷', category: 'Dental', en: 'Your teeth are as unique as your fingerprints - no two are alike!', bn: 'আপনার দাঁত আঙুলের ছাপের মতোই অনন্য!' },
+  { icon: '🫁', category: 'Lungs', en: 'If you spread out your lungs, they would cover a tennis court!', bn: 'ফুসফুস ছড়িয়ে দিলে একটি টেনিস কোর্ট ঢেকে যাবে!' },
+  { icon: '🩸', category: 'Blood', en: 'Your blood travels 19,000 km per day - almost halfway around Earth!', bn: 'রক্ত প্রতিদিন ১৯,০০০ কিমি ভ্রমণ করে - প্রায় অর্ধেক পৃথিবী!' },
+  
+  // Nirnoy Tips
+  { icon: '💡', category: 'Tip', en: 'Regular health checkups can detect 90% of diseases early. Book with Nirnoy!', bn: 'নিয়মিত স্বাস্থ্য পরীক্ষায় ৯০% রোগ আগেই ধরা পড়ে। নির্ণয়ে বুক করুন!' },
+  { icon: '📋', category: 'Tip', en: 'Keep your health records digital with Nirnoy - access anytime, anywhere!', bn: 'নির্ণয়ে স্বাস্থ্য রেকর্ড ডিজিটাল রাখুন - যেকোনো সময় দেখুন!' },
+  { icon: '👨‍👩‍👧‍👦', category: 'Family', en: 'Add your family to Nirnoy - one app for everyone\'s health!', bn: 'পরিবারকে নির্ণয়ে যোগ করুন - সবার স্বাস্থ্য এক অ্যাপে!' },
+];
+
+// Get trivia based on hour (changes every hour)
+const getCurrentTrivia = () => {
+  const hour = new Date().getHours();
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  const index = (dayOfYear * 24 + hour) % HEALTH_TRIVIA.length;
+  return HEALTH_TRIVIA[index];
+};
+
+// Trivia Strip Component
+const HealthTriviaStrip: React.FC = () => {
+  const { language } = useLanguage();
+  const [trivia, setTrivia] = useState(getCurrentTrivia());
+  const [isAnimating, setIsAnimating] = useState(false);
+  const isBn = language === 'bn';
+  
+  // Update trivia every hour
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setTrivia(getCurrentTrivia());
+        setIsAnimating(false);
+      }, 300);
+    }, 3600000); // 1 hour
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Manual refresh for demo
+  const refreshTrivia = () => {
+    setIsAnimating(true);
+    setTimeout(() => {
+      const randomIndex = Math.floor(Math.random() * HEALTH_TRIVIA.length);
+      setTrivia(HEALTH_TRIVIA[randomIndex]);
+      setIsAnimating(false);
+    }, 300);
+  };
+  
+  return (
+    <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -left-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute right-1/4 -bottom-4 w-32 h-32 bg-white/10 rounded-full blur-xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute right-10 top-0 w-16 h-16 bg-white/10 rounded-full blur-lg animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+      </div>
+      
+      <div className="max-w-7xl mx-auto px-4 py-3 relative">
+        <div className={`flex items-center justify-center gap-4 transition-all duration-300 ${isAnimating ? 'opacity-0 transform -translate-y-2' : 'opacity-100 transform translate-y-0'}`}>
+          {/* Icon */}
+          <span className="text-2xl md:text-3xl">{trivia.icon}</span>
+          
+          {/* Content */}
+          <div className="flex-1 text-center">
+            <span className="inline-block px-2 py-0.5 bg-white/20 rounded-full text-[10px] md:text-xs text-white/90 font-medium mb-1">
+              {trivia.category}
+            </span>
+            <p className="text-white text-sm md:text-base font-medium leading-snug">
+              {isBn ? trivia.bn : trivia.en}
+            </p>
+          </div>
+          
+          {/* Refresh button */}
+          <button 
+            onClick={refreshTrivia}
+            className="p-2 hover:bg-white/20 rounded-full transition-colors group"
+            title={isBn ? 'নতুন তথ্য দেখুন' : 'See another fact'}
+          >
+            <i className="fas fa-sync-alt text-white/70 group-hover:text-white text-sm transition-transform group-hover:rotate-180 duration-500"></i>
+          </button>
+        </div>
+        
+        {/* CTA for non-logged users */}
+        <div className="text-center mt-2">
+          <span className="text-white/60 text-xs">
+            {isBn ? '🌟 নির্ণয়ে যোগ দিন - বিনামূল্যে স্বাস্থ্য পরামর্শ পান!' : '🌟 Join Nirnoy - Get free health consultations!'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Animated Counter
 const AnimatedCounter: React.FC<{ end: number; suffix?: string }> = ({ end, suffix = '' }) => {
   const [count, setCount] = useState(0);
@@ -97,6 +216,9 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar userRole={userRole} onLogout={handleLogout} />
+
+      {/* Health Trivia Strip */}
+      <HealthTriviaStrip />
 
       {/* Hero Section */}
       <section className="pt-24 pb-16 px-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
