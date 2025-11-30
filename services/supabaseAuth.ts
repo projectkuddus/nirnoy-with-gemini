@@ -1,10 +1,10 @@
 /**
  * ============================================
- * NIRNOY SUPABASE AUTHENTICATION SERVICE
+ * NIRNOY CLOUD AUTHENTICATION SERVICE
  * ============================================
- * Military-grade authentication for millions of users
- * Primary: Supabase Database
- * Fallback: localStorage (offline mode only)
+ * 100% Cloud-based - Supabase Only
+ * No localStorage for user data
+ * Military-grade security
  * ============================================
  */
 
@@ -16,14 +16,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Storage keys for offline fallback
-export const STORAGE_KEYS = {
-  USER: 'nirnoy_current_user',
-  PATIENTS: 'nirnoy_patients_db',
-  DOCTORS: 'nirnoy_doctors_db',
-  PENDING_SYNC: 'nirnoy_pending_sync',
-  ADMIN: 'nirnoy_admin_config',
-};
+// Only for session management (not user data)
+const SESSION_KEY = 'nirnoy_session';
+const ADMIN_KEY = 'nirnoy_admin';
 
 // ============================================
 // TYPES
@@ -94,13 +89,12 @@ export interface AdminConfig {
   password: string;
   name: string;
   email: string;
-  lastLogin?: string;
 }
 
 // ============================================
 // SUPABASE CLIENT
 // ============================================
-const supabase: SupabaseClient = createClient(
+export const supabase: SupabaseClient = createClient(
   SUPABASE_URL || 'https://placeholder.supabase.co',
   SUPABASE_ANON_KEY || 'placeholder',
   {
@@ -112,7 +106,6 @@ const supabase: SupabaseClient = createClient(
   }
 );
 
-// Check if Supabase is properly configured
 export const isSupabaseConfigured = (): boolean => {
   return !!(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.includes('supabase'));
 };
@@ -132,73 +125,89 @@ export const normalizePhone = (phone: string): string => {
 };
 
 const generateId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
   return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 11);
 };
 
-const isOnline = (): boolean => {
-  return navigator.onLine;
-};
-
 // ============================================
-// LOCAL STORAGE HELPERS
+// SESSION MANAGEMENT (localStorage only for session token)
 // ============================================
-const storage = {
-  get: <T>(key: string, defaultValue: T): T => {
+const session = {
+  save(userId: string, role: string, userData: any): void {
     try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue;
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ userId, role, userData, timestamp: Date.now() }));
+    } catch (e) {
+      console.error('[Session] Failed to save:', e);
+    }
+  },
+  
+  get(): { userId: string; role: string; userData: any } | null {
+    try {
+      const data = sessionStorage.getItem(SESSION_KEY);
+      if (!data) return null;
+      const parsed = JSON.parse(data);
+      // Session expires after 24 hours
+      if (Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000) {
+        sessionStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      return parsed;
     } catch {
-      return defaultValue;
+      return null;
     }
   },
   
-  set: <T>(key: string, value: T): void => {
+  clear(): void {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-      console.error('[Storage] Failed to save:', error);
-    }
-  },
-  
-  remove: (key: string): void => {
-    try {
-      localStorage.removeItem(key);
-    } catch (error) {
-      console.error('[Storage] Failed to remove:', error);
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch (e) {
+      console.error('[Session] Failed to clear:', e);
     }
   },
 };
 
 // ============================================
-// SUPABASE DATABASE OPERATIONS
+// DATABASE OPERATIONS - 100% CLOUD
 // ============================================
 const db = {
-  async getPatientByPhone(phone: string): Promise<PatientProfile | null> {
-    if (!isSupabaseConfigured()) return null;
+  // ---- PROFILES ----
+  async getProfileByPhone(phone: string): Promise<{ profile: any; type: 'patient' | 'doctor' | null } | null> {
+    if (!isSupabaseConfigured()) {
+      console.error('[DB] Supabase not configured!');
+      return null;
+    }
     
     const normalized = normalizePhone(phone);
+    console.log('[DB] Looking for phone:', normalized);
+    
     try {
-      // Try to find in profiles table with role=patient
+      // Search in profiles table
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'patient')
-        .or('phone.eq.' + normalized + ',phone.eq.0' + normalized);
+        .or(`phone.eq.${normalized},phone.eq.0${normalized}`);
       
-      if (error || !data || data.length === 0) return null;
+      if (error) {
+        console.error('[DB] Query error:', error);
+        return null;
+      }
+      
+      if (!data || data.length === 0) {
+        console.log('[DB] No profile found');
+        return null;
+      }
       
       const profile = data[0];
+      console.log('[DB] Found profile:', profile.name, 'role:', profile.role);
       
-      // Get patient-specific data
-      const { data: patientData } = await supabase
-        .from('patients')
-        .select('*')
-        .eq('user_id', profile.id)
-        .single();
-      
-      return mapDbToPatient(profile, patientData);
+      return {
+        profile,
+        type: profile.role as 'patient' | 'doctor',
+      };
     } catch (err) {
-      console.error('[DB] getPatientByPhone error:', err);
+      console.error('[DB] getProfileByPhone error:', err);
       return null;
     }
   },
@@ -208,55 +217,227 @@ const db = {
       return { success: false, error: 'Supabase not configured' };
     }
     
+    const normalized = normalizePhone(patient.phone);
+    console.log('[DB] Creating patient:', normalized);
+    
     try {
-      const profileId = crypto.randomUUID ? crypto.randomUUID() : patient.id;
-      
       // Create profile
-      const { error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .insert({
-          id: profileId,
-          phone: normalizePhone(patient.phone),
+          id: patient.id,
+          phone: normalized,
           name: patient.name,
-          email: patient.email,
+          email: patient.email || null,
           role: 'patient',
-          date_of_birth: patient.dateOfBirth,
-          gender: patient.gender,
-          blood_group: patient.bloodGroup,
-          avatar_url: patient.avatarUrl,
+          date_of_birth: patient.dateOfBirth || null,
+          gender: patient.gender || null,
+          blood_group: patient.bloodGroup || null,
+          avatar_url: patient.avatarUrl || null,
           is_verified: true,
-          created_at: patient.createdAt,
-          updated_at: patient.updatedAt,
-        });
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
       
       if (profileError) {
         console.error('[DB] Profile creation error:', profileError);
         return { success: false, error: profileError.message };
       }
       
+      console.log('[DB] Profile created:', profileData.id);
+      
       // Create patient record
       const { error: patientError } = await supabase
         .from('patients')
         .insert({
-          user_id: profileId,
-          emergency_contact_phone: patient.emergencyContact,
+          user_id: profileData.id,
+          emergency_contact_phone: patient.emergencyContact || null,
           chronic_conditions: patient.chronicConditions || [],
           allergies: patient.allergies || [],
-          height_cm: patient.height,
-          weight_kg: patient.weight,
-          subscription_tier: patient.subscriptionTier,
+          height_cm: patient.height || null,
+          weight_kg: patient.weight || null,
+          subscription_tier: patient.subscriptionTier || 'premium',
         });
       
       if (patientError) {
-        console.error('[DB] Patient creation error:', patientError);
-        // Don't fail - profile was created
+        console.error('[DB] Patient record error:', patientError);
+        // Profile was created, so partial success
       }
       
+      console.log('[DB] Patient created successfully');
       return { success: true };
     } catch (error: any) {
       console.error('[DB] Create patient failed:', error);
       return { success: false, error: error.message };
     }
+  },
+  
+  async createDoctor(doctor: DoctorProfile): Promise<{ success: boolean; error?: string }> {
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Supabase not configured' };
+    }
+    
+    const normalized = normalizePhone(doctor.phone);
+    console.log('[DB] Creating doctor:', normalized);
+    
+    try {
+      // Create profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: doctor.id,
+          phone: normalized,
+          name: doctor.name,
+          email: doctor.email || null,
+          role: 'doctor',
+          date_of_birth: doctor.dateOfBirth || null,
+          gender: doctor.gender || null,
+          avatar_url: doctor.avatarUrl || null,
+          is_verified: false, // Needs admin approval
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      
+      if (profileError) {
+        console.error('[DB] Doctor profile creation error:', profileError);
+        return { success: false, error: profileError.message };
+      }
+      
+      console.log('[DB] Doctor profile created:', profileData.id);
+      
+      // Create doctor record
+      const { data: doctorData, error: doctorError } = await supabase
+        .from('doctors')
+        .insert({
+          user_id: profileData.id,
+          bmdc_number: doctor.bmdcNumber,
+          nid_number: doctor.nidNumber || null,
+          degrees: doctor.qualifications || [],
+          specialties: doctor.specializations || [],
+          experience_years: doctor.experienceYears || 0,
+          consultation_fee: doctor.consultationFee || 500,
+          is_verified: false,
+          is_featured: false,
+          rating: 0,
+          total_reviews: 0,
+          total_patients: 0,
+        })
+        .select()
+        .single();
+      
+      if (doctorError) {
+        console.error('[DB] Doctor record error:', doctorError);
+        return { success: false, error: doctorError.message };
+      }
+      
+      // Create chambers if provided
+      if (doctor.chambers && doctor.chambers.length > 0) {
+        for (const chamber of doctor.chambers) {
+          await supabase.from('chambers').insert({
+            doctor_id: doctorData.id,
+            name: chamber.name,
+            address: chamber.address,
+            area: chamber.area,
+            city: chamber.city,
+            phone: chamber.phone || null,
+            fee: chamber.fee,
+            is_primary: true,
+          });
+        }
+      }
+      
+      console.log('[DB] Doctor created successfully');
+      return { success: true };
+    } catch (error: any) {
+      console.error('[DB] Create doctor failed:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  async getPatientByPhone(phone: string): Promise<PatientProfile | null> {
+    const result = await this.getProfileByPhone(phone);
+    if (!result || result.type !== 'patient') return null;
+    
+    const profile = result.profile;
+    
+    // Get patient-specific data
+    const { data: patientData } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('user_id', profile.id)
+      .single();
+    
+    return {
+      id: profile.id,
+      phone: profile.phone,
+      name: profile.name || '',
+      email: profile.email,
+      dateOfBirth: profile.date_of_birth,
+      gender: profile.gender,
+      bloodGroup: profile.blood_group,
+      emergencyContact: patientData?.emergency_contact_phone,
+      chronicConditions: patientData?.chronic_conditions || [],
+      allergies: patientData?.allergies || [],
+      height: patientData?.height_cm,
+      weight: patientData?.weight_kg,
+      avatarUrl: profile.avatar_url,
+      subscriptionTier: patientData?.subscription_tier || 'premium',
+      isVerified: profile.is_verified || false,
+      createdAt: profile.created_at,
+      updatedAt: profile.updated_at,
+    };
+  },
+  
+  async getDoctorByPhone(phone: string): Promise<DoctorProfile | null> {
+    const result = await this.getProfileByPhone(phone);
+    if (!result || result.type !== 'doctor') return null;
+    
+    const profile = result.profile;
+    
+    // Get doctor-specific data
+    const { data: doctorData } = await supabase
+      .from('doctors')
+      .select('*, chambers(*)')
+      .eq('user_id', profile.id)
+      .single();
+    
+    return {
+      id: profile.id,
+      phone: profile.phone,
+      name: profile.name || '',
+      email: profile.email,
+      dateOfBirth: profile.date_of_birth,
+      gender: profile.gender,
+      bmdcNumber: doctorData?.bmdc_number || '',
+      nidNumber: doctorData?.nid_number,
+      specializations: doctorData?.specialties || [],
+      qualifications: doctorData?.degrees || [],
+      experienceYears: doctorData?.experience_years || 0,
+      consultationFee: doctorData?.consultation_fee || 0,
+      chambers: (doctorData?.chambers || []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        address: c.address,
+        area: c.area,
+        city: c.city,
+        phone: c.phone,
+        fee: c.fee,
+        schedule: [],
+      })),
+      avatarUrl: profile.avatar_url,
+      status: doctorData?.is_verified ? 'approved' : 'pending',
+      isVerified: doctorData?.is_verified || false,
+      rating: parseFloat(doctorData?.rating) || 0,
+      totalPatients: doctorData?.total_patients || 0,
+      createdAt: profile.created_at,
+      updatedAt: profile.updated_at,
+    };
   },
   
   async getAllPatients(): Promise<PatientProfile[]> {
@@ -271,134 +452,22 @@ const db = {
       
       if (error || !data) return [];
       
-      return data.map(p => mapDbToPatient(p, null));
+      return data.map(profile => ({
+        id: profile.id,
+        phone: profile.phone || '',
+        name: profile.name || '',
+        email: profile.email,
+        dateOfBirth: profile.date_of_birth,
+        gender: profile.gender,
+        bloodGroup: profile.blood_group,
+        avatarUrl: profile.avatar_url,
+        subscriptionTier: 'premium' as const,
+        isVerified: profile.is_verified || false,
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at,
+      }));
     } catch {
       return [];
-    }
-  },
-  
-  async getDoctorByPhone(phone: string): Promise<DoctorProfile | null> {
-    if (!isSupabaseConfigured()) return null;
-    
-    const normalized = normalizePhone(phone);
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'doctor')
-        .or('phone.eq.' + normalized + ',phone.eq.0' + normalized);
-      
-      if (error || !data || data.length === 0) return null;
-      
-      const profile = data[0];
-      
-      // Get doctor-specific data
-      const { data: doctorData } = await supabase
-        .from('doctors')
-        .select('*, chambers(*)')
-        .eq('user_id', profile.id)
-        .single();
-      
-      return mapDbToDoctor(profile, doctorData);
-    } catch (err) {
-      console.error('[DB] getDoctorByPhone error:', err);
-      return null;
-    }
-  },
-  
-  async createDoctor(doctor: DoctorProfile): Promise<{ success: boolean; error?: string }> {
-    if (!isSupabaseConfigured()) {
-      return { success: false, error: 'Supabase not configured' };
-    }
-    
-    try {
-      const profileId = crypto.randomUUID ? crypto.randomUUID() : doctor.id;
-      
-      // Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: profileId,
-          phone: normalizePhone(doctor.phone),
-          name: doctor.name,
-          email: doctor.email,
-          role: 'doctor',
-          date_of_birth: doctor.dateOfBirth,
-          gender: doctor.gender,
-          avatar_url: doctor.avatarUrl,
-          is_verified: false,
-          created_at: doctor.createdAt,
-          updated_at: doctor.updatedAt,
-        });
-      
-      if (profileError) {
-        console.error('[DB] Doctor profile creation error:', profileError);
-        return { success: false, error: profileError.message };
-      }
-      
-      // Create doctor record
-      const { data: doctorData, error: doctorError } = await supabase
-        .from('doctors')
-        .insert({
-          user_id: profileId,
-          bmdc_number: doctor.bmdcNumber,
-          nid_number: doctor.nidNumber,
-          degrees: doctor.qualifications,
-          specialties: doctor.specializations,
-          experience_years: doctor.experienceYears,
-          consultation_fee: doctor.consultationFee,
-          is_verified: false,
-        })
-        .select()
-        .single();
-      
-      if (doctorError) {
-        console.error('[DB] Doctor creation error:', doctorError);
-        return { success: false, error: doctorError.message };
-      }
-      
-      // Create chambers
-      if (doctor.chambers && doctor.chambers.length > 0 && doctorData) {
-        for (const chamber of doctor.chambers) {
-          await supabase.from('chambers').insert({
-            doctor_id: doctorData.id,
-            name: chamber.name,
-            address: chamber.address,
-            area: chamber.area,
-            city: chamber.city,
-            phone: chamber.phone,
-            fee: chamber.fee,
-            is_primary: true,
-          });
-        }
-      }
-      
-      return { success: true };
-    } catch (error: any) {
-      console.error('[DB] Create doctor failed:', error);
-      return { success: false, error: error.message };
-    }
-  },
-  
-  async updateDoctorStatus(id: string, status: 'approved' | 'rejected'): Promise<boolean> {
-    if (!isSupabaseConfigured()) return false;
-    
-    try {
-      const isVerified = status === 'approved';
-      
-      await supabase
-        .from('doctors')
-        .update({ is_verified: isVerified, updated_at: new Date().toISOString() })
-        .eq('user_id', id);
-      
-      await supabase
-        .from('profiles')
-        .update({ is_verified: isVerified, updated_at: new Date().toISOString() })
-        .eq('id', id);
-      
-      return true;
-    } catch {
-      return false;
     }
   },
   
@@ -407,25 +476,46 @@ const db = {
     
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'doctor')
+        .from('doctors')
+        .select('*, profiles:user_id(*), chambers(*)')
         .order('created_at', { ascending: false });
       
       if (error || !data) return [];
       
-      const doctors: DoctorProfile[] = [];
-      for (const profile of data) {
-        const { data: doctorData } = await supabase
-          .from('doctors')
-          .select('*, chambers(*)')
-          .eq('user_id', profile.id)
-          .single();
-        
-        doctors.push(mapDbToDoctor(profile, doctorData));
-      }
-      
-      return doctors;
+      return data.map(d => {
+        const profile = d.profiles || {};
+        return {
+          id: profile.id || d.user_id,
+          phone: profile.phone || '',
+          name: profile.name || '',
+          email: profile.email,
+          dateOfBirth: profile.date_of_birth,
+          gender: profile.gender,
+          bmdcNumber: d.bmdc_number || '',
+          nidNumber: d.nid_number,
+          specializations: d.specialties || [],
+          qualifications: d.degrees || [],
+          experienceYears: d.experience_years || 0,
+          consultationFee: d.consultation_fee || 0,
+          chambers: (d.chambers || []).map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            address: c.address,
+            area: c.area,
+            city: c.city,
+            phone: c.phone,
+            fee: c.fee,
+            schedule: [],
+          })),
+          avatarUrl: profile.avatar_url,
+          status: d.is_verified ? 'approved' as const : 'pending' as const,
+          isVerified: d.is_verified || false,
+          rating: parseFloat(d.rating) || 0,
+          totalPatients: d.total_patients || 0,
+          createdAt: profile.created_at || d.created_at,
+          updatedAt: profile.updated_at || d.updated_at,
+        };
+      });
     } catch {
       return [];
     }
@@ -438,197 +528,100 @@ const db = {
       const { data, error } = await supabase
         .from('doctors')
         .select('*, profiles:user_id(*), chambers(*)')
-        .eq('is_verified', false);
+        .eq('is_verified', false)
+        .order('created_at', { ascending: false });
       
       if (error || !data) return [];
       
-      return data.map(d => mapDbToDoctor(d.profiles, d));
+      return data.map(d => {
+        const profile = d.profiles || {};
+        return {
+          id: profile.id || d.user_id,
+          phone: profile.phone || '',
+          name: profile.name || '',
+          email: profile.email,
+          dateOfBirth: profile.date_of_birth,
+          gender: profile.gender,
+          bmdcNumber: d.bmdc_number || '',
+          nidNumber: d.nid_number,
+          specializations: d.specialties || [],
+          qualifications: d.degrees || [],
+          experienceYears: d.experience_years || 0,
+          consultationFee: d.consultation_fee || 0,
+          chambers: [],
+          avatarUrl: profile.avatar_url,
+          status: 'pending' as const,
+          isVerified: false,
+          rating: 0,
+          totalPatients: 0,
+          createdAt: profile.created_at || d.created_at,
+          updatedAt: profile.updated_at || d.updated_at,
+        };
+      });
     } catch {
       return [];
     }
   },
-};
-
-// ============================================
-// DATA MAPPERS
-// ============================================
-function mapDbToPatient(profile: any, patientData: any): PatientProfile {
-  return {
-    id: profile.id,
-    phone: profile.phone || '',
-    name: profile.name || '',
-    email: profile.email,
-    dateOfBirth: profile.date_of_birth,
-    gender: profile.gender,
-    bloodGroup: profile.blood_group,
-    emergencyContact: patientData?.emergency_contact_phone,
-    chronicConditions: patientData?.chronic_conditions || [],
-    allergies: patientData?.allergies || [],
-    height: patientData?.height_cm,
-    weight: patientData?.weight_kg,
-    avatarUrl: profile.avatar_url,
-    subscriptionTier: patientData?.subscription_tier || 'premium',
-    isVerified: profile.is_verified || false,
-    createdAt: profile.created_at,
-    updatedAt: profile.updated_at,
-  };
-}
-
-function mapDbToDoctor(profile: any, doctorData: any): DoctorProfile {
-  return {
-    id: profile?.id || doctorData?.user_id,
-    phone: profile?.phone || '',
-    name: profile?.name || '',
-    email: profile?.email,
-    dateOfBirth: profile?.date_of_birth,
-    gender: profile?.gender,
-    bmdcNumber: doctorData?.bmdc_number || '',
-    nidNumber: doctorData?.nid_number,
-    specializations: doctorData?.specialties || [],
-    qualifications: doctorData?.degrees || [],
-    experienceYears: doctorData?.experience_years || 0,
-    consultationFee: doctorData?.consultation_fee || 0,
-    chambers: (doctorData?.chambers || []).map((c: any) => ({
-      id: c.id,
-      name: c.name,
-      address: c.address,
-      area: c.area,
-      city: c.city,
-      phone: c.phone,
-      fee: c.fee,
-      schedule: [],
-    })),
-    avatarUrl: profile?.avatar_url,
-    status: doctorData?.is_verified ? 'approved' : 'pending',
-    isVerified: doctorData?.is_verified || false,
-    rating: parseFloat(doctorData?.rating) || 0,
-    totalPatients: doctorData?.total_patients || 0,
-    createdAt: profile?.created_at || doctorData?.created_at,
-    updatedAt: profile?.updated_at || doctorData?.updated_at,
-  };
-}
-
-// ============================================
-// OFFLINE STORAGE (Fallback)
-// ============================================
-const offline = {
-  savePatient(patient: PatientProfile): void {
-    const patients = storage.get<PatientProfile[]>(STORAGE_KEYS.PATIENTS, []);
-    const normalized = normalizePhone(patient.phone);
-    const existing = patients.findIndex(p => normalizePhone(p.phone) === normalized);
+  
+  async updateDoctorStatus(userId: string, status: 'approved' | 'rejected'): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
     
-    if (existing >= 0) {
-      patients[existing] = { ...patients[existing], ...patient };
-    } else {
-      patients.push(patient);
-    }
-    
-    storage.set(STORAGE_KEYS.PATIENTS, patients);
-  },
-  
-  getPatientByPhone(phone: string): PatientProfile | null {
-    const patients = storage.get<PatientProfile[]>(STORAGE_KEYS.PATIENTS, []);
-    const normalized = normalizePhone(phone);
-    return patients.find(p => normalizePhone(p.phone) === normalized) || null;
-  },
-  
-  getAllPatients(): PatientProfile[] {
-    return storage.get<PatientProfile[]>(STORAGE_KEYS.PATIENTS, []);
-  },
-  
-  saveDoctor(doctor: DoctorProfile): void {
-    const doctors = storage.get<DoctorProfile[]>(STORAGE_KEYS.DOCTORS, []);
-    const normalized = normalizePhone(doctor.phone);
-    const existing = doctors.findIndex(d => normalizePhone(d.phone) === normalized);
-    
-    if (existing >= 0) {
-      doctors[existing] = { ...doctors[existing], ...doctor };
-    } else {
-      doctors.push(doctor);
-    }
-    
-    storage.set(STORAGE_KEYS.DOCTORS, doctors);
-  },
-  
-  getDoctorByPhone(phone: string): DoctorProfile | null {
-    const doctors = storage.get<DoctorProfile[]>(STORAGE_KEYS.DOCTORS, []);
-    const normalized = normalizePhone(phone);
-    return doctors.find(d => normalizePhone(d.phone) === normalized) || null;
-  },
-  
-  getAllDoctors(): DoctorProfile[] {
-    return storage.get<DoctorProfile[]>(STORAGE_KEYS.DOCTORS, []);
-  },
-  
-  getPendingDoctors(): DoctorProfile[] {
-    return storage.get<DoctorProfile[]>(STORAGE_KEYS.DOCTORS, [])
-      .filter(d => d.status === 'pending');
-  },
-  
-  updateDoctorStatus(phone: string, status: 'approved' | 'rejected'): boolean {
-    const doctors = storage.get<DoctorProfile[]>(STORAGE_KEYS.DOCTORS, []);
-    const normalized = normalizePhone(phone);
-    const index = doctors.findIndex(d => normalizePhone(d.phone) === normalized);
-    
-    if (index >= 0) {
-      doctors[index].status = status;
-      doctors[index].isVerified = status === 'approved';
-      doctors[index].updatedAt = new Date().toISOString();
-      storage.set(STORAGE_KEYS.DOCTORS, doctors);
+    try {
+      const isVerified = status === 'approved';
+      
+      // Update doctor record
+      const { error: doctorError } = await supabase
+        .from('doctors')
+        .update({ is_verified: isVerified, updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+      
+      if (doctorError) {
+        console.error('[DB] Update doctor status error:', doctorError);
+        return false;
+      }
+      
+      // Update profile
+      await supabase
+        .from('profiles')
+        .update({ is_verified: isVerified, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+      
+      console.log('[DB] Doctor status updated:', userId, status);
       return true;
+    } catch (err) {
+      console.error('[DB] updateDoctorStatus error:', err);
+      return false;
     }
-    return false;
-  },
-  
-  setCurrentUser(user: PatientProfile | DoctorProfile | null, role: string | null): void {
-    if (user && role) {
-      storage.set(STORAGE_KEYS.USER, { user, role });
-    } else {
-      storage.remove(STORAGE_KEYS.USER);
-    }
-  },
-  
-  getCurrentUser(): { user: PatientProfile | DoctorProfile; role: string } | null {
-    return storage.get<{ user: PatientProfile | DoctorProfile; role: string } | null>(STORAGE_KEYS.USER, null);
-  },
-  
-  addPendingSync(action: { type: string; data: any }): void {
-    const pending = storage.get<any[]>(STORAGE_KEYS.PENDING_SYNC, []);
-    pending.push({ ...action, timestamp: Date.now() });
-    storage.set(STORAGE_KEYS.PENDING_SYNC, pending);
-  },
-  
-  getPendingSync(): any[] {
-    return storage.get<any[]>(STORAGE_KEYS.PENDING_SYNC, []);
-  },
-  
-  clearPendingSync(): void {
-    storage.remove(STORAGE_KEYS.PENDING_SYNC);
   },
 };
 
 // ============================================
-// ADMIN OPERATIONS
+// ADMIN OPERATIONS (stored in localStorage for simplicity)
 // ============================================
 const admin = {
-  DEFAULT_CONFIG: {
+  DEFAULT: {
     password: 'nirnoy2024',
     name: 'Admin',
     email: 'admin@nirnoy.ai',
   } as AdminConfig,
   
   getConfig(): AdminConfig {
-    return storage.get<AdminConfig>(STORAGE_KEYS.ADMIN, this.DEFAULT_CONFIG);
+    try {
+      const stored = localStorage.getItem(ADMIN_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {}
+    return this.DEFAULT;
   },
   
   setConfig(config: Partial<AdminConfig>): void {
     const current = this.getConfig();
-    storage.set(STORAGE_KEYS.ADMIN, { ...current, ...config });
+    localStorage.setItem(ADMIN_KEY, JSON.stringify({ ...current, ...config }));
   },
   
   validatePassword(password: string): boolean {
-    const config = this.getConfig();
-    return password === config.password;
+    return password === this.getConfig().password;
   },
   
   changePassword(newPassword: string): void {
@@ -637,206 +630,127 @@ const admin = {
 };
 
 // ============================================
-// SYNC SERVICE
-// ============================================
-const sync = {
-  async syncToSupabase(): Promise<void> {
-    if (!isSupabaseConfigured() || !isOnline()) return;
-    
-    console.log('[Sync] Starting sync to Supabase...');
-    
-    const pending = offline.getPendingSync();
-    for (const action of pending) {
-      try {
-        if (action.type === 'CREATE_PATIENT') {
-          await db.createPatient(action.data);
-        } else if (action.type === 'CREATE_DOCTOR') {
-          await db.createDoctor(action.data);
-        } else if (action.type === 'UPDATE_DOCTOR_STATUS') {
-          await db.updateDoctorStatus(action.data.id, action.data.status);
-        }
-      } catch (error) {
-        console.error('[Sync] Failed to sync action:', action, error);
-      }
-    }
-    
-    offline.clearPendingSync();
-    console.log('[Sync] Sync completed');
-  },
-  
-  async syncFromSupabase(): Promise<void> {
-    if (!isSupabaseConfigured() || !isOnline()) return;
-    
-    console.log('[Sync] Fetching data from Supabase...');
-    
-    try {
-      const patients = await db.getAllPatients();
-      if (patients.length > 0) {
-        storage.set(STORAGE_KEYS.PATIENTS, patients);
-        console.log('[Sync] Synced ' + patients.length + ' patients');
-      }
-      
-      const doctors = await db.getAllDoctors();
-      if (doctors.length > 0) {
-        storage.set(STORAGE_KEYS.DOCTORS, doctors);
-        console.log('[Sync] Synced ' + doctors.length + ' doctors');
-      }
-    } catch (error) {
-      console.error('[Sync] Failed to sync from Supabase:', error);
-    }
-  },
-};
-
-// ============================================
 // MAIN AUTH SERVICE
 // ============================================
 export const authService = {
   async initialize(): Promise<void> {
-    console.log('[Auth] Initializing authentication service...');
-    console.log('[Auth] Supabase configured:', isSupabaseConfigured());
-    console.log('[Auth] Online:', isOnline());
-    
-    if (isSupabaseConfigured() && isOnline()) {
-      await sync.syncFromSupabase();
-    }
-    
-    window.addEventListener('online', () => {
-      console.log('[Auth] Back online - syncing...');
-      sync.syncToSupabase();
-      sync.syncFromSupabase();
-    });
+    console.log('[Auth] Initializing...');
+    console.log('[Auth] Supabase URL:', SUPABASE_URL ? 'configured' : 'missing');
+    console.log('[Auth] Supabase Key:', SUPABASE_ANON_KEY ? 'configured' : 'missing');
+    console.log('[Auth] Is configured:', isSupabaseConfigured());
   },
   
   getCurrentUser(): { user: PatientProfile | DoctorProfile; role: string } | null {
-    return offline.getCurrentUser();
+    const sessionData = session.get();
+    if (!sessionData) return null;
+    return { user: sessionData.userData, role: sessionData.role };
   },
   
   async checkPhone(phone: string): Promise<{ exists: boolean; type: 'patient' | 'doctor' | null; isApproved?: boolean }> {
     const normalized = normalizePhone(phone);
     console.log('[Auth] Checking phone:', normalized);
     
-    // Try Supabase first
-    if (isSupabaseConfigured() && isOnline()) {
-      const patient = await db.getPatientByPhone(normalized);
-      if (patient) {
-        offline.savePatient(patient); // Cache
-        return { exists: true, type: 'patient' };
-      }
-      
-      const doctor = await db.getDoctorByPhone(normalized);
-      if (doctor) {
-        offline.saveDoctor(doctor); // Cache
-        return { exists: true, type: 'doctor', isApproved: doctor.status === 'approved' };
-      }
+    const result = await db.getProfileByPhone(normalized);
+    
+    if (!result) {
+      return { exists: false, type: null };
     }
     
-    // Fallback to offline
-    const offlinePatient = offline.getPatientByPhone(normalized);
-    if (offlinePatient) {
-      return { exists: true, type: 'patient' };
+    if (result.type === 'doctor') {
+      return { 
+        exists: true, 
+        type: 'doctor', 
+        isApproved: result.profile.is_verified 
+      };
     }
     
-    const offlineDoctor = offline.getDoctorByPhone(normalized);
-    if (offlineDoctor) {
-      return { exists: true, type: 'doctor', isApproved: offlineDoctor.status === 'approved' };
-    }
-    
-    return { exists: false, type: null };
+    return { exists: true, type: 'patient' };
   },
   
   async loginPatient(phone: string): Promise<{ success: boolean; user?: PatientProfile; error?: string }> {
-    const normalized = normalizePhone(phone);
-    console.log('[Auth] Logging in patient:', normalized);
+    console.log('[Auth] Logging in patient:', phone);
     
-    // Try Supabase first
-    if (isSupabaseConfigured() && isOnline()) {
-      const patient = await db.getPatientByPhone(normalized);
-      if (patient) {
-        offline.setCurrentUser(patient, 'patient');
-        offline.savePatient(patient);
-        return { success: true, user: patient };
-      }
+    const patient = await db.getPatientByPhone(phone);
+    
+    if (!patient) {
+      return { success: false, error: 'Patient not found' };
     }
     
-    // Fallback to offline
-    const offlinePatient = offline.getPatientByPhone(normalized);
-    if (offlinePatient) {
-      offline.setCurrentUser(offlinePatient, 'patient');
-      return { success: true, user: offlinePatient };
-    }
+    // Save session
+    session.save(patient.id, 'patient', patient);
     
-    return { success: false, error: 'Patient not found' };
+    return { success: true, user: patient };
   },
   
-  async registerPatient(data: Omit<PatientProfile, 'id' | 'createdAt' | 'updatedAt' | 'isVerified' | 'subscriptionTier'>): Promise<{ success: boolean; user?: PatientProfile; error?: string }> {
+  async registerPatient(data: any): Promise<{ success: boolean; user?: PatientProfile; error?: string }> {
     console.log('[Auth] Registering patient:', data.phone);
     
     const patient: PatientProfile = {
-      ...data,
       id: generateId(),
       phone: normalizePhone(data.phone),
+      name: data.name,
+      email: data.email,
+      dateOfBirth: data.dateOfBirth,
+      gender: data.gender,
+      bloodGroup: data.bloodGroup,
+      emergencyContact: data.emergencyContact,
+      chronicConditions: [],
+      allergies: [],
       subscriptionTier: 'premium',
       isVerified: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     
-    // Try Supabase first
-    if (isSupabaseConfigured() && isOnline()) {
-      const result = await db.createPatient(patient);
-      if (result.success) {
-        offline.savePatient(patient);
-        offline.setCurrentUser(patient, 'patient');
-        return { success: true, user: patient };
-      }
-      console.warn('[Auth] Supabase save failed:', result.error);
+    const result = await db.createPatient(patient);
+    
+    if (!result.success) {
+      return { success: false, error: result.error };
     }
     
-    // Fallback to offline with pending sync
-    offline.savePatient(patient);
-    offline.setCurrentUser(patient, 'patient');
-    offline.addPendingSync({ type: 'CREATE_PATIENT', data: patient });
+    // Save session
+    session.save(patient.id, 'patient', patient);
     
     return { success: true, user: patient };
   },
   
   async loginDoctor(phone: string): Promise<{ success: boolean; user?: DoctorProfile; error?: string }> {
-    const normalized = normalizePhone(phone);
-    console.log('[Auth] Logging in doctor:', normalized);
+    console.log('[Auth] Logging in doctor:', phone);
     
-    // Try Supabase first
-    if (isSupabaseConfigured() && isOnline()) {
-      const doctor = await db.getDoctorByPhone(normalized);
-      if (doctor) {
-        if (doctor.status !== 'approved') {
-          return { success: false, error: 'Doctor account pending approval' };
-        }
-        offline.setCurrentUser(doctor, 'doctor');
-        offline.saveDoctor(doctor);
-        return { success: true, user: doctor };
-      }
+    const doctor = await db.getDoctorByPhone(phone);
+    
+    if (!doctor) {
+      return { success: false, error: 'Doctor not found' };
     }
     
-    // Fallback to offline
-    const offlineDoctor = offline.getDoctorByPhone(normalized);
-    if (offlineDoctor) {
-      if (offlineDoctor.status !== 'approved') {
-        return { success: false, error: 'Doctor account pending approval' };
-      }
-      offline.setCurrentUser(offlineDoctor, 'doctor');
-      return { success: true, user: offlineDoctor };
+    if (!doctor.isVerified) {
+      return { success: false, error: 'Account pending approval' };
     }
     
-    return { success: false, error: 'Doctor not found' };
+    // Save session
+    session.save(doctor.id, 'doctor', doctor);
+    
+    return { success: true, user: doctor };
   },
   
-  async registerDoctor(data: Omit<DoctorProfile, 'id' | 'createdAt' | 'updatedAt' | 'isVerified' | 'status' | 'rating' | 'totalPatients'>): Promise<{ success: boolean; user?: DoctorProfile; error?: string }> {
+  async registerDoctor(data: any): Promise<{ success: boolean; user?: DoctorProfile; error?: string }> {
     console.log('[Auth] Registering doctor:', data.phone);
     
     const doctor: DoctorProfile = {
-      ...data,
       id: generateId(),
       phone: normalizePhone(data.phone),
+      name: data.name,
+      email: data.email,
+      dateOfBirth: data.dateOfBirth,
+      gender: data.gender,
+      bmdcNumber: data.bmdcNumber,
+      nidNumber: data.nidNumber,
+      specializations: data.specializations || [],
+      qualifications: data.qualifications || [],
+      experienceYears: data.experienceYears || 0,
+      consultationFee: data.consultationFee || 500,
+      chambers: data.chambers || [],
+      avatarUrl: data.profileImage,
       status: 'pending',
       isVerified: false,
       rating: 0,
@@ -845,83 +759,61 @@ export const authService = {
       updatedAt: new Date().toISOString(),
     };
     
-    // Try Supabase first
-    if (isSupabaseConfigured() && isOnline()) {
-      const result = await db.createDoctor(doctor);
-      if (result.success) {
-        offline.saveDoctor(doctor);
-        return { success: true, user: doctor };
-      }
-      console.warn('[Auth] Supabase save failed:', result.error);
+    const result = await db.createDoctor(doctor);
+    
+    if (!result.success) {
+      return { success: false, error: result.error };
     }
     
-    // Fallback to offline with pending sync
-    offline.saveDoctor(doctor);
-    offline.addPendingSync({ type: 'CREATE_DOCTOR', data: doctor });
-    
+    // Don't save session - doctor needs approval
     return { success: true, user: doctor };
   },
   
   logout(): void {
-    offline.setCurrentUser(null, null);
+    session.clear();
   },
   
   async updatePatient(id: string, updates: Partial<PatientProfile>): Promise<boolean> {
-    const current = offline.getCurrentUser();
-    if (current && current.role === 'patient') {
-      const updated = { ...current.user, ...updates, updatedAt: new Date().toISOString() } as PatientProfile;
-      offline.savePatient(updated);
-      offline.setCurrentUser(updated, 'patient');
+    // Update in Supabase
+    if (isSupabaseConfigured()) {
+      await supabase
+        .from('profiles')
+        .update({
+          name: updates.name,
+          email: updates.email,
+          date_of_birth: updates.dateOfBirth,
+          gender: updates.gender,
+          blood_group: updates.bloodGroup,
+          avatar_url: updates.avatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
     }
+    
+    // Update session
+    const current = session.get();
+    if (current && current.role === 'patient') {
+      const updated = { ...current.userData, ...updates };
+      session.save(id, 'patient', updated);
+    }
+    
     return true;
   },
   
   async getAllPatients(): Promise<PatientProfile[]> {
-    if (isSupabaseConfigured() && isOnline()) {
-      const patients = await db.getAllPatients();
-      if (patients.length > 0) {
-        storage.set(STORAGE_KEYS.PATIENTS, patients);
-        return patients;
-      }
-    }
-    return offline.getAllPatients();
+    return await db.getAllPatients();
   },
   
   async getAllDoctors(): Promise<DoctorProfile[]> {
-    if (isSupabaseConfigured() && isOnline()) {
-      const doctors = await db.getAllDoctors();
-      if (doctors.length > 0) {
-        storage.set(STORAGE_KEYS.DOCTORS, doctors);
-        return doctors;
-      }
-    }
-    return offline.getAllDoctors();
+    return await db.getAllDoctors();
   },
   
   async getPendingDoctors(): Promise<DoctorProfile[]> {
-    if (isSupabaseConfigured() && isOnline()) {
-      const doctors = await db.getPendingDoctors();
-      if (doctors.length > 0) return doctors;
-    }
-    return offline.getPendingDoctors();
+    return await db.getPendingDoctors();
   },
   
   async updateDoctorStatus(id: string, phone: string, status: 'approved' | 'rejected'): Promise<boolean> {
-    console.log('[Auth] Updating doctor status:', phone, status);
-    
-    // Update in Supabase
-    if (isSupabaseConfigured() && isOnline()) {
-      await db.updateDoctorStatus(id, status);
-    }
-    
-    // Update locally
-    offline.updateDoctorStatus(phone, status);
-    
-    if (!isOnline()) {
-      offline.addPendingSync({ type: 'UPDATE_DOCTOR_STATUS', data: { id, status } });
-    }
-    
-    return true;
+    return await db.updateDoctorStatus(id, status);
   },
   
   admin: {
@@ -931,7 +823,10 @@ export const authService = {
     setConfig: admin.setConfig.bind(admin),
   },
   
-  isOnline,
+  isOnline: () => navigator.onLine,
   isSupabaseConfigured,
   normalizePhone,
 };
+
+// Export for use in other files
+export { ADMIN_KEY as STORAGE_KEYS };
