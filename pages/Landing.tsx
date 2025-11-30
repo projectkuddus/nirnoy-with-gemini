@@ -54,26 +54,24 @@ const getCurrentTrivia = () => {
 // Trivia Strip Component
 const HealthTriviaStrip: React.FC = () => {
   const { language } = useLanguage();
+  const navigate = useNavigate();
   const [trivia, setTrivia] = useState(getCurrentTrivia());
   const [isAnimating, setIsAnimating] = useState(false);
+  const [clickCount, setClickCount] = useState(0);
   const isBn = language === 'bn';
   
-  // Update trivia every hour
+  // Update trivia every hour automatically
   useEffect(() => {
     const interval = setInterval(() => {
-      setIsAnimating(true);
-      setTimeout(() => {
-        setTrivia(getCurrentTrivia());
-        setIsAnimating(false);
-      }, 300);
+      refreshTrivia();
     }, 3600000); // 1 hour
-    
     return () => clearInterval(interval);
   }, []);
   
-  // Manual refresh for demo
+  // Refresh trivia with animation
   const refreshTrivia = () => {
     setIsAnimating(true);
+    setClickCount(prev => prev + 1);
     setTimeout(() => {
       const randomIndex = Math.floor(Math.random() * HEALTH_TRIVIA.length);
       setTrivia(HEALTH_TRIVIA[randomIndex]);
@@ -82,44 +80,49 @@ const HealthTriviaStrip: React.FC = () => {
   };
   
   return (
-    <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -left-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-xl animate-pulse"></div>
-        <div className="absolute right-1/4 -bottom-4 w-32 h-32 bg-white/10 rounded-full blur-xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute right-10 top-0 w-16 h-16 bg-white/10 rounded-full blur-lg animate-pulse" style={{ animationDelay: '0.5s' }}></div>
-      </div>
-      
-      <div className="max-w-7xl mx-auto px-4 py-3 relative">
-        <div className={`flex items-center justify-center gap-4 transition-all duration-300 ${isAnimating ? 'opacity-0 transform -translate-y-2' : 'opacity-100 transform translate-y-0'}`}>
-          {/* Icon */}
-          <span className="text-2xl md:text-3xl">{trivia.icon}</span>
+    <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 border-y border-slate-700/50">
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex items-center gap-4">
+          {/* Fun Icon with bounce animation */}
+          <div 
+            className={`text-4xl cursor-pointer transition-transform hover:scale-125 ${isAnimating ? 'animate-bounce' : ''}`}
+            onClick={refreshTrivia}
+          >
+            {trivia.icon}
+          </div>
           
           {/* Content */}
-          <div className="flex-1 text-center">
-            <span className="inline-block px-2 py-0.5 bg-white/20 rounded-full text-[10px] md:text-xs text-white/90 font-medium mb-1">
-              {trivia.category}
-            </span>
-            <p className="text-white text-sm md:text-base font-medium leading-snug">
+          <div className={`flex-1 transition-all duration-300 ${isAnimating ? 'opacity-0 translate-x-4' : 'opacity-100 translate-x-0'}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full text-xs font-bold">
+                💡 {isBn ? 'জানেন কি?' : 'Did You Know?'}
+              </span>
+              <span className="text-slate-500 text-xs">
+                #{clickCount + 1} • {trivia.category}
+              </span>
+            </div>
+            <p className="text-white text-sm md:text-base font-medium">
               {isBn ? trivia.bn : trivia.en}
             </p>
           </div>
           
-          {/* Refresh button */}
-          <button 
-            onClick={refreshTrivia}
-            className="p-2 hover:bg-white/20 rounded-full transition-colors group"
-            title={isBn ? 'নতুন তথ্য দেখুন' : 'See another fact'}
-          >
-            <i className="fas fa-sync-alt text-white/70 group-hover:text-white text-sm transition-transform group-hover:rotate-180 duration-500"></i>
-          </button>
-        </div>
-        
-        {/* CTA for non-logged users */}
-        <div className="text-center mt-2">
-          <span className="text-white/60 text-xs">
-            {isBn ? '🌟 নির্ণয়ে যোগ দিন - বিনামূল্যে স্বাস্থ্য পরামর্শ পান!' : '🌟 Join Nirnoy - Get free health consultations!'}
-          </span>
+          {/* Action buttons */}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={refreshTrivia}
+              className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-all group border border-white/10"
+              title={isBn ? 'আরেকটি দেখুন' : 'Show another'}
+            >
+              <i className={`fas fa-dice text-blue-400 group-hover:text-blue-300 transition-transform ${isAnimating ? 'animate-spin' : 'group-hover:rotate-12'}`}></i>
+            </button>
+            <button 
+              onClick={() => navigate('/patient-auth')}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-bold rounded-lg hover:from-blue-600 hover:to-indigo-600 transition shadow-lg shadow-blue-500/25"
+            >
+              <i className="fas fa-user-plus"></i>
+              {isBn ? 'যোগ দিন' : 'Join Free'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -218,19 +221,16 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
       <Navbar userRole={userRole} onLogout={handleLogout} />
 
       {/* Health Trivia Strip */}
-      <HealthTriviaStrip />
-
-      {/* Hero Section */}
       <section className="pt-24 pb-16 px-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
             <div className="space-y-8">
               <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                   </span>
                   {isBn ? 'ঢাকা জুড়ে সক্রিয়' : 'Active Across Dhaka'}
                 </div>
@@ -274,7 +274,7 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
                   <p className="text-sm text-slate-500">{isBn ? 'সন্তুষ্ট রোগী' : 'Happy Patients'}</p>
                 </div>
                 <div>
-                  <p className="text-3xl font-black text-green-600">24/7</p>
+                  <p className="text-3xl font-black text-blue-600">24/7</p>
                   <p className="text-sm text-slate-500">{isBn ? 'AI সাপোর্ট' : 'AI Support'}</p>
                 </div>
               </div>
@@ -322,6 +322,9 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
         </div>
       </section>
 
+
+      {/* Fun Health Trivia - Above Why Nirnoy */}
+      <HealthTriviaStrip />
       {/* Features Section */}
       <section className="py-16 px-6 bg-gradient-to-br from-slate-900 to-slate-800">
         <div className="max-w-7xl mx-auto">
@@ -335,9 +338,9 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
               { icon: 'fa-microphone-alt', title: isBn ? 'ভয়েস বুকিং' : 'Voice Booking', desc: isBn ? 'বাংলায় কথা বলে অ্যাপয়েন্টমেন্ট নিন' : 'Book appointments by speaking in Bangla', color: 'from-blue-500 to-indigo-500' },
               { icon: 'fa-users', title: isBn ? 'পারিবারিক স্বাস্থ্য' : 'Family Health', desc: isBn ? 'পুরো পরিবারের স্বাস্থ্য এক জায়গায়' : 'Manage your entire family health', color: 'from-pink-500 to-rose-500' },
               { icon: 'fa-brain', title: isBn ? 'AI হেলথ ব্রেইন' : 'AI Health Brain', desc: isBn ? 'আপনার স্বাস্থ্যের সম্পূর্ণ চিত্র' : 'Complete picture of your health', color: 'from-amber-500 to-orange-500' },
-              { icon: 'fa-clock', title: isBn ? 'লাইভ কিউ' : 'Live Queue', desc: isBn ? 'রিয়েল-টাইম সিরিয়াল ট্র্যাকিং' : 'Real-time serial tracking', color: 'from-green-500 to-emerald-500' },
+              { icon: 'fa-clock', title: isBn ? 'লাইভ কিউ' : 'Live Queue', desc: isBn ? 'রিয়েল-টাইম সিরিয়াল ট্র্যাকিং' : 'Real-time serial tracking', color: 'from-blue-500 to-indigo-500' },
               { icon: 'fa-file-medical', title: isBn ? 'ডিজিটাল রেকর্ড' : 'Digital Records', desc: isBn ? 'সব রিপোর্ট ও প্রেসক্রিপশন এক জায়গায়' : 'All reports & prescriptions in one place', color: 'from-purple-500 to-violet-500' },
-              { icon: 'fa-bell', title: isBn ? 'স্মার্ট এলার্ট' : 'Smart Alerts', desc: isBn ? 'SMS ও পুশ নোটিফিকেশন' : 'SMS & push notifications', color: 'from-cyan-500 to-teal-500' },
+              { icon: 'fa-bell', title: isBn ? 'স্মার্ট এলার্ট' : 'Smart Alerts', desc: isBn ? 'SMS ও পুশ নোটিফিকেশন' : 'SMS & push notifications', color: 'from-indigo-500 to-purple-500' },
             ].map((feature, i) => (
               <div key={i} className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10 hover:border-white/20 transition group">
                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition`}>
@@ -415,7 +418,7 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
               <i className="fas fa-code"></i> Dev Mode
             </p>
             <div className="space-y-2">
-              <button onClick={() => navigate("/patient-auth")} className="w-full py-2 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl text-sm font-bold">
+              <button onClick={() => navigate("/patient-auth")} className="w-full py-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl text-sm font-bold">
                 Patient Login
               </button>
               <button onClick={() => navigate("/doctor-registration")} className="w-full py-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl text-sm font-bold">
