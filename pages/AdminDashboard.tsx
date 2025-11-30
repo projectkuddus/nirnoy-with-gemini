@@ -397,7 +397,9 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleAdminLogin = () => {
+    console.log("[Admin] Login attempt with password:", adminPassword);
     const settings = getAdminSettings();
+    console.log("[Admin] Stored settings:", settings);
     if (adminPassword === settings.adminPassword) {
       localStorage.setItem(ADMIN_STORAGE.AUTH, 'authenticated');
       setIsAuthenticated(true);
