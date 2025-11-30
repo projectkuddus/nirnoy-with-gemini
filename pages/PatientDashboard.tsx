@@ -8,6 +8,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth, PatientProfile } from '../contexts/AuthContext';
+import { saveFeedback } from '../components/FeedbackWidget';
 
 // ============ TYPES ============
 interface QuizQuestion {
@@ -62,6 +63,9 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
+  // Health insights from AI
+  const [healthInsights, setHealthInsights] = useState<string[]>([]);
+  
   // Profile & Pricing
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -81,7 +85,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   
   // Feedback state
   const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackCategory, setFeedbackCategory] = useState('general');
+  const [feedbackCategory, setFeedbackCategory] = useState<'general' | 'bug' | 'feature' | 'complaint'>('general');
   const [feedbackSent, setFeedbackSent] = useState(false);
   
   // Safe user data
@@ -122,12 +126,12 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
   useEffect(() => {
     if (patientUser && messages.length === 0) {
-      const greeting = isBn 
-        ? 'আসসালামু আলাইকুম ' + patientUser.name + '! আমি নির্ণয় এআই। আপনার স্বাস্থ্য সমস্যা বলুন, আমি সাহায্য করব এবং প্রয়োজনে নির্ণয়ের ডাক্তারদের কাছে অ্যাপয়েন্টমেন্ট নিতে সাহায্য করব।'
-        : 'Hello ' + patientUser.name + '! I am Nirnoy AI. Tell me your health concerns, I will help and can book appointments with Nirnoy doctors if needed.';
-      setMessages([{ role: 'assistant', content: greeting }]);
+      setMessages([{ 
+        role: 'assistant', 
+        content: `আসসালামু আলাইকুম ${patientUser.name}! 👋\n\nআমি নির্ণয় এআই। আপনার শারীরিক সমস্যা বলুন, আমি সমস্যা চিহ্নিত করতে সাহায্য করব এবং প্রয়োজনে সঠিক ডাক্তারের কাছে যেতে বলব।\n\n⚠️ দ্রষ্টব্য: আমি কোনো ওষুধ বা প্রেসক্রিপশন দিতে পারি না। শুধুমাত্র সমস্যা বুঝতে সাহায্য করব।`
+      }]);
     }
-  }, [patientUser, isBn, messages.length]);
+  }, [patientUser, messages.length]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -140,7 +144,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     navigate('/', { replace: true });
   };
 
-  // SMART AI - Only recommends Nirnoy
+  // BANGLA AI - No prescriptions, only identify problems
   const handleSendMessage = async () => {
     if (!chatInput.trim() || isTyping) return;
     
@@ -149,33 +153,38 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsTyping(true);
     
-    // Simulate AI thinking
     await new Promise(r => setTimeout(r, 1500));
     
-    // Smart response based on keywords
     const msgLower = userMessage.toLowerCase();
     let response = '';
+    let detectedCondition = '';
     
-    if (msgLower.includes('headache') || msgLower.includes('মাথা') || msgLower.includes('ব্যথা')) {
-      response = isBn 
-        ? `${patientUser?.name}, মাথাব্যথার জন্য:\n\n✅ পরামর্শ:\n১. পর্যাপ্ত বিশ্রাম নিন\n২. প্রচুর পানি পান করুন\n৩. অন্ধকার ঘরে বিশ্রাম নিন\n\n💊 প্যারাসিটামল নিতে পারেন (৫০০mg)\n\n⚠️ যদি ২-৩ দিনে না কমে, নির্ণয়ের একজন নিউরোলজিস্টের সাথে অ্যাপয়েন্টমেন্ট নিন।\n\n👨‍⚕️ অ্যাপয়েন্টমেন্ট বুক করতে "ডাক্তার বুক করুন" বলুন।`
-        : `${patientUser?.name}, for your headache:\n\n✅ Advice:\n1. Get adequate rest\n2. Stay hydrated\n3. Rest in a dark room\n\n💊 You can take Paracetamol (500mg)\n\n⚠️ If it persists for 2-3 days, book an appointment with a Nirnoy neurologist.\n\n👨‍⚕️ Say "book doctor" to schedule an appointment.`;
-    } else if (msgLower.includes('fever') || msgLower.includes('জ্বর')) {
-      response = isBn
-        ? `${patientUser?.name}, জ্বরের জন্য:\n\n✅ পরামর্শ:\n১. প্রচুর পানি ও তরল খান\n২. হালকা কাপড় পরুন\n৩. বিশ্রাম নিন\n\n💊 প্যারাসিটামল নিতে পারেন\n\n⚠️ ১০২°F এর বেশি হলে বা ৩ দিনের বেশি থাকলে নির্ণয়ের একজন মেডিসিন বিশেষজ্ঞের সাথে দেখা করুন।\n\n👨‍⚕️ "ডাক্তার দেখান" বলুন অ্যাপয়েন্টমেন্টের জন্য।`
-        : `${patientUser?.name}, for your fever:\n\n✅ Advice:\n1. Drink plenty of fluids\n2. Wear light clothing\n3. Rest well\n\n💊 You can take Paracetamol\n\n⚠️ If above 102°F or lasting more than 3 days, see a Nirnoy medicine specialist.\n\n👨‍⚕️ Say "see doctor" to book an appointment.`;
-    } else if (msgLower.includes('doctor') || msgLower.includes('ডাক্তার') || msgLower.includes('book') || msgLower.includes('বুক')) {
-      response = isBn
-        ? `অবশ্যই! নির্ণয়তে আমাদের ৫০০+ বিশেষজ্ঞ ডাক্তার আছেন।\n\n🏥 ডাক্তার খুঁজতে:\n১. হোম পেজে যান\n২. "ডাক্তার খুঁজুন" এ ক্লিক করুন\n৩. বিশেষত্ব বা এলাকা দিয়ে খুঁজুন\n\n📅 অথবা সরাসরি অ্যাপয়েন্টমেন্ট পেজে যান।\n\nআপনার কোন ধরনের ডাক্তার দরকার?`
-        : `Of course! Nirnoy has 500+ specialist doctors.\n\n🏥 To find a doctor:\n1. Go to Home page\n2. Click "Find Doctor"\n3. Search by specialty or area\n\n📅 Or go directly to Appointments page.\n\nWhat type of doctor do you need?`;
-    } else if (msgLower.includes('stomach') || msgLower.includes('পেট') || msgLower.includes('digestion') || msgLower.includes('হজম')) {
-      response = isBn
-        ? `${patientUser?.name}, পেটের সমস্যার জন্য:\n\n✅ পরামর্শ:\n১. হালকা খাবার খান\n২. তেল-মশলা এড়িয়ে চলুন\n৩. প্রচুর পানি পান করুন\n\n💊 অ্যান্টাসিড নিতে পারেন\n\n⚠️ রক্ত গেলে বা তীব্র ব্যথা হলে জরুরি ভিত্তিতে নির্ণয়ের গ্যাস্ট্রোএন্টেরোলজিস্ট দেখান।\n\n👨‍⚕️ অ্যাপয়েন্টমেন্টের জন্য "ডাক্তার বুক করুন" বলুন।`
-        : `${patientUser?.name}, for stomach issues:\n\n✅ Advice:\n1. Eat light meals\n2. Avoid oily/spicy food\n3. Stay hydrated\n\n💊 You can take antacids\n\n⚠️ If there's blood or severe pain, urgently see a Nirnoy gastroenterologist.\n\n👨‍⚕️ Say "book doctor" for an appointment.`;
+    if (msgLower.includes('headache') || msgLower.includes('মাথা') || msgLower.includes('ব্যথা') || msgLower.includes('মাথাব্যথা')) {
+      detectedCondition = 'মাথাব্যথা';
+      response = `${patientUser?.name}, আপনার মাথাব্যথার কথা শুনে দুঃখিত। 😔\n\n🔍 সমস্যা চিহ্নিতকরণ:\nমাথাব্যথা বিভিন্ন কারণে হতে পারে:\n• টেনশন বা স্ট্রেস\n• ঘুমের অভাব\n• পানিশূন্যতা\n• চোখের সমস্যা\n• মাইগ্রেন\n\n❓ আরো জানতে বলুন:\n• কতক্ষণ ধরে ব্যথা হচ্ছে?\n• মাথার কোন অংশে ব্যথা?\n• আগেও এরকম হয়েছে?\n\n👨‍⚕️ যদি ব্যথা তীব্র হয় বা ২-৩ দিনের বেশি থাকে, নির্ণয়ের একজন নিউরোলজিস্ট দেখান।\n\n📝 আপনার প্রোফাইলে "মাথাব্যথা" যোগ করা হয়েছে।`;
+    } else if (msgLower.includes('fever') || msgLower.includes('জ্বর') || msgLower.includes('তাপ')) {
+      detectedCondition = 'জ্বর';
+      response = `${patientUser?.name}, জ্বরের কথা জানালেন। 🤒\n\n🔍 সমস্যা চিহ্নিতকরণ:\nজ্বর সাধারণত শরীরের প্রতিরক্ষা ব্যবস্থার অংশ। কারণ হতে পারে:\n• ভাইরাল ইনফেকশন\n• ব্যাকটেরিয়াল ইনফেকশন\n• সর্দি-কাশি\n• ডেঙ্গু (মশার কামড় থাকলে)\n\n❓ আরো জানতে বলুন:\n• কত ডিগ্রি জ্বর?\n• কতদিন ধরে?\n• অন্য কোনো লক্ষণ আছে?\n\n👨‍⚕️ ১০২°F এর বেশি হলে বা ৩ দিনের বেশি থাকলে নির্ণয়ের মেডিসিন বিশেষজ্ঞ দেখান।\n\n📝 আপনার প্রোফাইলে "জ্বর" যোগ করা হয়েছে।`;
+    } else if (msgLower.includes('stomach') || msgLower.includes('পেট') || msgLower.includes('বমি') || msgLower.includes('ডায়রিয়া')) {
+      detectedCondition = 'পেটের সমস্যা';
+      response = `${patientUser?.name}, পেটের সমস্যার কথা বললেন। 😣\n\n🔍 সমস্যা চিহ্নিতকরণ:\nপেটের সমস্যার কারণ হতে পারে:\n• খাবারে সমস্যা\n• গ্যাস্ট্রিক\n• ফুড পয়জনিং\n• ইনফেকশন\n\n❓ আরো জানতে বলুন:\n• ব্যথা কোথায়?\n• বমি বা ডায়রিয়া আছে?\n• কি খেয়েছিলেন?\n\n👨‍⚕️ রক্ত গেলে বা তীব্র ব্যথা হলে জরুরি ভিত্তিতে নির্ণয়ের গ্যাস্ট্রোএন্টেরোলজিস্ট দেখান।\n\n📝 আপনার প্রোফাইলে "পেটের সমস্যা" যোগ করা হয়েছে।`;
+    } else if (msgLower.includes('cold') || msgLower.includes('সর্দি') || msgLower.includes('কাশি') || msgLower.includes('cough')) {
+      detectedCondition = 'সর্দি-কাশি';
+      response = `${patientUser?.name}, সর্দি-কাশির কথা বললেন। 🤧\n\n🔍 সমস্যা চিহ্নিতকরণ:\nসর্দি-কাশি সাধারণত ভাইরাল ইনফেকশন। লক্ষণ:\n• নাক দিয়ে পানি পড়া\n• গলা ব্যথা\n• হাঁচি\n• কাশি\n\n❓ আরো জানতে বলুন:\n• কতদিন ধরে?\n• জ্বর আছে?\n• শ্বাসকষ্ট আছে?\n\n👨‍⚕️ শ্বাসকষ্ট হলে বা ৭ দিনের বেশি থাকলে নির্ণয়ের ENT বা মেডিসিন বিশেষজ্ঞ দেখান।\n\n📝 আপনার প্রোফাইলে "সর্দি-কাশি" যোগ করা হয়েছে।`;
+    } else if (msgLower.includes('doctor') || msgLower.includes('ডাক্তার') || msgLower.includes('অ্যাপয়েন্টমেন্ট')) {
+      response = `অবশ্যই ${patientUser?.name}! 👨‍⚕️\n\nনির্ণয়তে ৫০০+ বিশেষজ্ঞ ডাক্তার আছেন।\n\n📋 কিভাবে অ্যাপয়েন্টমেন্ট নিবেন:\n১. হোম পেজে যান\n২. "অ্যাপয়েন্টমেন্ট" এ ক্লিক করুন\n৩. বিশেষত্ব বা এলাকা দিয়ে খুঁজুন\n৪. সময় নির্বাচন করুন\n\nআপনার কোন ধরনের ডাক্তার দরকার? বলুন, আমি সাহায্য করি।`;
+    } else if (msgLower.includes('thank') || msgLower.includes('ধন্যবাদ') || msgLower.includes('শুকরিয়া')) {
+      response = `আপনাকেও ধন্যবাদ ${patientUser?.name}! 😊\n\nআপনার স্বাস্থ্য ভালো থাকুক। যেকোনো সমস্যায় আবার জানাবেন।\n\n💙 নির্ণয় সবসময় আপনার পাশে।`;
     } else {
-      response = isBn
-        ? `ধন্যবাদ ${patientUser?.name}। আপনার সমস্যাটি বিস্তারিত বলুন। আমি সাহায্য করতে চাই।\n\nআপনি জিজ্ঞাসা করতে পারেন:\n• মাথা ব্যথা\n• জ্বর\n• পেটের সমস্যা\n• ডাক্তার খুঁজুন\n\n👨‍⚕️ যেকোনো সমস্যায় নির্ণয়ের ডাক্তারদের সাথে অ্যাপয়েন্টমেন্ট নিতে পারবেন।`
-        : `Thank you ${patientUser?.name}. Please describe your problem in detail. I want to help.\n\nYou can ask about:\n• Headache\n• Fever\n• Stomach issues\n• Find a doctor\n\n👨‍⚕️ For any health concern, you can book appointments with Nirnoy doctors.`;
+      response = `${patientUser?.name}, আপনার কথা শুনলাম। 🤔\n\nআরেকটু বিস্তারিত বলুন:\n• কোথায় সমস্যা হচ্ছে?\n• কতদিন ধরে?\n• কি ধরনের অনুভূতি?\n\nআমি সমস্যা চিহ্নিত করে সঠিক ডাক্তারের কাছে যেতে সাহায্য করব।\n\n💡 আপনি বলতে পারেন:\n• মাথা ব্যথা করছে\n• জ্বর হয়েছে\n• পেটে সমস্যা\n• সর্দি-কাশি\n• ডাক্তার দেখাতে চাই`;
+    }
+    
+    // Add detected condition to health insights
+    if (detectedCondition) {
+      setHealthInsights(prev => {
+        const updated = [...prev, `${new Date().toLocaleDateString('bn-BD')}: ${detectedCondition}`];
+        return updated.slice(-10); // Keep last 10
+      });
     }
     
     setMessages(prev => [...prev, { role: 'assistant', content: response }]);
@@ -204,13 +213,13 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       
       const success = await updateProfile(updates);
       if (success) {
-        setSaveMessage(isBn ? '✓ সংরক্ষিত' : '✓ Saved');
+        setSaveMessage('✓ সংরক্ষিত');
         setIsEditing(false);
       } else {
-        setSaveMessage(isBn ? '✗ ব্যর্থ' : '✗ Failed');
+        setSaveMessage('✗ ব্যর্থ');
       }
     } catch (e) {
-      setSaveMessage(isBn ? '✗ ত্রুটি' : '✗ Error');
+      setSaveMessage('✗ ত্রুটি');
     }
     
     setSaving(false);
@@ -233,19 +242,24 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     }
   };
 
-  const submitFeedback = async () => {
-    if (!feedbackText.trim()) return;
-    // Save to localStorage for now (will be Supabase)
-    const feedbacks = JSON.parse(localStorage.getItem('nirnoy_feedbacks') || '[]');
-    feedbacks.push({
+  const submitFeedback = () => {
+    if (!feedbackText.trim() || !patientUser) return;
+    
+    // Use the proper saveFeedback function from FeedbackWidget
+    saveFeedback({
       id: Date.now().toString(),
-      userId: patientUser?.id,
-      userName: patientUser?.name,
-      category: feedbackCategory,
+      type: feedbackCategory,
+      mood: 'neutral',
       message: feedbackText,
-      createdAt: new Date().toISOString()
+      page: '/patient-dashboard',
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+      userId: patientUser.id,
+      userRole: 'patient',
+      userName: patientUser.name,
+      status: 'new'
     });
-    localStorage.setItem('nirnoy_feedbacks', JSON.stringify(feedbacks));
+    
     setFeedbackSent(true);
     setFeedbackText('');
     setTimeout(() => setFeedbackSent(false), 3000);
@@ -257,7 +271,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">{isBn ? 'লোড হচ্ছে...' : 'Loading...'}</p>
+          <p className="text-gray-600">লোড হচ্ছে...</p>
         </div>
       </div>
     );
@@ -268,7 +282,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">{isBn ? 'লগইন পেজে যাচ্ছে...' : 'Redirecting...'}</p>
+          <p className="text-gray-600">লগইন পেজে যাচ্ছে...</p>
         </div>
       </div>
     );
@@ -281,7 +295,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-blue-600">{isBn ? 'নির্ণয়' : 'Nirnoy'}</span>
+            <span className="text-2xl font-bold text-blue-600">নির্ণয়</span>
             <span className="bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-xs font-medium">
               {(patientUser.subscriptionTier || 'free').toUpperCase()}
             </span>
@@ -289,7 +303,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           <div className="flex items-center gap-3">
             <span className="text-gray-700 text-sm hidden sm:block">{patientUser.name}</span>
             <button onClick={handleLogout} className="text-red-500 hover:text-red-600 text-sm font-medium">
-              {isBn ? 'লগআউট' : 'Logout'}
+              লগআউট
             </button>
           </div>
         </div>
@@ -300,11 +314,11 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex gap-4 overflow-x-auto">
             {[
-              { id: 'home', icon: '🏠', label: isBn ? 'হোম' : 'Home' },
-              { id: 'ai', icon: '🤖', label: isBn ? 'এআই সহকারী' : 'AI Assistant' },
-              { id: 'quiz', icon: '🎯', label: isBn ? 'কুইজ' : 'Quiz' },
-              { id: 'feedback', icon: '💬', label: isBn ? 'মতামত' : 'Feedback' },
-              { id: 'profile', icon: '👤', label: isBn ? 'প্রোফাইল' : 'Profile' },
+              { id: 'home', icon: '🏠', label: 'হোম' },
+              { id: 'ai', icon: '🤖', label: 'এআই সহকারী' },
+              { id: 'quiz', icon: '🎯', label: 'কুইজ' },
+              { id: 'feedback', icon: '💬', label: 'মতামত' },
+              { id: 'profile', icon: '👤', label: 'প্রোফাইল' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -330,16 +344,16 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         {activeTab === 'home' && (
           <div className="space-y-6">
             <div className="bg-blue-600 rounded-xl p-6 text-white">
-              <h1 className="text-xl font-semibold mb-1">{isBn ? 'স্বাগতম, ' + patientUser.name : 'Welcome, ' + patientUser.name}</h1>
-              <p className="text-blue-100 text-sm">{isBn ? 'আপনার স্বাস্থ্য ড্যাশবোর্ড' : 'Your health dashboard'}</p>
+              <h1 className="text-xl font-semibold mb-1">স্বাগতম, {patientUser.name}!</h1>
+              <p className="text-blue-100 text-sm">আপনার স্বাস্থ্য ড্যাশবোর্ড</p>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { icon: '❤️', value: patientUser.healthScore || 85, label: isBn ? 'স্বাস্থ্য স্কোর' : 'Health Score' },
-                { icon: '🏆', value: patientUser.quizPoints || 0, label: isBn ? 'পয়েন্ট' : 'Points' },
-                { icon: '🔥', value: patientUser.streakDays || 0, label: isBn ? 'স্ট্রিক' : 'Streak' },
-                { icon: '📅', value: 0, label: isBn ? 'অ্যাপয়েন্টমেন্ট' : 'Appointments' },
+                { icon: '❤️', value: patientUser.healthScore || 85, label: 'স্বাস্থ্য স্কোর' },
+                { icon: '🏆', value: patientUser.quizPoints || 0, label: 'পয়েন্ট' },
+                { icon: '🔥', value: patientUser.streakDays || 0, label: 'স্ট্রিক' },
+                { icon: '📅', value: 0, label: 'অ্যাপয়েন্টমেন্ট' },
               ].map((stat, i) => (
                 <div key={i} className="bg-white rounded-lg p-4 border border-gray-200">
                   <div className="text-2xl mb-1">{stat.icon}</div>
@@ -349,24 +363,36 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               ))}
             </div>
 
+            {/* Health Insights */}
+            {healthInsights.length > 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <h2 className="font-semibold text-gray-800 mb-3">📋 সাম্প্রতিক স্বাস্থ্য সমস্যা</h2>
+                <div className="space-y-2">
+                  {healthInsights.map((insight, i) => (
+                    <div key={i} className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded">{insight}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <h2 className="font-semibold text-gray-800 mb-4">{isBn ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}</h2>
+              <h2 className="font-semibold text-gray-800 mb-4">দ্রুত অ্যাকশন</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <button onClick={() => setActiveTab('ai')} className="p-4 bg-gray-50 hover:bg-blue-50 rounded-lg text-center transition-colors">
                   <span className="text-2xl block mb-1">🤖</span>
-                  <span className="text-xs text-gray-600">{isBn ? 'এআই সহকারী' : 'AI Assistant'}</span>
+                  <span className="text-xs text-gray-600">এআই সহকারী</span>
                 </button>
                 <Link to="/my-appointments" className="p-4 bg-gray-50 hover:bg-blue-50 rounded-lg text-center transition-colors">
                   <span className="text-2xl block mb-1">📅</span>
-                  <span className="text-xs text-gray-600">{isBn ? 'অ্যাপয়েন্টমেন্ট' : 'Appointments'}</span>
+                  <span className="text-xs text-gray-600">অ্যাপয়েন্টমেন্ট</span>
                 </Link>
                 <button onClick={() => setActiveTab('quiz')} className="p-4 bg-gray-50 hover:bg-blue-50 rounded-lg text-center transition-colors">
                   <span className="text-2xl block mb-1">🎯</span>
-                  <span className="text-xs text-gray-600">{isBn ? 'কুইজ খেলুন' : 'Play Quiz'}</span>
+                  <span className="text-xs text-gray-600">কুইজ খেলুন</span>
                 </button>
                 <button onClick={() => setActiveTab('feedback')} className="p-4 bg-gray-50 hover:bg-blue-50 rounded-lg text-center transition-colors">
                   <span className="text-2xl block mb-1">💬</span>
-                  <span className="text-xs text-gray-600">{isBn ? 'মতামত দিন' : 'Give Feedback'}</span>
+                  <span className="text-xs text-gray-600">মতামত দিন</span>
                 </button>
               </div>
             </div>
@@ -377,8 +403,8 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         {activeTab === 'ai' && (
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden h-[calc(100vh-200px)] flex flex-col">
             <div className="bg-blue-600 p-4 text-white">
-              <h2 className="font-semibold">{isBn ? '🤖 নির্ণয় এআই সহকারী' : '🤖 Nirnoy AI Assistant'}</h2>
-              <p className="text-sm text-blue-100">{isBn ? 'আপনার স্বাস্থ্য সমস্যা বলুন' : 'Tell me your health concerns'}</p>
+              <h2 className="font-semibold">🤖 নির্ণয় এআই সহকারী</h2>
+              <p className="text-sm text-blue-100">সমস্যা বলুন, সমাধান খুঁজি (ওষুধ দিতে পারব না)</p>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -407,7 +433,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder={isBn ? 'আপনার সমস্যা লিখুন...' : 'Describe your problem...'}
+                  placeholder="আপনার সমস্যা লিখুন..."
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                   disabled={isTyping}
@@ -417,7 +443,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                   disabled={isTyping || !chatInput.trim()}
                   className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-5 py-2 rounded-lg text-sm font-medium"
                 >
-                  {isBn ? 'পাঠান' : 'Send'}
+                  পাঠান
                 </button>
               </div>
             </div>
@@ -427,31 +453,31 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         {/* QUIZ TAB */}
         {activeTab === 'quiz' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">{isBn ? '🎯 স্বাস্থ্য কুইজ' : '🎯 Health Quiz'}</h2>
+            <h2 className="text-lg font-semibold text-gray-800">🎯 স্বাস্থ্য কুইজ</h2>
             
             {!currentQuiz ? (
               <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
                 <div className="text-5xl mb-4">🎯</div>
-                <h3 className="font-semibold text-gray-800 mb-2">{isBn ? 'দৈনিক স্বাস্থ্য কুইজ' : 'Daily Health Quiz'}</h3>
-                <p className="text-gray-500 text-sm mb-4">{isBn ? 'আপনার স্বাস্থ্য সম্পর্কে জানুন এবং পয়েন্ট অর্জন করুন' : 'Learn about your health and earn points'}</p>
+                <h3 className="font-semibold text-gray-800 mb-2">দৈনিক স্বাস্থ্য কুইজ</h3>
+                <p className="text-gray-500 text-sm mb-4">আপনার স্বাস্থ্য সম্পর্কে জানুন এবং পয়েন্ট অর্জন করুন</p>
                 <button onClick={startQuiz} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium">
-                  {isBn ? 'কুইজ শুরু করুন' : 'Start Quiz'}
+                  কুইজ শুরু করুন
                 </button>
               </div>
             ) : quizComplete ? (
               <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
                 <div className="text-5xl mb-4">🎉</div>
-                <h3 className="font-semibold text-gray-800 mb-2">{isBn ? 'কুইজ সম্পন্ন!' : 'Quiz Complete!'}</h3>
+                <h3 className="font-semibold text-gray-800 mb-2">কুইজ সম্পন্ন!</h3>
                 <p className="text-3xl font-bold text-blue-600 mb-2">{quizScore}/{DAILY_QUIZ.length * 10}</p>
-                <p className="text-gray-500 text-sm mb-4">{isBn ? 'পয়েন্ট অর্জিত' : 'Points earned'}</p>
+                <p className="text-gray-500 text-sm mb-4">পয়েন্ট অর্জিত</p>
                 <button onClick={() => setCurrentQuiz(null)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium">
-                  {isBn ? 'ফিরে যান' : 'Go Back'}
+                  ফিরে যান
                 </button>
               </div>
             ) : (
               <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="text-sm text-gray-500 mb-2">{isBn ? 'প্রশ্ন' : 'Question'} {quizIndex + 1}/{DAILY_QUIZ.length}</div>
-                <h3 className="font-semibold text-gray-800 mb-4">{isBn ? currentQuiz[quizIndex].questionBn : currentQuiz[quizIndex].question}</h3>
+                <div className="text-sm text-gray-500 mb-2">প্রশ্ন {quizIndex + 1}/{DAILY_QUIZ.length}</div>
+                <h3 className="font-semibold text-gray-800 mb-4">{currentQuiz[quizIndex].questionBn}</h3>
                 <div className="space-y-2">
                   {currentQuiz[quizIndex].options.map((opt, i) => (
                     <button
@@ -459,7 +485,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                       onClick={() => answerQuiz(opt.points)}
                       className="w-full text-left p-3 bg-gray-50 hover:bg-blue-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
                     >
-                      {isBn ? opt.textBn : opt.text}
+                      {opt.textBn}
                     </button>
                   ))}
                 </div>
@@ -471,36 +497,36 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         {/* FEEDBACK TAB */}
         {activeTab === 'feedback' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">{isBn ? '💬 মতামত দিন' : '💬 Give Feedback'}</h2>
+            <h2 className="text-lg font-semibold text-gray-800">💬 মতামত দিন</h2>
             
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               {feedbackSent ? (
                 <div className="text-center py-8">
                   <div className="text-5xl mb-4">✅</div>
-                  <h3 className="font-semibold text-gray-800">{isBn ? 'ধন্যবাদ!' : 'Thank you!'}</h3>
-                  <p className="text-gray-500 text-sm">{isBn ? 'আপনার মতামত পাঠানো হয়েছে' : 'Your feedback has been submitted'}</p>
+                  <h3 className="font-semibold text-gray-800">ধন্যবাদ!</h3>
+                  <p className="text-gray-500 text-sm">আপনার মতামত পাঠানো হয়েছে</p>
                 </div>
               ) : (
                 <>
                   <div className="mb-4">
-                    <label className="text-sm text-gray-600 block mb-2">{isBn ? 'বিভাগ' : 'Category'}</label>
+                    <label className="text-sm text-gray-600 block mb-2">বিভাগ</label>
                     <select
                       value={feedbackCategory}
-                      onChange={(e) => setFeedbackCategory(e.target.value)}
+                      onChange={(e) => setFeedbackCategory(e.target.value as any)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     >
-                      <option value="general">{isBn ? 'সাধারণ' : 'General'}</option>
-                      <option value="bug">{isBn ? 'সমস্যা রিপোর্ট' : 'Bug Report'}</option>
-                      <option value="feature">{isBn ? 'নতুন ফিচার' : 'Feature Request'}</option>
-                      <option value="complaint">{isBn ? 'অভিযোগ' : 'Complaint'}</option>
+                      <option value="general">সাধারণ</option>
+                      <option value="bug">সমস্যা রিপোর্ট</option>
+                      <option value="feature">নতুন ফিচার</option>
+                      <option value="complaint">অভিযোগ</option>
                     </select>
                   </div>
                   <div className="mb-4">
-                    <label className="text-sm text-gray-600 block mb-2">{isBn ? 'আপনার মতামত' : 'Your Feedback'}</label>
+                    <label className="text-sm text-gray-600 block mb-2">আপনার মতামত</label>
                     <textarea
                       value={feedbackText}
                       onChange={(e) => setFeedbackText(e.target.value)}
-                      placeholder={isBn ? 'আপনার মতামত লিখুন...' : 'Write your feedback...'}
+                      placeholder="আপনার মতামত লিখুন..."
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm h-32 resize-none"
                     />
                   </div>
@@ -509,7 +535,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                     disabled={!feedbackText.trim()}
                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white px-6 py-2 rounded-lg font-medium"
                   >
-                    {isBn ? 'পাঠান' : 'Submit'}
+                    পাঠান
                   </button>
                 </>
               )}
@@ -524,11 +550,11 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             <div className="bg-white rounded-lg border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-semibold text-gray-800">{isBn ? '💎 সাবস্ক্রিপশন' : '💎 Subscription'}</h3>
-                  <p className="text-sm text-gray-500">{isBn ? 'বর্তমান প্ল্যান: ' : 'Current plan: '}<span className="font-medium text-blue-600">{(patientUser.subscriptionTier || 'free').toUpperCase()}</span></p>
+                  <h3 className="font-semibold text-gray-800">💎 সাবস্ক্রিপশন</h3>
+                  <p className="text-sm text-gray-500">বর্তমান প্ল্যান: <span className="font-medium text-blue-600">{(patientUser.subscriptionTier || 'free').toUpperCase()}</span></p>
                 </div>
                 <button onClick={() => setShowPricing(!showPricing)} className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                  {showPricing ? (isBn ? 'বন্ধ করুন' : 'Close') : (isBn ? 'প্ল্যান দেখুন' : 'View Plans')}
+                  {showPricing ? 'বন্ধ করুন' : 'প্ল্যান দেখুন'}
                 </button>
               </div>
               
@@ -536,11 +562,11 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                 <div className="grid md:grid-cols-4 gap-3 pt-4 border-t border-gray-200">
                   {PLANS.map(plan => (
                     <div key={plan.id} className={'p-4 rounded-lg border-2 ' + (plan.popular ? 'border-blue-500 bg-blue-50' : 'border-gray-200')}>
-                      {plan.popular && <div className="text-xs text-blue-600 font-medium mb-1">{isBn ? 'জনপ্রিয়' : 'Popular'}</div>}
-                      <div className="font-semibold text-gray-800">{isBn ? plan.nameBn : plan.name}</div>
-                      <div className="text-2xl font-bold text-gray-800">৳{isBn ? plan.priceBn : plan.price}<span className="text-sm font-normal text-gray-500">/{isBn ? 'মাস' : 'mo'}</span></div>
+                      {plan.popular && <div className="text-xs text-blue-600 font-medium mb-1">জনপ্রিয়</div>}
+                      <div className="font-semibold text-gray-800">{plan.nameBn}</div>
+                      <div className="text-2xl font-bold text-gray-800">৳{plan.priceBn}<span className="text-sm font-normal text-gray-500">/মাস</span></div>
                       <ul className="mt-2 space-y-1">
-                        {(isBn ? plan.featuresBn : plan.features).map((f, i) => (
+                        {plan.featuresBn.map((f, i) => (
                           <li key={i} className="text-xs text-gray-600">✓ {f}</li>
                         ))}
                       </ul>
@@ -549,7 +575,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                           ? 'bg-gray-100 text-gray-500 cursor-default' 
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
                       )}>
-                        {patientUser.subscriptionTier === plan.id ? (isBn ? 'বর্তমান' : 'Current') : (isBn ? 'আপগ্রেড' : 'Upgrade')}
+                        {patientUser.subscriptionTier === plan.id ? 'বর্তমান' : 'আপগ্রেড'}
                       </button>
                     </div>
                   ))}
@@ -560,32 +586,32 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             {/* Profile Info */}
             <div className="bg-white rounded-lg border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="font-semibold text-gray-800">{isBn ? '👤 প্রোফাইল' : '👤 Profile'}</h2>
+                <h2 className="font-semibold text-gray-800">👤 প্রোফাইল</h2>
                 <div className="flex items-center gap-2">
                   {saveMessage && <span className={saveMessage.includes('✓') ? 'text-green-600 text-sm' : 'text-red-600 text-sm'}>{saveMessage}</span>}
                   {isEditing ? (
                     <>
-                      <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded text-sm">{isBn ? 'বাতিল' : 'Cancel'}</button>
+                      <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded text-sm">বাতিল</button>
                       <button onClick={handleSaveProfile} disabled={saving} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm disabled:opacity-50">
-                        {saving ? '...' : (isBn ? 'সংরক্ষণ' : 'Save')}
+                        {saving ? '...' : 'সংরক্ষণ'}
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => setIsEditing(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">{isBn ? 'সম্পাদনা' : 'Edit'}</button>
+                    <button onClick={() => setIsEditing(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">সম্পাদনা</button>
                   )}
                 </div>
               </div>
               
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-3">
-                  <h3 className="text-xs font-medium text-gray-500 uppercase">{isBn ? 'মৌলিক তথ্য' : 'Basic Info'}</h3>
+                  <h3 className="text-xs font-medium text-gray-500 uppercase">মৌলিক তথ্য</h3>
                   {[
-                    { key: 'name', label: isBn ? 'নাম' : 'Name', type: 'text' },
-                    { key: 'phone', label: isBn ? 'ফোন' : 'Phone', readonly: true, value: patientUser.phone },
-                    { key: 'email', label: isBn ? 'ইমেইল' : 'Email', type: 'email' },
-                    { key: 'dateOfBirth', label: isBn ? 'জন্ম তারিখ' : 'DOB', type: 'date' },
-                    { key: 'gender', label: isBn ? 'লিঙ্গ' : 'Gender', type: 'select', options: ['', 'male', 'female', 'other'] },
-                    { key: 'bloodGroup', label: isBn ? 'রক্তের গ্রুপ' : 'Blood', type: 'select', options: ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] },
+                    { key: 'name', label: 'নাম', type: 'text' },
+                    { key: 'phone', label: 'ফোন', readonly: true, value: patientUser.phone },
+                    { key: 'email', label: 'ইমেইল', type: 'email' },
+                    { key: 'dateOfBirth', label: 'জন্ম তারিখ', type: 'date' },
+                    { key: 'gender', label: 'লিঙ্গ', type: 'select', options: ['', 'male', 'female', 'other'] },
+                    { key: 'bloodGroup', label: 'রক্তের গ্রুপ', type: 'select', options: ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] },
                   ].map(field => (
                     <div key={field.key} className="flex items-center">
                       <label className="text-xs text-gray-500 w-24">{field.label}</label>
@@ -607,14 +633,14 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="text-xs font-medium text-gray-500 uppercase">{isBn ? 'স্বাস্থ্য তথ্য' : 'Health Info'}</h3>
+                  <h3 className="text-xs font-medium text-gray-500 uppercase">স্বাস্থ্য তথ্য</h3>
                   {[
-                    { key: 'heightCm', label: isBn ? 'উচ্চতা' : 'Height', type: 'number', suffix: 'cm' },
-                    { key: 'weightKg', label: isBn ? 'ওজন' : 'Weight', type: 'number', suffix: 'kg' },
-                    { key: 'chronicConditions', label: isBn ? 'রোগ' : 'Conditions', type: 'text' },
-                    { key: 'allergies', label: isBn ? 'এলার্জি' : 'Allergies', type: 'text' },
-                    { key: 'emergencyContactName', label: isBn ? 'জরুরি নাম' : 'Emergency', type: 'text' },
-                    { key: 'emergencyContactPhone', label: isBn ? 'জরুরি ফোন' : 'Emg Phone', type: 'tel' },
+                    { key: 'heightCm', label: 'উচ্চতা', type: 'number', suffix: 'cm' },
+                    { key: 'weightKg', label: 'ওজন', type: 'number', suffix: 'kg' },
+                    { key: 'chronicConditions', label: 'রোগ', type: 'text' },
+                    { key: 'allergies', label: 'এলার্জি', type: 'text' },
+                    { key: 'emergencyContactName', label: 'জরুরি নাম', type: 'text' },
+                    { key: 'emergencyContactPhone', label: 'জরুরি ফোন', type: 'tel' },
                   ].map(field => (
                     <div key={field.key} className="flex items-center">
                       <label className="text-xs text-gray-500 w-24">{field.label}</label>
