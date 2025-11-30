@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/PageHeader';
 
 type Step = 'personal' | 'professional' | 'verification' | 'review';
@@ -192,6 +193,7 @@ const INSTITUTION_GROUPS = {
 };
 
 export const DoctorRegistration: React.FC = () => {
+  const { registerDoctor, user } = useAuth();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
@@ -478,14 +480,39 @@ export const DoctorRegistration: React.FC = () => {
     
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // In production, call the API:
-    // await api.doctors.register(data);
+    try {
+      // Register doctor using AuthContext
+      const result = await registerDoctor({
+        phone: data.phone,
+        email: data.email,
+        name: data.nameEn,
+        nameBn: data.nameBn,
+        bmdcNumber: data.bmdcNumber,
+        nidNumber: data.nidNumber,
+        specializations: data.specializations.map(s => s.name),
+        qualifications: data.qualifications.map(q => ({
+          degree: q.degree,
+          institution: q.institution,
+          year: q.yearOfCompletion,
+        })),
+        experienceYears: parseInt(data.experienceYears) || 0,
+        consultationFee: 500, // Default fee
+        profileImage: data.profilePhotoUrl,
+      });
+      
+      console.log('Doctor registration result:', result);
+      
+      if (result.success) {
+        setStep('review'); // Show success state
+      } else {
+        alert(result.error || 'Registration failed');
+      }
+    } catch (error: any) {
+      console.error('Doctor registration error:', error);
+      alert(error.message || 'An error occurred');
+    }
     
     setIsSubmitting(false);
-    setStep('review'); // Show success state
   };
 
   const [submitted, setSubmitted] = useState(false);
