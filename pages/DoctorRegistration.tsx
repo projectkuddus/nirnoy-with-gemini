@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useAuth, STORAGE_KEYS, DoctorProfile } from '../contexts/AuthContext';
+import { useAuth, DoctorProfile, normalizePhone as authNormalizePhone } from '../contexts/AuthContext';
 import PageHeader from '../components/PageHeader';
 
 type Step = 'phone' | 'otp' | 'personal' | 'professional' | 'verification' | 'review';
@@ -227,7 +227,7 @@ const INSTITUTION_GROUPS = {
 };
 
 export const DoctorRegistration: React.FC = () => {
-  const { registerDoctor, user, sendOTP, verifyOTP } = useAuth();
+  const { registerDoctor, checkPhone, loginDoctor, user, isOnline } = useAuth();
   
   // Phone-first auth state
   const [authPhone, setAuthPhone] = useState('');
