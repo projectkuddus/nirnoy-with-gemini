@@ -710,9 +710,14 @@ export const DoctorRegistration: React.FC = () => {
                     <button
                       onClick={() => {
                         if (authPhone.length >= 10) {
+                          // Normalize phone for comparison
+                          const normalizePhone = (p: string) => p.replace(/^\+880/, '').replace(/^0/, '');
+                          const normalizedInput = normalizePhone(authPhone);
+                          console.log('[DoctorReg] Checking phone:', authPhone, 'Normalized:', normalizedInput);
                           // Check if doctor already exists
                           const doctors: DoctorProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCTORS) || '[]');
-                          const existingDoc = doctors.find(d => d.phone === authPhone || d.phone === `+880${authPhone.replace(/^0/, '')}`);
+                          const existingDoc = doctors.find(d => normalizePhone(d.phone) === normalizedInput);
+                          console.log('[DoctorReg] Found doctors:', doctors.length, 'Existing:', existingDoc?.name || 'none');
                           
                           if (existingDoc) {
                             setIsExistingDoctor(true);
