@@ -334,3 +334,32 @@ SELECT * FROM (VALUES
 WHERE NOT EXISTS (SELECT 1 FROM public.quizzes WHERE quizzes.slug = v.slug);
 
 SELECT 'SAFE MIGRATION COMPLETE! All tables ready, NO data deleted!' as result;
+
+-- ============================================
+-- FEEDBACK TABLE - Store all user feedback in cloud
+-- ============================================
+CREATE TABLE IF NOT EXISTS feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  user_name TEXT,
+  user_role TEXT DEFAULT 'patient',
+  type TEXT DEFAULT 'general' CHECK (type IN ('general', 'bug', 'feature', 'complaint', 'doctor')),
+  mood TEXT DEFAULT 'neutral' CHECK (mood IN ('happy', 'neutral', 'sad')),
+  message TEXT NOT NULL,
+  page TEXT,
+  status TEXT DEFAULT 'new' CHECK (status IN ('new', 'reviewed', 'resolved')),
+  admin_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+
+-- Allow all operations for now (will restrict later)
+DROP POLICY IF EXISTS feedback_all ON feedback;
+CREATE POLICY feedback_all ON feedback FOR ALL USING (true) WITH CHECK (true);
+
+-- Index for faster queries
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
+CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at DESC);
