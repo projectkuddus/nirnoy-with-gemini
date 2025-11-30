@@ -110,19 +110,108 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Storage keys for hybrid mode (Supabase + localStorage fallback)
+// IMPORTANT: These keys should NEVER change after production launch
+// All user data is now stored in Supabase - localStorage is only for offline/fallback
 const STORAGE_KEYS = {
-  USER: 'nirnoy_user_v4',
-  ROLE: 'nirnoy_role_v4',
-  PATIENTS: 'nirnoy_patients_db_v4',
-  DOCTORS: 'nirnoy_doctors_db_v4',
-  OTP_STORE: 'nirnoy_otp_temp_v4',
+  USER: 'nirnoy_user_prod',
+  ROLE: 'nirnoy_role_prod',
+  PATIENTS: 'nirnoy_patients_prod',
+  DOCTORS: 'nirnoy_doctors_prod',
+  OTP_STORE: 'nirnoy_otp_temp',
+  MIGRATED: 'nirnoy_data_migrated',
 };
+
+// Old keys to migrate from (will be cleaned up after migration)
+const OLD_STORAGE_KEYS = [
+  'nirnoy_user', 'nirnoy_role', 'nirnoy_patients_db', 'nirnoy_doctors_db',
+  'nirnoy_user_v2', 'nirnoy_role_v2', 'nirnoy_patients_db_v2', 'nirnoy_doctors_db_v2',
+  'nirnoy_user_v3', 'nirnoy_role_v3', 'nirnoy_patients_db_v3', 'nirnoy_doctors_db_v3',
+  'nirnoy_user_v4', 'nirnoy_role_v4', 'nirnoy_patients_db_v4', 'nirnoy_doctors_db_v4',
+];
 
 // Export for use in other components
 export { STORAGE_KEYS };
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 const generateReferralCode = () => Math.random().toString(36).substr(2, 8).toUpperCase();
+
+// ============ MIGRATION HELPER ============
+const migrateOldData = () => {
+  // Check if already migrated
+  if (localStorage.getItem(STORAGE_KEYS.MIGRATED)) {
+    return;
+  }
+
+  console.log('[Auth] Checking for old data to migrate...');
+
+  // Try to find and migrate old user data
+  const oldUserKeys = ['nirnoy_user_v4', 'nirnoy_user_v3', 'nirnoy_user_v2', 'nirnoy_user'];
+  const oldPatientsKeys = ['nirnoy_patients_db_v4', 'nirnoy_patients_db_v3', 'nirnoy_patients_db_v2', 'nirnoy_patients_db'];
+  const oldDoctorsKeys = ['nirnoy_doctors_db_v4', 'nirnoy_doctors_db_v3', 'nirnoy_doctors_db_v2', 'nirnoy_doctors_db'];
+
+  // Migrate current user
+  for (const key of oldUserKeys) {
+    const oldUser = localStorage.getItem(key);
+    if (oldUser && !localStorage.getItem(STORAGE_KEYS.USER)) {
+      console.log(`[Auth] Migrating user from ${key}`);
+      localStorage.setItem(STORAGE_KEYS.USER, oldUser);
+      break;
+    }
+  }
+
+  // Migrate patients database
+  let allPatients: PatientProfile[] = [];
+  for (const key of oldPatientsKeys) {
+    try {
+      const oldPatients = JSON.parse(localStorage.getItem(key) || '[]');
+      if (oldPatients.length > 0) {
+        console.log(`[Auth] Found ${oldPatients.length} patients in ${key}`);
+        allPatients = [...allPatients, ...oldPatients];
+      }
+    } catch (e) { /* ignore */ }
+  }
+  
+  // Deduplicate by phone
+  const uniquePatients = allPatients.reduce((acc: PatientProfile[], p) => {
+    if (!acc.find(x => x.phone === p.phone)) acc.push(p);
+    return acc;
+  }, []);
+  
+  if (uniquePatients.length > 0) {
+    console.log(`[Auth] Migrating ${uniquePatients.length} unique patients`);
+    localStorage.setItem(STORAGE_KEYS.PATIENTS, JSON.stringify(uniquePatients));
+  }
+
+  // Migrate doctors database
+  let allDoctors: DoctorProfile[] = [];
+  for (const key of oldDoctorsKeys) {
+    try {
+      const oldDoctors = JSON.parse(localStorage.getItem(key) || '[]');
+      if (oldDoctors.length > 0) {
+        console.log(`[Auth] Found ${oldDoctors.length} doctors in ${key}`);
+        allDoctors = [...allDoctors, ...oldDoctors];
+      }
+    } catch (e) { /* ignore */ }
+  }
+  
+  // Deduplicate by phone
+  const uniqueDoctors = allDoctors.reduce((acc: DoctorProfile[], d) => {
+    if (!acc.find(x => x.phone === d.phone)) acc.push(d);
+    return acc;
+  }, []);
+  
+  if (uniqueDoctors.length > 0) {
+    console.log(`[Auth] Migrating ${uniqueDoctors.length} unique doctors`);
+    localStorage.setItem(STORAGE_KEYS.DOCTORS, JSON.stringify(uniqueDoctors));
+  }
+
+  // Mark as migrated
+  localStorage.setItem(STORAGE_KEYS.MIGRATED, new Date().toISOString());
+  console.log('[Auth] Migration complete!');
+
+  // Clean up old keys (optional - keep for safety)
+  // OLD_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+};
 
 // ============ LOCAL STORAGE HELPERS (Fallback) ============
 const getStoredPatients = (): PatientProfile[] => {
@@ -219,12 +308,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [isSupabaseReady, setIsSupabaseReady] = useState(false);
 
-  // Clear old storage keys on mount
+  // Migrate old data on first mount (runs once)
   useEffect(() => {
-    // Clean up old versions
-    ['nirnoy_user', 'nirnoy_role', 'nirnoy_user_v2', 'nirnoy_role_v2', 'nirnoy_user_v3', 'nirnoy_role_v3'].forEach(key => {
-      localStorage.removeItem(key);
-    });
+    migrateOldData();
   }, []);
 
   // Initialize auth state
