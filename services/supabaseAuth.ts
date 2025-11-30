@@ -607,21 +607,64 @@ export const authService = {
   },
 
   async updatePatient(id: string, updates: any): Promise<boolean> {
-    await supabase.from('profiles').update({
-      name: updates.name,
-      email: updates.email,
-      date_of_birth: updates.dateOfBirth,
-      gender: updates.gender,
-      blood_group: updates.bloodGroup,
-      updated_at: new Date().toISOString()
-    }).eq('id', id);
+    console.log('[Auth] updatePatient:', id, updates);
     
-    const cached = session.get();
-    if (cached && cached.userId === id) {
-      session.save(id, 'patient', { ...cached.user, ...updates });
+    if (!isSupabaseConfigured()) {
+      console.error('[Auth] Supabase not configured');
+      return false;
     }
     
-    return true;
+    try {
+      // Update profiles table
+      const profileUpdates: any = { updated_at: new Date().toISOString() };
+      if (updates.name !== undefined) profileUpdates.name = updates.name;
+      if (updates.email !== undefined) profileUpdates.email = updates.email;
+      if (updates.dateOfBirth !== undefined) profileUpdates.date_of_birth = updates.dateOfBirth;
+      if (updates.gender !== undefined) profileUpdates.gender = updates.gender;
+      if (updates.bloodGroup !== undefined) profileUpdates.blood_group = updates.bloodGroup;
+      
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', id);
+      
+      if (profileError) {
+        console.error('[Auth] Profile update error:', profileError);
+      }
+      
+      // Update patients table
+      const patientUpdates: any = {};
+      if (updates.heightCm !== undefined) patientUpdates.height_cm = updates.heightCm;
+      if (updates.weightKg !== undefined) patientUpdates.weight_kg = updates.weightKg;
+      if (updates.chronicConditions !== undefined) patientUpdates.chronic_conditions = updates.chronicConditions;
+      if (updates.allergies !== undefined) patientUpdates.allergies = updates.allergies;
+      if (updates.emergencyContactPhone !== undefined) patientUpdates.emergency_contact_phone = updates.emergencyContactPhone;
+      if (updates.emergencyContactName !== undefined) patientUpdates.emergency_contact_name = updates.emergencyContactName;
+      
+      if (Object.keys(patientUpdates).length > 0) {
+        const { error: patientError } = await supabase
+          .from('patients')
+          .update(patientUpdates)
+          .eq('profile_id', id);
+        
+        if (patientError) {
+          console.error('[Auth] Patient update error:', patientError);
+        }
+      }
+      
+      // Update session cache
+      const cached = session.get();
+      if (cached && cached.userId === id) {
+        const updatedUser = { ...cached.user, ...updates };
+        session.save(id, 'patient', updatedUser);
+      }
+      
+      console.log('[Auth] Profile updated successfully');
+      return true;
+    } catch (e) {
+      console.error('[Auth] Update exception:', e);
+      return false;
+    }
   },
 
   getAllPatients: () => db.getAllPatients(),

@@ -1,5 +1,5 @@
 /**
- * NIRNOY PATIENT DASHBOARD - SIMPLIFIED FOR STABILITY
+ * NIRNOY PATIENT DASHBOARD - PRODUCTION READY
  * Handles 1000+ users with Supabase backend
  */
 
@@ -12,7 +12,7 @@ import { useAuth, PatientProfile } from '../contexts/AuthContext';
 export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { user, role, logout, isLoading } = useAuth();
+  const { user, role, logout, isLoading, updateProfile } = useAuth();
   const isBn = language === 'bn';
   
   // State
@@ -20,6 +20,24 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const [activeTab, setActiveTab] = useState<'home' | 'profile' | 'ai'>('home');
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<{role: string; content: string}[]>([]);
+  
+  // Profile editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    dateOfBirth: '',
+    gender: '',
+    bloodGroup: '',
+    heightCm: '',
+    weightKg: '',
+    chronicConditions: '',
+    allergies: '',
+    emergencyContactName: '',
+    emergencyContactPhone: ''
+  });
   
   // Safe user data with defaults
   const patientUser = useMemo(() => {
@@ -49,6 +67,25 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     }
   }, [user, role, isLoading, initDelay, navigate]);
 
+  // Initialize edit form when user loads
+  useEffect(() => {
+    if (patientUser) {
+      setEditForm({
+        name: patientUser.name || '',
+        email: patientUser.email || '',
+        dateOfBirth: patientUser.dateOfBirth || '',
+        gender: patientUser.gender || '',
+        bloodGroup: patientUser.bloodGroup || '',
+        heightCm: patientUser.heightCm ? String(patientUser.heightCm) : '',
+        weightKg: patientUser.weightKg ? String(patientUser.weightKg) : '',
+        chronicConditions: (patientUser.chronicConditions || []).join(', '),
+        allergies: (patientUser.allergies || []).join(', '),
+        emergencyContactName: patientUser.emergencyContactName || '',
+        emergencyContactPhone: patientUser.emergencyContactPhone || ''
+      });
+    }
+  }, [patientUser]);
+
   // Welcome message
   useEffect(() => {
     if (patientUser && messages.length === 0) {
@@ -66,6 +103,46 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     logout();
     if (onLogout) onLogout();
     navigate('/', { replace: true });
+  };
+
+  // Handle profile save
+  const handleSaveProfile = async () => {
+    if (!patientUser || !updateProfile) return;
+    
+    setSaving(true);
+    setSaveMessage('');
+    
+    try {
+      const updates: Partial<PatientProfile> = {
+        name: editForm.name,
+        email: editForm.email || undefined,
+        dateOfBirth: editForm.dateOfBirth || undefined,
+        gender: editForm.gender as any || undefined,
+        bloodGroup: editForm.bloodGroup || undefined,
+        heightCm: editForm.heightCm ? parseInt(editForm.heightCm) : undefined,
+        weightKg: editForm.weightKg ? parseFloat(editForm.weightKg) : undefined,
+        chronicConditions: editForm.chronicConditions ? editForm.chronicConditions.split(',').map(s => s.trim()).filter(Boolean) : [],
+        allergies: editForm.allergies ? editForm.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
+        emergencyContactName: editForm.emergencyContactName || undefined,
+        emergencyContactPhone: editForm.emergencyContactPhone || undefined
+      };
+      
+      console.log('[Dashboard] Saving profile:', updates);
+      const success = await updateProfile(updates);
+      
+      if (success) {
+        setSaveMessage(isBn ? '✅ সফলভাবে সংরক্ষিত!' : '✅ Saved successfully!');
+        setIsEditing(false);
+      } else {
+        setSaveMessage(isBn ? '❌ সংরক্ষণ ব্যর্থ হয়েছে' : '❌ Failed to save');
+      }
+    } catch (e) {
+      console.error('[Dashboard] Save error:', e);
+      setSaveMessage(isBn ? '❌ ত্রুটি হয়েছে' : '❌ Error occurred');
+    }
+    
+    setSaving(false);
+    setTimeout(() => setSaveMessage(''), 3000);
   };
 
   // Loading state
@@ -192,7 +269,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                 {isBn ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Link to="/doctors" className="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
+                <Link to="/doctor-search" className="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
                   <span className="text-3xl mb-2">👨‍⚕️</span>
                   <span className="text-sm font-medium text-gray-700">{isBn ? 'ডাক্তার খুঁজুন' : 'Find Doctor'}</span>
                 </Link>
@@ -200,7 +277,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                   <span className="text-3xl mb-2">🤖</span>
                   <span className="text-sm font-medium text-gray-700">{isBn ? 'এআই সহকারী' : 'AI Assistant'}</span>
                 </button>
-                <Link to="/appointments" className="flex flex-col items-center p-4 bg-purple-50 rounded-xl hover:bg-purple-100 transition-colors">
+                <Link to="/my-appointments" className="flex flex-col items-center p-4 bg-purple-50 rounded-xl hover:bg-purple-100 transition-colors">
                   <span className="text-3xl mb-2">📅</span>
                   <span className="text-sm font-medium text-gray-700">{isBn ? 'অ্যাপয়েন্টমেন্ট' : 'Appointments'}</span>
                 </Link>
@@ -287,9 +364,42 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         {/* Profile Tab */}
         {activeTab === 'profile' && (
           <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-6">
-              {isBn ? '👤 আমার প্রোফাইল' : '👤 My Profile'}
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-800">
+                {isBn ? '👤 আমার প্রোফাইল' : '👤 My Profile'}
+              </h2>
+              <div className="flex items-center gap-2">
+                {saveMessage && (
+                  <span className={saveMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}>
+                    {saveMessage}
+                  </span>
+                )}
+                {isEditing ? (
+                  <>
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      {isBn ? 'বাতিল' : 'Cancel'}
+                    </button>
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={saving}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {saving ? (isBn ? 'সংরক্ষণ হচ্ছে...' : 'Saving...') : (isBn ? '💾 সংরক্ষণ করুন' : '💾 Save')}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                  >
+                    {isBn ? '✏️ সম্পাদনা করুন' : '✏️ Edit Profile'}
+                  </button>
+                )}
+              </div>
+            </div>
             
             <div className="grid md:grid-cols-2 gap-6">
               {/* Basic Info */}
@@ -298,7 +408,16 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm text-gray-500">{isBn ? 'নাম' : 'Name'}</label>
-                    <p className="font-medium text-gray-800">{patientUser.name}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-800">{patientUser.name}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm text-gray-500">{isBn ? 'ফোন' : 'Phone'}</label>
@@ -306,19 +425,69 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                   </div>
                   <div>
                     <label className="text-sm text-gray-500">{isBn ? 'ইমেইল' : 'Email'}</label>
-                    <p className="font-medium text-gray-800">{patientUser.email || '-'}</p>
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="example@email.com"
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-800">{patientUser.email || '-'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm text-gray-500">{isBn ? 'জন্ম তারিখ' : 'Date of Birth'}</label>
-                    <p className="font-medium text-gray-800">{patientUser.dateOfBirth || '-'}</p>
+                    {isEditing ? (
+                      <input
+                        type="date"
+                        value={editForm.dateOfBirth}
+                        onChange={(e) => setEditForm({...editForm, dateOfBirth: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-800">{patientUser.dateOfBirth || '-'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm text-gray-500">{isBn ? 'লিঙ্গ' : 'Gender'}</label>
-                    <p className="font-medium text-gray-800">{patientUser.gender || '-'}</p>
+                    {isEditing ? (
+                      <select
+                        value={editForm.gender}
+                        onChange={(e) => setEditForm({...editForm, gender: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
+                        <option value="male">{isBn ? 'পুরুষ' : 'Male'}</option>
+                        <option value="female">{isBn ? 'মহিলা' : 'Female'}</option>
+                        <option value="other">{isBn ? 'অন্যান্য' : 'Other'}</option>
+                      </select>
+                    ) : (
+                      <p className="font-medium text-gray-800">{patientUser.gender || '-'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm text-gray-500">{isBn ? 'রক্তের গ্রুপ' : 'Blood Group'}</label>
-                    <p className="font-medium text-gray-800">{patientUser.bloodGroup || '-'}</p>
+                    {isEditing ? (
+                      <select
+                        value={editForm.bloodGroup}
+                        onChange={(e) => setEditForm({...editForm, bloodGroup: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                      </select>
+                    ) : (
+                      <p className="font-medium text-gray-800">{patientUser.bloodGroup || '-'}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -328,20 +497,88 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                 <h3 className="font-semibold text-gray-700 border-b pb-2">{isBn ? 'স্বাস্থ্য তথ্য' : 'Health Information'}</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-sm text-gray-500">{isBn ? 'উচ্চতা' : 'Height'}</label>
-                    <p className="font-medium text-gray-800">{patientUser.heightCm ? patientUser.heightCm + ' cm' : '-'}</p>
+                    <label className="text-sm text-gray-500">{isBn ? 'উচ্চতা (সেমি)' : 'Height (cm)'}</label>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        value={editForm.heightCm}
+                        onChange={(e) => setEditForm({...editForm, heightCm: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="170"
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-800">{patientUser.heightCm ? patientUser.heightCm + ' cm' : '-'}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="text-sm text-gray-500">{isBn ? 'ওজন' : 'Weight'}</label>
-                    <p className="font-medium text-gray-800">{patientUser.weightKg ? patientUser.weightKg + ' kg' : '-'}</p>
+                    <label className="text-sm text-gray-500">{isBn ? 'ওজন (কেজি)' : 'Weight (kg)'}</label>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={editForm.weightKg}
+                        onChange={(e) => setEditForm({...editForm, weightKg: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="70"
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-800">{patientUser.weightKg ? patientUser.weightKg + ' kg' : '-'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm text-gray-500">{isBn ? 'দীর্ঘস্থায়ী রোগ' : 'Chronic Conditions'}</label>
-                    <p className="font-medium text-gray-800">{(patientUser.chronicConditions || []).join(', ') || '-'}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editForm.chronicConditions}
+                        onChange={(e) => setEditForm({...editForm, chronicConditions: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder={isBn ? 'কমা দিয়ে আলাদা করুন' : 'Separate with commas'}
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-800">{(patientUser.chronicConditions || []).join(', ') || '-'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm text-gray-500">{isBn ? 'এলার্জি' : 'Allergies'}</label>
-                    <p className="font-medium text-gray-800">{(patientUser.allergies || []).join(', ') || '-'}</p>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editForm.allergies}
+                        onChange={(e) => setEditForm({...editForm, allergies: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder={isBn ? 'কমা দিয়ে আলাদা করুন' : 'Separate with commas'}
+                      />
+                    ) : (
+                      <p className="font-medium text-gray-800">{(patientUser.allergies || []).join(', ') || '-'}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-500">{isBn ? 'জরুরি যোগাযোগ' : 'Emergency Contact'}</label>
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={editForm.emergencyContactName}
+                          onChange={(e) => setEditForm({...editForm, emergencyContactName: e.target.value})}
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder={isBn ? 'নাম' : 'Name'}
+                        />
+                        <input
+                          type="tel"
+                          value={editForm.emergencyContactPhone}
+                          onChange={(e) => setEditForm({...editForm, emergencyContactPhone: e.target.value})}
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder={isBn ? 'ফোন নম্বর' : 'Phone number'}
+                        />
+                      </div>
+                    ) : (
+                      <p className="font-medium text-gray-800">
+                        {patientUser.emergencyContactName || patientUser.emergencyContactPhone 
+                          ? (patientUser.emergencyContactName || '') + ' - ' + (patientUser.emergencyContactPhone || '')
+                          : '-'}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
