@@ -142,9 +142,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const loadUser = async () => {
       try {
+        // Clear old localStorage keys (v1)
+        localStorage.removeItem('nirnoy_user');
+        localStorage.removeItem('nirnoy_role');
+        
         const storedUser = localStorage.getItem(STORAGE_KEYS.USER);
+        console.log('AuthContext loadUser - storedUser:', storedUser);
+        
         if (storedUser) {
-          setUser(JSON.parse(storedUser));
+          const parsedUser = JSON.parse(storedUser);
+          console.log('AuthContext loadUser - parsedUser:', parsedUser);
+          setUser(parsedUser);
         }
       } catch (error) {
         console.error('Error loading user:', error);

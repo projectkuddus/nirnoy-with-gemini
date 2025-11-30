@@ -183,11 +183,40 @@ interface PatientDashboardProps {
 export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const isBn = true;
   
-  // Use real user data if available, otherwise use demo data
-  const patientData = user && user.role === 'PATIENT' ? {
+  // Debug: Log user state
+  console.log('PatientDashboard - user:', user);
+  console.log('PatientDashboard - isLoading:', isLoading);
+  
+  // Redirect if not logged in (after loading completes)
+  useEffect(() => {
+    if (!isLoading && (!user || user.role !== 'PATIENT')) {
+      console.log('Redirecting to patient-auth - no valid patient user');
+      navigate('/patient-auth');
+    }
+  }, [user, isLoading, navigate]);
+  
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">লোড হচ্ছে...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // If no user after loading, show nothing (will redirect)
+  if (!user || user.role !== 'PATIENT') {
+    return null;
+  }
+  
+  // Use real user data - NO FALLBACK TO DEMO DATA
+  const patientData = {
     id: user.id,
     name: user.name,
     nameBn: user.nameBn || user.name,
@@ -208,7 +237,7 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({ onLogout }) 
     badges: (user as PatientProfile).badges || [],
     streak: (user as PatientProfile).streak || 0,
     subscription: (user as PatientProfile).subscription || { tier: 'free', features: [] },
-  } : PATIENT;
+  };
   
   const [activeTab, setActiveTab] = useState<'home' | 'doctors' | 'chat' | 'profile'>('home');
   const [chatInput, setChatInput] = useState('');
