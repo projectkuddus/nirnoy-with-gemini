@@ -2,702 +2,1049 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getFeedbacks, updateFeedbackStatus } from '../components/FeedbackWidget';
-import { useAuth, DoctorProfile } from '../contexts/AuthContext';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import { useAuth, DoctorProfile, PatientProfile, STORAGE_KEYS } from '../contexts/AuthContext';
 
 // ============ TYPES ============
-type AdminTab = 'overview' | 'users' | 'doctors' | 'subscriptions' | 'payments' | 'feedback' | 'credits' | 'analytics' | 'settings';
+type AdminTab = 'overview' | 'doctor-requests' | 'doctors' | 'patients' | 'subscribers' | 'feedback' | 'analytics' | 'settings';
 
-interface DashboardStats {
-  totalUsers: number;
-  activeSubscriptions: number;
-  monthlyRevenue: number;
-  totalCredits: number;
-  newUsersToday: number;
-  conversionRate: number;
+interface AdminSettings {
+  adminName: string;
+  adminEmail: string;
+  adminPassword: string;
+  notificationsEnabled: boolean;
+  autoApproveVerifiedDoctors: boolean;
+  maintenanceMode: boolean;
 }
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: 'patient' | 'doctor';
-  plan: string;
-  credits: number;
-  createdAt: string;
-  lastActive: string;
-}
-
-interface Payment {
-  id: string;
-  userId: string;
-  userName: string;
-  amount: number;
-  method: string;
-  status: string;
-  createdAt: string;
-}
-
-// ============ MOCK DATA ============
-const MOCK_STATS: DashboardStats = {
-  totalUsers: 1247,
-  activeSubscriptions: 423,
-  monthlyRevenue: 127500,
-  totalCredits: 45230,
-  newUsersToday: 23,
-  conversionRate: 33.9,
+// ============ STORAGE KEYS ============
+const ADMIN_STORAGE = {
+  AUTH: 'nirnoy_admin_auth',
+  SETTINGS: 'nirnoy_admin_settings',
 };
 
-const MOCK_USERS: User[] = [
-  { id: '1', name: 'রহিম উদ্দিন', email: 'rahim@gmail.com', phone: '01712345678', role: 'patient', plan: 'Premium', credits: 150, createdAt: '2024-11-15', lastActive: '2024-11-29' },
-  { id: '2', name: 'ডা. সালমা আক্তার', email: 'salma@nirnoy.ai', phone: '01812345679', role: 'doctor', plan: 'Professional', credits: 0, createdAt: '2024-11-10', lastActive: '2024-11-29' },
-  { id: '3', name: 'করিম আহমেদ', email: 'karim@gmail.com', phone: '01912345680', role: 'patient', plan: 'Family', credits: 320, createdAt: '2024-11-01', lastActive: '2024-11-28' },
-  { id: '4', name: 'ফাতিমা বেগম', email: 'fatima@gmail.com', phone: '01612345681', role: 'patient', plan: 'Basic', credits: 80, createdAt: '2024-10-20', lastActive: '2024-11-27' },
-  { id: '5', name: 'ডা. আবুল কাশেম', email: 'kashem@nirnoy.ai', phone: '01712345682', role: 'doctor', plan: 'Enterprise', credits: 0, createdAt: '2024-10-15', lastActive: '2024-11-29' },
-];
+// ============ HELPER FUNCTIONS ============
+const getStoredPatients = (): PatientProfile[] => {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.PATIENTS) || '[]'); } catch { return []; }
+};
 
-const MOCK_PAYMENTS: Payment[] = [
-  { id: 'p1', userId: '1', userName: 'রহিম উদ্দিন', amount: 399, method: 'bkash', status: 'completed', createdAt: '2024-11-29 10:30' },
-  { id: 'p2', userId: '3', userName: 'করিম আহমেদ', amount: 699, method: 'nagad', status: 'completed', createdAt: '2024-11-29 09:15' },
-  { id: 'p3', userId: '2', userName: 'ডা. সালমা আক্তার', amount: 2499, method: 'card', status: 'completed', createdAt: '2024-11-28 14:20' },
-  { id: 'p4', userId: '4', userName: 'ফাতিমা বেগম', amount: 199, method: 'bkash', status: 'pending', createdAt: '2024-11-28 11:45' },
-];
+const getStoredDoctors = (): DoctorProfile[] => {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCTORS) || '[]'); } catch { return []; }
+};
 
-const REVENUE_DATA = [
-  { month: 'Jun', revenue: 45000, users: 120 },
-  { month: 'Jul', revenue: 62000, users: 180 },
-  { month: 'Aug', revenue: 78000, users: 250 },
-  { month: 'Sep', revenue: 95000, users: 340 },
-  { month: 'Oct', revenue: 112000, users: 420 },
-  { month: 'Nov', revenue: 127500, users: 520 },
-];
+const getAdminSettings = (): AdminSettings => {
+  try {
+    const stored = localStorage.getItem(ADMIN_STORAGE.SETTINGS);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return {
+    adminName: 'Admin',
+    adminEmail: 'admin@nirnoy.ai',
+    adminPassword: 'nirnoy2024',
+    notificationsEnabled: true,
+    autoApproveVerifiedDoctors: false,
+    maintenanceMode: false,
+  };
+};
 
-const PLAN_DISTRIBUTION = [
-  { name: 'Free', value: 650, color: '#94a3b8' },
-  { name: 'Basic', value: 280, color: '#3b82f6' },
-  { name: 'Premium', value: 200, color: '#8b5cf6' },
-  { name: 'Family', value: 117, color: '#ec4899' },
-];
+const saveAdminSettings = (settings: AdminSettings) => {
+  localStorage.setItem(ADMIN_STORAGE.SETTINGS, JSON.stringify(settings));
+};
 
 // ============ COMPONENT ============
 export const AdminDashboard: React.FC = () => {
-  const { getAllPendingDoctors, approveDoctor, rejectDoctor, getAllUsers } = useAuth();
-  const [pendingDoctors, setPendingDoctors] = useState<DoctorProfile[]>([]);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
-  
-  // Load pending doctors
-  useEffect(() => {
-    const loadData = async () => {
-      const doctors = await getAllPendingDoctors();
-      setPendingDoctors(doctors);
-      const users = await getAllUsers();
-      setAllUsers(users);
-    };
-    loadData();
-  }, []);
-  
-  const handleApproveDoctor = async (doctorId: string) => {
-    const result = await approveDoctor(doctorId);
-    if (result.success) {
-      setPendingDoctors(prev => prev.filter(d => d.id !== doctorId));
-      alert('ডাক্তার অনুমোদিত হয়েছে! / Doctor approved!');
-    }
-  };
-  
-  const handleRejectDoctor = async (doctorId: string) => {
-    const reason = prompt('প্রত্যাখ্যানের কারণ লিখুন / Enter rejection reason:');
-    if (reason) {
-      const result = await rejectDoctor(doctorId, reason);
-      if (result.success) {
-        setPendingDoctors(prev => prev.filter(d => d.id !== doctorId));
-        alert('ডাক্তার প্রত্যাখ্যাত হয়েছে / Doctor rejected');
-      }
-    }
-  };
-
+  const { getAllPendingDoctors, approveDoctor, rejectDoctor } = useAuth();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
+  // State
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
-  const [stats, setStats] = useState<DashboardStats>(MOCK_STATS);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [payments, setPayments] = useState<Payment[]>(MOCK_PAYMENTS);
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Load feedbacks
-  useEffect(() => {
-    const loadedFeedbacks = getFeedbacks();
-    setFeedbacks(loadedFeedbacks);
-  }, [activeTab]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  
+  // Data state
+  const [pendingDoctors, setPendingDoctors] = useState<DoctorProfile[]>([]);
+  const [allDoctors, setAllDoctors] = useState<DoctorProfile[]>([]);
+  const [allPatients, setAllPatients] = useState<PatientProfile[]>([]);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>(getAdminSettings());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterTier, setFilterTier] = useState<string>('all');
+  
+  // Settings edit state
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Check admin auth
   useEffect(() => {
-    const auth = localStorage.getItem('nirnoy_admin_auth');
+    const auth = localStorage.getItem(ADMIN_STORAGE.AUTH);
     if (auth === 'authenticated') {
       setIsAuthenticated(true);
     }
   }, []);
 
+  // Load data
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadAllData();
+    }
+  }, [isAuthenticated, activeTab]);
+
+  const loadAllData = async () => {
+    // Load pending doctors
+    const pending = await getAllPendingDoctors();
+    setPendingDoctors(pending);
+    
+    // Load all doctors from storage
+    const doctors = getStoredDoctors();
+    setAllDoctors(doctors);
+    
+    // Load all patients from storage
+    const patients = getStoredPatients();
+    setAllPatients(patients);
+    
+    // Load feedbacks
+    const fbs = getFeedbacks();
+    setFeedbacks(fbs);
+    
+    // Load settings
+    setAdminSettings(getAdminSettings());
+  };
+
   const handleAdminLogin = () => {
-    // Simple admin password (in production, use proper auth)
-    if (adminPassword === 'nirnoy2024') {
-      localStorage.setItem('nirnoy_admin_auth', 'authenticated');
+    const settings = getAdminSettings();
+    if (adminPassword === settings.adminPassword) {
+      localStorage.setItem(ADMIN_STORAGE.AUTH, 'authenticated');
       setIsAuthenticated(true);
+      setLoginError('');
     } else {
-      alert('Invalid password');
+      setLoginError(isBn ? 'ভুল পাসওয়ার্ড' : 'Incorrect password');
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('nirnoy_admin_auth');
+    localStorage.removeItem(ADMIN_STORAGE.AUTH);
     setIsAuthenticated(false);
+    navigate('/');
   };
 
-  // Login screen
+  const handleApproveDoctor = async (doctorId: string) => {
+    const result = await approveDoctor(doctorId);
+    if (result.success) {
+      setPendingDoctors(prev => prev.filter(d => d.id !== doctorId));
+      loadAllData();
+      alert(isBn ? '✅ ডাক্তার অনুমোদিত হয়েছে!' : '✅ Doctor approved!');
+    }
+  };
+
+  const handleRejectDoctor = async (doctorId: string) => {
+    const reason = prompt(isBn ? 'প্রত্যাখ্যানের কারণ লিখুন:' : 'Enter rejection reason:');
+    if (reason) {
+      const result = await rejectDoctor(doctorId, reason);
+      if (result.success) {
+        setPendingDoctors(prev => prev.filter(d => d.id !== doctorId));
+        loadAllData();
+        alert(isBn ? '❌ ডাক্তার প্রত্যাখ্যাত হয়েছে' : '❌ Doctor rejected');
+      }
+    }
+  };
+
+  const handleUpdateFeedbackStatus = (feedbackId: string, status: string) => {
+    updateFeedbackStatus(feedbackId, status);
+    setFeedbacks(getFeedbacks());
+  };
+
+  const handleSaveSettings = () => {
+    if (newPassword && newPassword !== confirmPassword) {
+      alert(isBn ? 'পাসওয়ার্ড মিলছে না!' : 'Passwords do not match!');
+      return;
+    }
+    
+    const updatedSettings = {
+      ...adminSettings,
+      ...(newPassword ? { adminPassword: newPassword } : {}),
+    };
+    
+    saveAdminSettings(updatedSettings);
+    setAdminSettings(updatedSettings);
+    setEditingSettings(false);
+    setNewPassword('');
+    setConfirmPassword('');
+    alert(isBn ? '✅ সেটিংস সংরক্ষিত!' : '✅ Settings saved!');
+  };
+
+  // Calculate stats from real data
+  const stats = {
+    totalPatients: allPatients.length,
+    totalDoctors: allDoctors.filter(d => d.status === 'approved').length,
+    pendingDoctors: pendingDoctors.length,
+    totalFeedbacks: feedbacks.length,
+    pendingFeedbacks: feedbacks.filter(f => f.status === 'pending').length,
+    premiumUsers: allPatients.filter(p => p.subscription?.tier === 'premium').length,
+    basicUsers: allPatients.filter(p => p.subscription?.tier === 'basic').length,
+    freeUsers: allPatients.filter(p => !p.subscription?.tier || p.subscription?.tier === 'free').length,
+  };
+
+  // Filter patients by subscription tier
+  const filteredPatients = allPatients.filter(p => {
+    const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          p.phone?.includes(searchQuery);
+    const matchesTier = filterTier === 'all' || 
+                        (filterTier === 'free' && (!p.subscription?.tier || p.subscription?.tier === 'free')) ||
+                        p.subscription?.tier === filterTier;
+    return matchesSearch && matchesTier;
+  });
+
+  // Filter doctors
+  const filteredDoctors = allDoctors.filter(d => 
+    d.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    d.phone?.includes(searchQuery) ||
+    d.bmdcNumber?.includes(searchQuery)
+  );
+
+  // ============ LOGIN SCREEN ============
   if (!isAuthenticated) {
-  
-  // Render Feedback
-  const renderFeedback = () => {
-    const newCount = feedbacks.filter(f => f.status === 'new').length;
-    const resolvedCount = feedbacks.filter(f => f.status === 'resolved').length;
-    
-    const handleStatusChange = (id: string, status: 'new' | 'reviewed' | 'resolved') => {
-      updateFeedbackStatus(id, status);
-      setFeedbacks(getFeedbacks());
-    };
-    
-    const getMoodEmoji = (mood: string) => {
-      switch(mood) {
-        case 'happy': return '😊';
-        case 'sad': return '😞';
-        default: return '😐';
-      }
-    };
-    
-    const getTypeColor = (type: string) => {
-      switch(type) {
-        case 'bug': return 'bg-red-500/20 text-red-400';
-        case 'feature': return 'bg-blue-500/20 text-blue-400';
-        case 'complaint': return 'bg-orange-500/20 text-orange-400';
-        case 'doctor': return 'bg-purple-500/20 text-purple-400';
-        default: return 'bg-slate-500/20 text-slate-400';
-      }
-    };
-    
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white">User Feedback</h2>
-          <div className="flex gap-3">
-            <div className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-xl font-medium">
-              {newCount} New
-            </div>
-            <div className="px-4 py-2 bg-green-500/20 text-green-400 rounded-xl font-medium">
-              {resolvedCount} Resolved
-            </div>
-          </div>
-        </div>
-        
-        {feedbacks.length === 0 ? (
-          <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-12 border border-white/10 text-center">
-            <div className="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">💬</span>
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">No Feedback Yet</h3>
-            <p className="text-slate-400">User feedback will appear here</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {feedbacks.map((feedback) => (
-              <div key={feedback.id} className="bg-white/10 backdrop-blur-xl rounded-2xl p-5 border border-white/10">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{getMoodEmoji(feedback.mood)}</span>
-                    <div>
-                      <div className="text-white font-medium">{feedback.userName || feedback.phone || 'Anonymous'}</div>
-                      <div className="text-slate-400 text-sm">{feedback.page} • {new Date(feedback.timestamp).toLocaleString()}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-lg text-xs font-medium ${getTypeColor(feedback.type)}`}>
-                      {feedback.type}
-                    </span>
-                    <select
-                      value={feedback.status}
-                      onChange={(e) => handleStatusChange(feedback.id, e.target.value as any)}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium bg-white/10 border border-white/20 text-white focus:outline-none ${
-                        feedback.status === 'new' ? 'text-amber-400' :
-                        feedback.status === 'reviewed' ? 'text-blue-400' : 'text-green-400'
-                      }`}
-                    >
-                      <option value="new">New</option>
-                      <option value="reviewed">Reviewed</option>
-                      <option value="resolved">Resolved</option>
-                    </select>
-                  </div>
-                </div>
-                <p className="text-slate-300 bg-white/5 rounded-xl p-3">{feedback.message}</p>
-                {(feedback.email || feedback.phone) && (
-                  <div className="mt-3 text-sm text-slate-400">
-                    Contact: {feedback.email || feedback.phone}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md border border-white/20">
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 w-full max-w-md border border-white/20 shadow-2xl">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-white text-2xl font-black">ন</span>
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <i className="fas fa-shield-alt text-white text-3xl"></i>
             </div>
-            <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
-            <p className="text-slate-400 mt-2">Nirnoy Health Platform</p>
+            <h1 className="text-2xl font-black text-white">{isBn ? 'অ্যাডমিন প্যানেল' : 'Admin Panel'}</h1>
+            <p className="text-slate-400 mt-2">{isBn ? 'নির্ণয় ম্যানেজমেন্ট সিস্টেম' : 'Nirnoy Management System'}</p>
           </div>
-          
+
           <div className="space-y-4">
-            <input
-              type="password"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
-              placeholder="Admin Password"
-              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-teal-500"
-            />
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                {isBn ? 'অ্যাডমিন পাসওয়ার্ড' : 'Admin Password'}
+              </label>
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                placeholder="••••••••"
+              />
+              {loginError && <p className="text-red-400 text-sm mt-2">{loginError}</p>}
+            </div>
+
             <button
               onClick={handleAdminLogin}
-              className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-bold hover:shadow-lg transition"
+              className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition shadow-lg"
             >
-              Login
+              {isBn ? 'লগইন করুন' : 'Login'}
             </button>
           </div>
+
+          <button
+            onClick={() => navigate('/')}
+            className="w-full mt-4 py-3 text-slate-400 hover:text-white transition"
+          >
+            ← {isBn ? 'হোমে ফিরুন' : 'Back to Home'}
+          </button>
         </div>
       </div>
     );
   }
 
-  // Sidebar items
-  const sidebarItems = [
-    { id: 'overview', icon: '📊', label: 'Overview' },
-    { id: 'users', icon: '👥', label: 'Users' },
-    { id: 'subscriptions', icon: '💳', label: 'Subscriptions' },
-    { id: 'payments', icon: '💰', label: 'Payments' },
-    { id: 'feedback', icon: '💬', label: 'Feedback' },
-    { id: 'credits', icon: '🎮', label: 'Credits' },
-    { id: 'analytics', icon: '📈', label: 'Analytics' },
-    { id: 'settings', icon: '⚙️', label: 'Settings' },
-  ];
-
-  // Render Overview
-  const renderOverview = () => (
-    <div className="space-y-6">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {[
-          { label: 'Total Users', value: stats.totalUsers.toLocaleString(), icon: '👥', color: 'from-blue-500 to-indigo-600' },
-          { label: 'Active Subs', value: stats.activeSubscriptions.toLocaleString(), icon: '💳', color: 'from-emerald-500 to-teal-600' },
-          { label: 'Monthly Revenue', value: `৳${(stats.monthlyRevenue/1000).toFixed(1)}K`, icon: '💰', color: 'from-amber-500 to-orange-600' },
-          { label: 'Total Credits', value: stats.totalCredits.toLocaleString(), icon: '🎮', color: 'from-purple-500 to-pink-600' },
-          { label: 'New Today', value: stats.newUsersToday, icon: '📈', color: 'from-cyan-500 to-blue-600' },
-          { label: 'Conversion', value: `${stats.conversionRate}%`, icon: '🎯', color: 'from-rose-500 to-red-600' },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
-            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3`}>
-              <span className="text-xl">{stat.icon}</span>
+  // ============ MAIN DASHBOARD ============
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header */}
+      <header className="bg-slate-800/50 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <span className="text-white font-black">ন</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-white">{isBn ? 'অ্যাডমিন প্যানেল' : 'Admin Panel'}</h1>
+                <p className="text-xs text-slate-400">{adminSettings.adminName}</p>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-white">{stat.value}</div>
-            <div className="text-slate-400 text-sm">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-          <h3 className="text-lg font-bold text-white mb-4">Revenue Trend</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={REVENUE_DATA}>
-              <defs>
-                <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="month" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px' }} />
-              <Area type="monotone" dataKey="revenue" stroke="#14b8a6" fill="url(#revenueGradient)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Plan Distribution */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-          <h3 className="text-lg font-bold text-white mb-4">Plan Distribution</h3>
-          <div className="flex items-center justify-center">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={PLAN_DISTRIBUTION}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
+            
+            <div className="flex items-center gap-4">
+              {/* Pending Notifications */}
+              {pendingDoctors.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('doctor-requests')}
+                  className="relative px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg flex items-center gap-2 hover:bg-amber-500/30 transition"
                 >
-                  {PLAN_DISTRIBUTION.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-4 mt-4">
-            {PLAN_DISTRIBUTION.map((plan, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: plan.color }}></div>
-                <span className="text-slate-300 text-sm">{plan.name}: {plan.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent Users */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-          <h3 className="text-lg font-bold text-white mb-4">Recent Users</h3>
-          <div className="space-y-3">
-            {users.slice(0, 5).map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'doctor' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                    {user.role === 'doctor' ? '👨‍⚕️' : '👤'}
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">{user.name}</div>
-                    <div className="text-slate-400 text-sm">{user.plan}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-teal-400 font-medium">{user.credits} credits</div>
-                  <div className="text-slate-500 text-xs">{user.lastActive}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Payments */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-          <h3 className="text-lg font-bold text-white mb-4">Recent Payments</h3>
-          <div className="space-y-3">
-            {payments.map((payment) => (
-              <div key={payment.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    payment.method === 'bkash' ? 'bg-pink-500/20' : 
-                    payment.method === 'nagad' ? 'bg-orange-500/20' : 'bg-blue-500/20'
-                  }`}>
-                    {payment.method === 'bkash' ? '📱' : payment.method === 'nagad' ? '📱' : '💳'}
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">{payment.userName}</div>
-                    <div className="text-slate-400 text-sm capitalize">{payment.method}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-emerald-400 font-bold">৳{payment.amount}</div>
-                  <div className={`text-xs ${payment.status === 'completed' ? 'text-green-400' : 'text-amber-400'}`}>
-                    {payment.status}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render Users
-  const renderUsers = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">User Management</h2>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search users..."
-            className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-teal-500"
-          />
-          <button className="px-4 py-2 bg-teal-500 text-white rounded-xl font-medium hover:bg-teal-600">
-            Export CSV
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-white/5">
-            <tr>
-              <th className="text-left p-4 text-slate-400 font-medium">User</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Contact</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Role</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Plan</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Credits</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Last Active</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase())).map((user) => (
-              <tr key={user.id} className="border-t border-white/5 hover:bg-white/5">
-                <td className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'doctor' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                      {user.role === 'doctor' ? '👨‍⚕️' : '👤'}
-                    </div>
-                    <span className="text-white font-medium">{user.name}</span>
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="text-white text-sm">{user.email}</div>
-                  <div className="text-slate-400 text-xs">{user.phone}</div>
-                </td>
-                <td className="p-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${user.role === 'doctor' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                    {user.role}
-                  </span>
-                </td>
-                <td className="p-4 text-white">{user.plan}</td>
-                <td className="p-4 text-amber-400 font-medium">{user.credits}</td>
-                <td className="p-4 text-slate-400 text-sm">{user.lastActive}</td>
-                <td className="p-4">
-                  <div className="flex gap-2">
-                    <button className="p-2 bg-white/10 rounded-lg hover:bg-white/20 text-white">👁️</button>
-                    <button className="p-2 bg-white/10 rounded-lg hover:bg-white/20 text-white">✏️</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
-  // Render Payments
-  const renderPayments = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Payment History</h2>
-        <div className="flex gap-3">
-          <select className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none">
-            <option value="all">All Methods</option>
-            <option value="bkash">bKash</option>
-            <option value="nagad">Nagad</option>
-            <option value="card">Card</option>
-          </select>
-          <select className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none">
-            <option value="all">All Status</option>
-            <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: 'Today', value: '৳12,500', change: '+15%', color: 'emerald' },
-          { label: 'This Week', value: '৳45,200', change: '+8%', color: 'blue' },
-          { label: 'This Month', value: '৳127,500', change: '+23%', color: 'purple' },
-          { label: 'Pending', value: '৳3,400', change: '4 txn', color: 'amber' },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/10">
-            <div className="text-slate-400 text-sm">{stat.label}</div>
-            <div className="text-2xl font-bold text-white mt-1">{stat.value}</div>
-            <div className={`text-${stat.color}-400 text-sm mt-1`}>{stat.change}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-white/5">
-            <tr>
-              <th className="text-left p-4 text-slate-400 font-medium">Transaction ID</th>
-              <th className="text-left p-4 text-slate-400 font-medium">User</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Amount</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Method</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Status</th>
-              <th className="text-left p-4 text-slate-400 font-medium">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payments.map((payment) => (
-              <tr key={payment.id} className="border-t border-white/5 hover:bg-white/5">
-                <td className="p-4 text-white font-mono text-sm">{payment.id}</td>
-                <td className="p-4 text-white">{payment.userName}</td>
-                <td className="p-4 text-emerald-400 font-bold">৳{payment.amount}</td>
-                <td className="p-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                    payment.method === 'bkash' ? 'bg-pink-500/20 text-pink-400' :
-                    payment.method === 'nagad' ? 'bg-orange-500/20 text-orange-400' :
-                    'bg-blue-500/20 text-blue-400'
-                  }`}>
-                    {payment.method}
-                  </span>
-                </td>
-                <td className="p-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    payment.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                    payment.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
-                    'bg-red-500/20 text-red-400'
-                  }`}>
-                    {payment.status}
-                  </span>
-                </td>
-                <td className="p-4 text-slate-400 text-sm">{payment.createdAt}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
-  // Render Settings
-  const renderSettings = () => (
-    <div className="space-y-6 max-w-2xl">
-      <h2 className="text-2xl font-bold text-white">Settings</h2>
-
-      {/* Payment Gateway Settings */}
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-        <h3 className="text-lg font-bold text-white mb-4">💳 Payment Gateways</h3>
-        <div className="space-y-4">
-          {[
-            { name: 'bKash', status: 'Connected', color: 'pink' },
-            { name: 'Nagad', status: 'Connected', color: 'orange' },
-            { name: 'SSLCommerz', status: 'Sandbox', color: 'blue' },
-          ].map((gateway, i) => (
-            <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl bg-${gateway.color}-500/20 flex items-center justify-center`}>
-                  📱
-                </div>
-                <span className="text-white font-medium">{gateway.name}</span>
-              </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium bg-${gateway.color}-500/20 text-${gateway.color}-400`}>
-                {gateway.status}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Notification Settings */}
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
-        <h3 className="text-lg font-bold text-white mb-4">🔔 Notifications</h3>
-        <div className="space-y-4">
-          {[
-            { label: 'New User Signup', enabled: true },
-            { label: 'New Subscription', enabled: true },
-            { label: 'Payment Failed', enabled: true },
-            { label: 'Daily Report', enabled: false },
-          ].map((setting, i) => (
-            <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-              <span className="text-white">{setting.label}</span>
-              <button className={`w-12 h-6 rounded-full transition ${setting.enabled ? 'bg-teal-500' : 'bg-slate-600'}`}>
-                <div className={`w-5 h-5 bg-white rounded-full shadow transform transition ${setting.enabled ? 'translate-x-6' : 'translate-x-0.5'}`}></div>
+                  <i className="fas fa-user-md"></i>
+                  <span>{pendingDoctors.length} {isBn ? 'অপেক্ষমাণ' : 'Pending'}</span>
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full animate-pulse"></span>
+                </button>
+              )}
+              
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 text-slate-400 hover:text-white transition flex items-center gap-2"
+              >
+                <i className="fas fa-sign-out-alt"></i>
+                {isBn ? 'লগআউট' : 'Logout'}
               </button>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Danger Zone */}
-      <div className="bg-red-500/10 backdrop-blur-xl rounded-2xl p-6 border border-red-500/20">
-        <h3 className="text-lg font-bold text-red-400 mb-4">⚠️ Danger Zone</h3>
-        <button
-          onClick={handleLogout}
-          className="px-6 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600"
-        >
-          Logout from Admin
-        </button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white/5 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-xl flex items-center justify-center">
-            <span className="text-white font-black">ন</span>
-          </div>
-          <div>
-            <div className="text-white font-bold">Nirnoy</div>
-            <div className="text-slate-400 text-xs">Admin Panel</div>
           </div>
         </div>
+      </header>
 
-        <nav className="flex-1 space-y-1">
-          {sidebarItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as AdminTab)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-left ${
-                activeTab === item.id
-                  ? 'bg-teal-500/20 text-teal-400'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <span>{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
-            </button>
-          ))}
-        </nav>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex gap-8">
+          {/* Sidebar */}
+          <aside className="w-64 flex-shrink-0">
+            <nav className="space-y-2">
+              {[
+                { id: 'overview', icon: 'fa-chart-pie', label: isBn ? 'ওভারভিউ' : 'Overview' },
+                { id: 'doctor-requests', icon: 'fa-user-clock', label: isBn ? 'ডাক্তার অনুরোধ' : 'Doctor Requests', badge: pendingDoctors.length },
+                { id: 'doctors', icon: 'fa-user-md', label: isBn ? 'ডাক্তারগণ' : 'Doctors', badge: allDoctors.filter(d => d.status === 'approved').length },
+                { id: 'patients', icon: 'fa-users', label: isBn ? 'রোগীগণ' : 'Patients', badge: allPatients.length },
+                { id: 'subscribers', icon: 'fa-crown', label: isBn ? 'সাবস্ক্রাইবার' : 'Subscribers' },
+                { id: 'feedback', icon: 'fa-comments', label: isBn ? 'ফিডব্যাক' : 'Feedback', badge: stats.pendingFeedbacks },
+                { id: 'analytics', icon: 'fa-chart-line', label: isBn ? 'অ্যানালিটিক্স' : 'Analytics' },
+                { id: 'settings', icon: 'fa-cog', label: isBn ? 'সেটিংস' : 'Settings' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id as AdminTab)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition ${
+                    activeTab === item.id
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <i className={`fas ${item.icon} w-5`}></i>
+                    <span className="font-medium">{item.label}</span>
+                  </div>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                      item.id === 'doctor-requests' ? 'bg-amber-500 text-amber-900' : 'bg-slate-600 text-white'
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </aside>
 
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition"
-        >
-          <span>🚪</span>
-          <span>Logout</span>
-        </button>
-      </aside>
+          {/* Main Content */}
+          <main className="flex-1 min-w-0">
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-white">{isBn ? 'ড্যাশবোর্ড ওভারভিউ' : 'Dashboard Overview'}</h2>
+                
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { label: isBn ? 'মোট রোগী' : 'Total Patients', value: stats.totalPatients, icon: 'fa-users', color: 'blue' },
+                    { label: isBn ? 'অনুমোদিত ডাক্তার' : 'Approved Doctors', value: stats.totalDoctors, icon: 'fa-user-md', color: 'green' },
+                    { label: isBn ? 'অপেক্ষমাণ ডাক্তার' : 'Pending Doctors', value: stats.pendingDoctors, icon: 'fa-user-clock', color: 'amber' },
+                    { label: isBn ? 'মোট ফিডব্যাক' : 'Total Feedback', value: stats.totalFeedbacks, icon: 'fa-comments', color: 'purple' },
+                  ].map((stat, i) => (
+                    <div key={i} className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                      <div className={`w-12 h-12 rounded-xl bg-${stat.color}-500/20 flex items-center justify-center mb-4`}>
+                        <i className={`fas ${stat.icon} text-${stat.color}-400 text-xl`}></i>
+                      </div>
+                      <p className="text-3xl font-black text-white">{stat.value}</p>
+                      <p className="text-slate-400 text-sm mt-1">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
 
-      {/* Main Content */}
-      <main className="flex-1 p-8 overflow-auto">
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'users' && renderUsers()}
-        {activeTab === 'payments' && renderPayments()}
-        {activeTab === 'settings' && renderSettings()}
-        {activeTab === 'subscriptions' && renderOverview()}
-        {activeTab === 'credits' && renderOverview()}
-        {activeTab === 'analytics' && renderOverview()}
-      </main>
+                {/* Subscription Distribution */}
+                <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                  <h3 className="text-lg font-bold text-white mb-4">{isBn ? 'সাবস্ক্রিপশন বিতরণ' : 'Subscription Distribution'}</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                      <p className="text-3xl font-black text-slate-300">{stats.freeUsers}</p>
+                      <p className="text-slate-400 text-sm">Free</p>
+                    </div>
+                    <div className="bg-blue-500/20 rounded-xl p-4 text-center border border-blue-500/30">
+                      <p className="text-3xl font-black text-blue-400">{stats.basicUsers}</p>
+                      <p className="text-blue-300 text-sm">Basic</p>
+                    </div>
+                    <div className="bg-purple-500/20 rounded-xl p-4 text-center border border-purple-500/30">
+                      <p className="text-3xl font-black text-purple-400">{stats.premiumUsers}</p>
+                      <p className="text-purple-300 text-sm">Premium</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                  <h3 className="text-lg font-bold text-white mb-4">{isBn ? 'দ্রুত অ্যাকশন' : 'Quick Actions'}</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button
+                      onClick={() => setActiveTab('doctor-requests')}
+                      className="p-4 bg-amber-500/20 rounded-xl text-amber-400 hover:bg-amber-500/30 transition text-center"
+                    >
+                      <i className="fas fa-user-check text-2xl mb-2"></i>
+                      <p className="text-sm font-medium">{isBn ? 'ডাক্তার অনুমোদন' : 'Approve Doctors'}</p>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('feedback')}
+                      className="p-4 bg-purple-500/20 rounded-xl text-purple-400 hover:bg-purple-500/30 transition text-center"
+                    >
+                      <i className="fas fa-comment-dots text-2xl mb-2"></i>
+                      <p className="text-sm font-medium">{isBn ? 'ফিডব্যাক দেখুন' : 'View Feedback'}</p>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('patients')}
+                      className="p-4 bg-blue-500/20 rounded-xl text-blue-400 hover:bg-blue-500/30 transition text-center"
+                    >
+                      <i className="fas fa-users text-2xl mb-2"></i>
+                      <p className="text-sm font-medium">{isBn ? 'ইউজার দেখুন' : 'View Users'}</p>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('settings')}
+                      className="p-4 bg-slate-500/20 rounded-xl text-slate-400 hover:bg-slate-500/30 transition text-center"
+                    >
+                      <i className="fas fa-cog text-2xl mb-2"></i>
+                      <p className="text-sm font-medium">{isBn ? 'সেটিংস' : 'Settings'}</p>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Doctor Requests Tab */}
+            {activeTab === 'doctor-requests' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">{isBn ? 'অপেক্ষমাণ ডাক্তার অনুরোধ' : 'Pending Doctor Requests'}</h2>
+                  <span className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg">
+                    {pendingDoctors.length} {isBn ? 'অপেক্ষমাণ' : 'Pending'}
+                  </span>
+                </div>
+
+                {pendingDoctors.length === 0 ? (
+                  <div className="bg-white/5 backdrop-blur rounded-2xl p-12 border border-white/10 text-center">
+                    <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <i className="fas fa-check text-green-400 text-3xl"></i>
+                    </div>
+                    <p className="text-xl font-bold text-white mb-2">{isBn ? 'কোনো অপেক্ষমাণ অনুরোধ নেই' : 'No Pending Requests'}</p>
+                    <p className="text-slate-400">{isBn ? 'সব ডাক্তার অনুরোধ প্রক্রিয়া করা হয়েছে' : 'All doctor requests have been processed'}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingDoctors.map((doctor) => (
+                      <div key={doctor.id} className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                        <div className="flex items-start gap-6">
+                          {/* Doctor Photo */}
+                          <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center overflow-hidden">
+                            {doctor.profileImage ? (
+                              <img src={doctor.profileImage} alt={doctor.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-white text-2xl font-bold">{doctor.name?.charAt(0)}</span>
+                            )}
+                          </div>
+
+                          {/* Doctor Info */}
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="text-xl font-bold text-white">{doctor.name}</h3>
+                                <p className="text-slate-400">{doctor.phone}</p>
+                              </div>
+                              <span className="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-sm font-medium">
+                                {isBn ? 'অপেক্ষমাণ' : 'Pending'}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                              <div>
+                                <p className="text-xs text-slate-500 uppercase">{isBn ? 'BMDC নম্বর' : 'BMDC Number'}</p>
+                                <p className="text-white font-medium">{doctor.bmdcNumber || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 uppercase">{isBn ? 'বিশেষত্ব' : 'Specialty'}</p>
+                                <p className="text-white font-medium">
+                                  {Array.isArray(doctor.specializations) && doctor.specializations.length > 0
+                                    ? (typeof doctor.specializations[0] === 'string' 
+                                        ? doctor.specializations[0] 
+                                        : doctor.specializations[0]?.name || 'N/A')
+                                    : 'N/A'}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 uppercase">{isBn ? 'অভিজ্ঞতা' : 'Experience'}</p>
+                                <p className="text-white font-medium">{doctor.experienceYears || 0} {isBn ? 'বছর' : 'years'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-slate-500 uppercase">{isBn ? 'আবেদনের তারিখ' : 'Applied On'}</p>
+                                <p className="text-white font-medium">{new Date(doctor.createdAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+
+                            {/* Qualifications */}
+                            {Array.isArray(doctor.qualifications) && doctor.qualifications.length > 0 && (
+                              <div className="mt-4">
+                                <p className="text-xs text-slate-500 uppercase mb-2">{isBn ? 'যোগ্যতা' : 'Qualifications'}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {doctor.qualifications.map((q, i) => (
+                                    <span key={i} className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-sm">
+                                      {typeof q === 'string' ? q : q.degree}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-4 mt-6 pt-6 border-t border-white/10">
+                          <button
+                            onClick={() => handleApproveDoctor(doctor.id)}
+                            className="flex-1 py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition flex items-center justify-center gap-2"
+                          >
+                            <i className="fas fa-check"></i>
+                            {isBn ? 'অনুমোদন করুন' : 'Approve'}
+                          </button>
+                          <button
+                            onClick={() => handleRejectDoctor(doctor.id)}
+                            className="flex-1 py-3 bg-red-500/20 text-red-400 font-bold rounded-xl hover:bg-red-500/30 transition flex items-center justify-center gap-2"
+                          >
+                            <i className="fas fa-times"></i>
+                            {isBn ? 'প্রত্যাখ্যান করুন' : 'Reject'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Doctors Tab */}
+            {activeTab === 'doctors' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">{isBn ? 'সকল ডাক্তার' : 'All Doctors'}</h2>
+                  <input
+                    type="text"
+                    placeholder={isBn ? 'নাম, ফোন বা BMDC দিয়ে খুঁজুন...' : 'Search by name, phone or BMDC...'}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-400 w-64"
+                  />
+                </div>
+
+                {filteredDoctors.length === 0 ? (
+                  <div className="bg-white/5 backdrop-blur rounded-2xl p-12 border border-white/10 text-center">
+                    <i className="fas fa-user-md text-4xl text-slate-500 mb-4"></i>
+                    <p className="text-xl font-bold text-white mb-2">{isBn ? 'কোনো ডাক্তার নেই' : 'No Doctors Found'}</p>
+                    <p className="text-slate-400">{isBn ? 'এখনো কোনো ডাক্তার রেজিস্টার করেননি' : 'No doctors have registered yet'}</p>
+                  </div>
+                ) : (
+                  <div className="bg-white/5 backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-white/5">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'ডাক্তার' : 'Doctor'}</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'যোগাযোগ' : 'Contact'}</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">BMDC</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'বিশেষত্ব' : 'Specialty'}</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'স্ট্যাটাস' : 'Status'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {filteredDoctors.map((doctor) => (
+                          <tr key={doctor.id} className="hover:bg-white/5">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                                  <span className="text-blue-400 font-bold">{doctor.name?.charAt(0)}</span>
+                                </div>
+                                <div>
+                                  <p className="text-white font-medium">{doctor.name}</p>
+                                  <p className="text-xs text-slate-500">ID: {doctor.id.slice(0, 8)}...</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-slate-300">{doctor.phone}</td>
+                            <td className="px-6 py-4 text-slate-300 font-mono">{doctor.bmdcNumber || 'N/A'}</td>
+                            <td className="px-6 py-4 text-slate-300">
+                              {Array.isArray(doctor.specializations) && doctor.specializations.length > 0
+                                ? (typeof doctor.specializations[0] === 'string' 
+                                    ? doctor.specializations[0] 
+                                    : doctor.specializations[0]?.name || 'N/A')
+                                : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                doctor.status === 'approved' ? 'bg-green-500/20 text-green-400' :
+                                doctor.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                                'bg-red-500/20 text-red-400'
+                              }`}>
+                                {doctor.status === 'approved' ? (isBn ? 'অনুমোদিত' : 'Approved') :
+                                 doctor.status === 'pending' ? (isBn ? 'অপেক্ষমাণ' : 'Pending') :
+                                 (isBn ? 'প্রত্যাখ্যাত' : 'Rejected')}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Patients Tab */}
+            {activeTab === 'patients' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">{isBn ? 'সকল রোগী' : 'All Patients'}</h2>
+                  <input
+                    type="text"
+                    placeholder={isBn ? 'নাম বা ফোন দিয়ে খুঁজুন...' : 'Search by name or phone...'}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-400 w-64"
+                  />
+                </div>
+
+                {allPatients.length === 0 ? (
+                  <div className="bg-white/5 backdrop-blur rounded-2xl p-12 border border-white/10 text-center">
+                    <i className="fas fa-users text-4xl text-slate-500 mb-4"></i>
+                    <p className="text-xl font-bold text-white mb-2">{isBn ? 'কোনো রোগী নেই' : 'No Patients Found'}</p>
+                    <p className="text-slate-400">{isBn ? 'এখনো কোনো রোগী রেজিস্টার করেননি' : 'No patients have registered yet'}</p>
+                  </div>
+                ) : (
+                  <div className="bg-white/5 backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-white/5">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'রোগী' : 'Patient'}</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'ফোন' : 'Phone'}</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'লিঙ্গ' : 'Gender'}</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'সাবস্ক্রিপশন' : 'Subscription'}</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'যোগদান' : 'Joined'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {filteredPatients.map((patient) => (
+                          <tr key={patient.id} className="hover:bg-white/5">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                  patient.gender === 'female' ? 'bg-pink-500/20' : 'bg-blue-500/20'
+                                }`}>
+                                  <span className={patient.gender === 'female' ? 'text-pink-400' : 'text-blue-400'}>
+                                    {patient.name?.charAt(0) || '?'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-white font-medium">{patient.name || 'Unknown'}</p>
+                                  <p className="text-xs text-slate-500">ID: {patient.id.slice(0, 8)}...</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-slate-300">{patient.phone}</td>
+                            <td className="px-6 py-4 text-slate-300 capitalize">{patient.gender || 'N/A'}</td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                patient.subscription?.tier === 'premium' ? 'bg-purple-500/20 text-purple-400' :
+                                patient.subscription?.tier === 'basic' ? 'bg-blue-500/20 text-blue-400' :
+                                'bg-slate-500/20 text-slate-400'
+                              }`}>
+                                {patient.subscription?.tier || 'Free'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-slate-300">{new Date(patient.createdAt).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Subscribers Tab */}
+            {activeTab === 'subscribers' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">{isBn ? 'সাবস্ক্রাইবার' : 'Subscribers'}</h2>
+                  <div className="flex gap-2">
+                    {['all', 'premium', 'basic', 'free'].map((tier) => (
+                      <button
+                        key={tier}
+                        onClick={() => setFilterTier(tier)}
+                        className={`px-4 py-2 rounded-lg font-medium transition ${
+                          filterTier === tier
+                            ? tier === 'premium' ? 'bg-purple-500 text-white' :
+                              tier === 'basic' ? 'bg-blue-500 text-white' :
+                              tier === 'free' ? 'bg-slate-500 text-white' :
+                              'bg-white/20 text-white'
+                            : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                        }`}
+                      >
+                        {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tier Summary Cards */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-purple-500/20 rounded-2xl p-6 border border-purple-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-purple-300 text-sm">Premium</p>
+                        <p className="text-4xl font-black text-purple-400">{stats.premiumUsers}</p>
+                      </div>
+                      <i className="fas fa-crown text-3xl text-purple-400"></i>
+                    </div>
+                  </div>
+                  <div className="bg-blue-500/20 rounded-2xl p-6 border border-blue-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-300 text-sm">Basic</p>
+                        <p className="text-4xl font-black text-blue-400">{stats.basicUsers}</p>
+                      </div>
+                      <i className="fas fa-star text-3xl text-blue-400"></i>
+                    </div>
+                  </div>
+                  <div className="bg-slate-500/20 rounded-2xl p-6 border border-slate-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-slate-300 text-sm">Free</p>
+                        <p className="text-4xl font-black text-slate-400">{stats.freeUsers}</p>
+                      </div>
+                      <i className="fas fa-user text-3xl text-slate-400"></i>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filtered Users List */}
+                <div className="bg-white/5 backdrop-blur rounded-2xl border border-white/10 overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-white/5">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'ইউজার' : 'User'}</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'প্ল্যান' : 'Plan'}</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'ক্রেডিট' : 'Credits'}</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase">{isBn ? 'যোগদান' : 'Joined'}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {filteredPatients.map((patient) => (
+                        <tr key={patient.id} className="hover:bg-white/5">
+                          <td className="px-6 py-4">
+                            <p className="text-white font-medium">{patient.name || 'Unknown'}</p>
+                            <p className="text-xs text-slate-500">{patient.phone}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              patient.subscription?.tier === 'premium' ? 'bg-purple-500/20 text-purple-400' :
+                              patient.subscription?.tier === 'basic' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-slate-500/20 text-slate-400'
+                            }`}>
+                              {patient.subscription?.tier || 'Free'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-300">{patient.credits || 0}</td>
+                          <td className="px-6 py-4 text-slate-300">{new Date(patient.createdAt).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filteredPatients.length === 0 && (
+                    <div className="p-8 text-center text-slate-400">
+                      {isBn ? 'এই ক্যাটাগরিতে কোনো ইউজার নেই' : 'No users in this category'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Feedback Tab */}
+            {activeTab === 'feedback' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">{isBn ? 'ইউজার ফিডব্যাক' : 'User Feedback'}</h2>
+                  <span className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg">
+                    {feedbacks.length} {isBn ? 'মোট' : 'Total'}
+                  </span>
+                </div>
+
+                {feedbacks.length === 0 ? (
+                  <div className="bg-white/5 backdrop-blur rounded-2xl p-12 border border-white/10 text-center">
+                    <i className="fas fa-comments text-4xl text-slate-500 mb-4"></i>
+                    <p className="text-xl font-bold text-white mb-2">{isBn ? 'কোনো ফিডব্যাক নেই' : 'No Feedback Yet'}</p>
+                    <p className="text-slate-400">{isBn ? 'ইউজাররা এখনো কোনো ফিডব্যাক দেননি' : 'Users have not submitted any feedback yet'}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {feedbacks.map((fb) => (
+                      <div key={fb.id} className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-4">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                              fb.type === 'bug' ? 'bg-red-500/20' :
+                              fb.type === 'feature' ? 'bg-blue-500/20' :
+                              fb.type === 'praise' ? 'bg-green-500/20' :
+                              'bg-slate-500/20'
+                            }`}>
+                              <i className={`fas ${
+                                fb.type === 'bug' ? 'fa-bug text-red-400' :
+                                fb.type === 'feature' ? 'fa-lightbulb text-blue-400' :
+                                fb.type === 'praise' ? 'fa-heart text-green-400' :
+                                'fa-comment text-slate-400'
+                              } text-xl`}></i>
+                            </div>
+                            <div>
+                              <p className="text-white">{fb.message}</p>
+                              <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
+                                <span><i className="fas fa-user mr-1"></i>{fb.userName || 'Anonymous'}</span>
+                                <span><i className="fas fa-phone mr-1"></i>{fb.userPhone || 'N/A'}</span>
+                                <span><i className="fas fa-calendar mr-1"></i>{new Date(fb.createdAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <select
+                            value={fb.status}
+                            onChange={(e) => handleUpdateFeedbackStatus(fb.id, e.target.value)}
+                            className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                              fb.status === 'resolved' ? 'bg-green-500/20 text-green-400' :
+                              fb.status === 'in-progress' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-amber-500/20 text-amber-400'
+                            }`}
+                          >
+                            <option value="pending">{isBn ? 'অপেক্ষমাণ' : 'Pending'}</option>
+                            <option value="in-progress">{isBn ? 'প্রক্রিয়াধীন' : 'In Progress'}</option>
+                            <option value="resolved">{isBn ? 'সমাধান' : 'Resolved'}</option>
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-white">{isBn ? 'অ্যানালিটিক্স' : 'Analytics'}</h2>
+                
+                <div className="grid grid-cols-2 gap-6">
+                  {/* User Growth */}
+                  <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                    <h3 className="text-lg font-bold text-white mb-4">{isBn ? 'ইউজার গ্রোথ' : 'User Growth'}</h3>
+                    <div className="h-64 flex items-center justify-center text-slate-400">
+                      <div className="text-center">
+                        <i className="fas fa-chart-line text-4xl mb-4"></i>
+                        <p>{isBn ? 'মোট রেজিস্টার্ড ইউজার' : 'Total Registered Users'}</p>
+                        <p className="text-4xl font-black text-white mt-2">{stats.totalPatients + stats.totalDoctors}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Doctor Distribution */}
+                  <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                    <h3 className="text-lg font-bold text-white mb-4">{isBn ? 'ডাক্তার স্ট্যাটাস' : 'Doctor Status'}</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">{isBn ? 'অনুমোদিত' : 'Approved'}</span>
+                        <span className="text-green-400 font-bold">{allDoctors.filter(d => d.status === 'approved').length}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">{isBn ? 'অপেক্ষমাণ' : 'Pending'}</span>
+                        <span className="text-amber-400 font-bold">{pendingDoctors.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">{isBn ? 'প্রত্যাখ্যাত' : 'Rejected'}</span>
+                        <span className="text-red-400 font-bold">{allDoctors.filter(d => d.status === 'rejected').length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Platform Health */}
+                <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                  <h3 className="text-lg font-bold text-white mb-4">{isBn ? 'প্ল্যাটফর্ম হেলথ' : 'Platform Health'}</h3>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <p className="text-3xl font-black text-green-400">✓</p>
+                      <p className="text-slate-400 text-sm mt-1">{isBn ? 'সিস্টেম অনলাইন' : 'System Online'}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-3xl font-black text-white">{stats.totalPatients}</p>
+                      <p className="text-slate-400 text-sm mt-1">{isBn ? 'মোট রোগী' : 'Total Patients'}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-3xl font-black text-white">{stats.totalDoctors}</p>
+                      <p className="text-slate-400 text-sm mt-1">{isBn ? 'মোট ডাক্তার' : 'Total Doctors'}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-3xl font-black text-white">{feedbacks.length}</p>
+                      <p className="text-slate-400 text-sm mt-1">{isBn ? 'মোট ফিডব্যাক' : 'Total Feedback'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Settings Tab */}
+            {activeTab === 'settings' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-white">{isBn ? 'অ্যাডমিন সেটিংস' : 'Admin Settings'}</h2>
+
+                {/* Admin Profile */}
+                <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-white">{isBn ? 'অ্যাডমিন প্রোফাইল' : 'Admin Profile'}</h3>
+                    <button
+                      onClick={() => setEditingSettings(!editingSettings)}
+                      className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition"
+                    >
+                      <i className={`fas ${editingSettings ? 'fa-times' : 'fa-edit'} mr-2`}></i>
+                      {editingSettings ? (isBn ? 'বাতিল' : 'Cancel') : (isBn ? 'সম্পাদনা' : 'Edit')}
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-2">{isBn ? 'অ্যাডমিন নাম' : 'Admin Name'}</label>
+                      <input
+                        type="text"
+                        value={adminSettings.adminName}
+                        onChange={(e) => setAdminSettings({ ...adminSettings, adminName: e.target.value })}
+                        disabled={!editingSettings}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-400 mb-2">{isBn ? 'অ্যাডমিন ইমেইল' : 'Admin Email'}</label>
+                      <input
+                        type="email"
+                        value={adminSettings.adminEmail}
+                        onChange={(e) => setAdminSettings({ ...adminSettings, adminEmail: e.target.value })}
+                        disabled={!editingSettings}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white disabled:opacity-50"
+                      />
+                    </div>
+
+                    {editingSettings && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-400 mb-2">{isBn ? 'নতুন পাসওয়ার্ড' : 'New Password'}</label>
+                          <input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder={isBn ? 'পরিবর্তন করতে চাইলে লিখুন' : 'Leave empty to keep current'}
+                            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-500"
+                          />
+                        </div>
+
+                        {newPassword && (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">{isBn ? 'পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm Password'}</label>
+                            <input
+                              type="password"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white"
+                            />
+                          </div>
+                        )}
+
+                        <button
+                          onClick={handleSaveSettings}
+                          className="w-full py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition"
+                        >
+                          <i className="fas fa-save mr-2"></i>
+                          {isBn ? 'সংরক্ষণ করুন' : 'Save Changes'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* System Settings */}
+                <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
+                  <h3 className="text-lg font-bold text-white mb-6">{isBn ? 'সিস্টেম সেটিংস' : 'System Settings'}</h3>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div>
+                        <p className="text-white font-medium">{isBn ? 'নোটিফিকেশন' : 'Notifications'}</p>
+                        <p className="text-sm text-slate-400">{isBn ? 'নতুন ইভেন্টের জন্য নোটিফিকেশন' : 'Get notified for new events'}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const updated = { ...adminSettings, notificationsEnabled: !adminSettings.notificationsEnabled };
+                          setAdminSettings(updated);
+                          saveAdminSettings(updated);
+                        }}
+                        className={`w-14 h-7 rounded-full transition ${
+                          adminSettings.notificationsEnabled ? 'bg-green-500' : 'bg-slate-600'
+                        }`}
+                      >
+                        <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                          adminSettings.notificationsEnabled ? 'translate-x-8' : 'translate-x-1'
+                        }`}></span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div>
+                        <p className="text-white font-medium">{isBn ? 'মেইনটেন্যান্স মোড' : 'Maintenance Mode'}</p>
+                        <p className="text-sm text-slate-400">{isBn ? 'সাইট বন্ধ রাখুন' : 'Take the site offline'}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const updated = { ...adminSettings, maintenanceMode: !adminSettings.maintenanceMode };
+                          setAdminSettings(updated);
+                          saveAdminSettings(updated);
+                        }}
+                        className={`w-14 h-7 rounded-full transition ${
+                          adminSettings.maintenanceMode ? 'bg-red-500' : 'bg-slate-600'
+                        }`}
+                      >
+                        <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                          adminSettings.maintenanceMode ? 'translate-x-8' : 'translate-x-1'
+                        }`}></span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="bg-red-500/10 backdrop-blur rounded-2xl p-6 border border-red-500/30">
+                  <h3 className="text-lg font-bold text-red-400 mb-4">{isBn ? 'বিপদ অঞ্চল' : 'Danger Zone'}</h3>
+                  <p className="text-slate-400 text-sm mb-4">{isBn ? 'এই অ্যাকশনগুলো পূর্বাবস্থায় ফেরানো যাবে না' : 'These actions cannot be undone'}</p>
+                  <button
+                    onClick={() => {
+                      if (confirm(isBn ? 'আপনি কি নিশ্চিত? সব ডেটা মুছে যাবে!' : 'Are you sure? All data will be deleted!')) {
+                        localStorage.clear();
+                        window.location.reload();
+                      }
+                    }}
+                    className="px-6 py-3 bg-red-500/20 text-red-400 font-bold rounded-xl hover:bg-red-500/30 transition"
+                  >
+                    <i className="fas fa-trash mr-2"></i>
+                    {isBn ? 'সব ডেটা মুছুন' : 'Clear All Data'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
     </div>
   );
 };
