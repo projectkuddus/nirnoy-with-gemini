@@ -142,7 +142,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   const handlePhoneSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    console.log('[PatientAuth] handlePhoneSubmit called, phone:', phone); alert('Submitting: ' + phone);
+    console.log('handlePhoneSubmit called, phone:', phone);
     
     if (!isValidPhone(phone)) {
       setError(t.invalidPhone);
