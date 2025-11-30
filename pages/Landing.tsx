@@ -161,18 +161,16 @@ const SpecialtyCard: React.FC<{
   return (
     <button
       onClick={onClick}
-      className="group flex items-center gap-3 bg-white/80 backdrop-blur-sm rounded-xl px-4 py-3 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-md transition-all duration-200"
+      className="group flex flex-col items-center justify-center bg-white rounded-xl p-3 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-lg transition-all duration-200 aspect-square"
     >
       <div 
-        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+        className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-transform group-hover:scale-110"
         style={{ backgroundColor: `${color}15` }}
       >
-        <i className={`fas ${icon} text-base`} style={{ color }}></i>
+        <i className={`fas ${icon} text-lg`} style={{ color }}></i>
       </div>
-      <div className="text-left min-w-0">
-        <h3 className="font-semibold text-slate-800 text-sm truncate">{language === 'bn' ? nameBn : name}</h3>
-        <p className="text-xs text-slate-400">{count} {language === 'bn' ? 'ডাক্তার' : 'doctors'}</p>
-      </div>
+      <h3 className="font-semibold text-slate-800 text-xs text-center leading-tight">{language === 'bn' ? nameBn : name}</h3>
+      <p className="text-[10px] text-slate-400 mt-0.5">{count}+</p>
     </button>
   );
 };
@@ -201,14 +199,26 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
   MOCK_DOCTORS.forEach(d => d.specialties.forEach(s => { specialtyCounts[s] = (specialtyCounts[s] || 0) + 1; }));
 
   const specialties = [
-    { name: 'Internal Medicine', nameBn: 'মেডিসিন', icon: 'fa-stethoscope', color: '#3b82f6' },
+    { name: 'Medicine', nameBn: 'মেডিসিন', icon: 'fa-stethoscope', color: '#3b82f6' },
     { name: 'Cardiology', nameBn: 'হৃদরোগ', icon: 'fa-heartbeat', color: '#ef4444' },
-    { name: 'Gynaecology & Obstetrics', nameBn: 'স্ত্রীরোগ', icon: 'fa-venus', color: '#ec4899' },
+    { name: 'Gynaecology', nameBn: 'স্ত্রীরোগ', icon: 'fa-venus', color: '#ec4899' },
     { name: 'Paediatrics', nameBn: 'শিশুরোগ', icon: 'fa-baby', color: '#06b6d4' },
-    { name: 'Orthopedics', nameBn: 'হাড় ও জোড়া', icon: 'fa-bone', color: '#f97316' },
-    { name: 'Dermatology', nameBn: 'চর্মরোগ', icon: 'fa-allergies', color: '#8b5cf6' },
+    { name: 'Orthopedics', nameBn: 'হাড়', icon: 'fa-bone', color: '#f97316' },
+    { name: 'Dermatology', nameBn: 'চর্ম', icon: 'fa-allergies', color: '#8b5cf6' },
     { name: 'ENT', nameBn: 'নাক-কান-গলা', icon: 'fa-head-side-cough', color: '#14b8a6' },
-    { name: 'Eye (Ophthalmology)', nameBn: 'চক্ষু', icon: 'fa-eye', color: '#6366f1' },
+    { name: 'Eye', nameBn: 'চক্ষু', icon: 'fa-eye', color: '#6366f1' },
+    { name: 'Neurology', nameBn: 'স্নায়ু', icon: 'fa-brain', color: '#a855f7' },
+    { name: 'Psychiatry', nameBn: 'মানসিক', icon: 'fa-head-side-virus', color: '#0ea5e9' },
+    { name: 'Gastro', nameBn: 'পেট', icon: 'fa-stomach', color: '#22c55e' },
+    { name: 'Nephrology', nameBn: 'কিডনি', icon: 'fa-kidneys', color: '#dc2626' },
+    { name: 'Pulmonology', nameBn: 'ফুসফুস', icon: 'fa-lungs', color: '#0891b2' },
+    { name: 'Endocrine', nameBn: 'হরমোন', icon: 'fa-disease', color: '#7c3aed' },
+    { name: 'Oncology', nameBn: 'ক্যান্সার', icon: 'fa-ribbon', color: '#be185d' },
+    { name: 'Surgery', nameBn: 'সার্জারি', icon: 'fa-scalpel', color: '#059669' },
+    { name: 'Urology', nameBn: 'মূত্র', icon: 'fa-venus-mars', color: '#d97706' },
+    { name: 'Dental', nameBn: 'দাঁত', icon: 'fa-tooth', color: '#2563eb' },
+    { name: 'Physiotherapy', nameBn: 'ফিজিও', icon: 'fa-person-walking', color: '#16a34a' },
+    { name: 'Nutrition', nameBn: 'পুষ্টি', icon: 'fa-apple-whole', color: '#84cc16' },
   ];
 
   const handleSearch = (e: React.FormEvent) => {
@@ -309,7 +319,7 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 gap-2">
             {specialties.map(spec => (
               <SpecialtyCard
                 key={spec.name}
