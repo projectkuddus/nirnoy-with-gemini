@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Nirnoy Login Test</title>
+  <style>
+    body { font-family: Arial; padding: 40px; max-width: 600px; margin: 0 auto; }
+    h1 { color: #2563eb; }
+    input, button { padding: 12px; margin: 5px 0; font-size: 16px; width: 100%; box-sizing: border-box; }
+    button { background: #2563eb; color: white; border: none; cursor: pointer; border-radius: 8px; }
+    button:hover { background: #1d4ed8; }
+    #log { background: #f0f0f0; padding: 15px; margin-top: 20px; white-space: pre-wrap; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>🔧 Nirnoy Login Test</h1>
+  <p>This page tests the Supabase connection directly.</p>
+  
+  <input type="text" id="phone" placeholder="Enter phone: 01553014814" value="01553014814">
+  <button onclick="testLogin()">Test Login</button>
+  <button onclick="testSupabase()">Test Supabase Connection</button>
+  <button onclick="clearLog()">Clear Log</button>
+  
+  <div id="log">Click a button to start testing...</div>
+  
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    
+    const SUPABASE_URL = 'https://cmbgrjkigxfzlcaqzgkk.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtYmdyamtpZ3hmemxjYXF6Z2trIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMTk0NTIsImV4cCI6MjA2MzU5NTQ1Mn0.yL0MpSd9r-x-ij8MwGgQa6Hwv_7CIBjNOXNTqjdHrPE';
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    function log(msg, type = '') {
+      const el = document.getElementById('log');
+      const cls = type === 'success' ? 'success' : type === 'error' ? 'error' : '';
+      el.innerHTML += `<span class="${cls}">${new Date().toLocaleTimeString()}: ${msg}</span>\n`;
+      el.scrollTop = el.scrollHeight;
+    }
+    
+    window.clearLog = function() {
+      document.getElementById('log').innerHTML = '';
+    }
+    
+    window.testSupabase = async function() {
+      log('Testing Supabase connection...');
+      
+      try {
+        const { data, error } = await supabase.from('profiles').select('count').limit(1);
+        if (error) {
+          log('Supabase ERROR: ' + error.message, 'error');
+        } else {
+          log('Supabase connected! ✓', 'success');
+        }
+      } catch (e) {
+        log('Exception: ' + e.message, 'error');
+      }
+    }
+    
+    window.testLogin = async function() {
+      const phone = document.getElementById('phone').value.replace(/\D/g, '');
+      log('Testing login with phone: ' + phone);
+      
+      // Normalize phone
+      let normalized = phone;
+      if (normalized.startsWith('880')) normalized = normalized.substring(3);
+      if (normalized.startsWith('0')) normalized = normalized.substring(1);
+      log('Normalized phone: ' + normalized);
+      
+      try {
+        // Query 1: exact match
+        log('Query 1: SELECT * FROM profiles WHERE phone = ' + normalized);
+        const { data: data1, error: error1 } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('phone', normalized)
+          .maybeSingle();
+        
+        if (error1) {
+          log('Query 1 error: ' + error1.message, 'error');
+        } else if (data1) {
+          log('Query 1 FOUND: ' + data1.name + ' (phone: ' + data1.phone + ')', 'success');
+          log('Full data: ' + JSON.stringify(data1, null, 2));
+          
+          // Test saving to localStorage
+          log('Saving to localStorage...');
+          const session = { userId: data1.id, role: data1.role, user: data1, ts: Date.now() };
+          localStorage.setItem('nirnoy_session', JSON.stringify(session));
+          log('Session saved! ✓', 'success');
+          
+          // Verify
+          const verify = localStorage.getItem('nirnoy_session');
+          log('Verify localStorage: ' + (verify ? 'EXISTS (' + verify.length + ' chars)' : 'MISSING!'), verify ? 'success' : 'error');
+          
+          return;
+        } else {
+          log('Query 1: No result');
+        }
+        
+        // Query 2: with leading 0
+        log('Query 2: SELECT * FROM profiles WHERE phone = 0' + normalized);
+        const { data: data2, error: error2 } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('phone', '0' + normalized)
+          .maybeSingle();
+        
+        if (error2) {
+          log('Query 2 error: ' + error2.message, 'error');
+        } else if (data2) {
+          log('Query 2 FOUND: ' + data2.name, 'success');
+        } else {
+          log('Query 2: No result');
+          log('USER NOT FOUND in database!', 'error');
+        }
+        
+      } catch (e) {
+        log('Exception: ' + e.message, 'error');
+      }
+    }
+    
+    // Auto-test on load
+    window.testSupabase();
+  </script>
+</body>
+</html>
