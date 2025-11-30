@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { UserRole } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 // ============ TYPES ============
 type FeedbackType = 'bug' | 'feature' | 'general' | 'doctor' | 'complaint';
@@ -51,6 +51,7 @@ export const FeedbackWidget: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
+  const { user, isAuthenticated } = useAuth();
   const isBn = language === 'bn';
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -66,11 +67,6 @@ export const FeedbackWidget: React.FC = () => {
   // Hide on certain pages
   const hiddenPages = ['/admin', '/doctor-dashboard', '/patient-dashboard'];
   const shouldHide = hiddenPages.some(page => location.pathname.startsWith(page));
-
-  // Check if user is logged in
-  const userRole = localStorage.getItem('nirnoy_role') as UserRole | null;
-  const userData = JSON.parse(localStorage.getItem('nirnoy_user') || '{}');
-  const isLoggedIn = userRole && userRole !== UserRole.GUEST;
 
   // Auto-collapse after delay
   useEffect(() => {
@@ -98,211 +94,186 @@ export const FeedbackWidget: React.FC = () => {
     submit: isBn ? 'পাঠান' : 'Submit',
     submitting: isBn ? 'পাঠানো হচ্ছে...' : 'Sending...',
     thanks: isBn ? 'ধন্যবাদ!' : 'Thanks!',
-    thanksMessage: isBn ? 'আপনার মতামত পেয়েছি' : 'We received your feedback',
-    loginRequired: isBn ? 'লগইন করুন' : 'Login Required',
-    loginMessage: isBn ? 'মতামত দিতে লগইন করুন' : 'Please login to submit feedback',
-    loginBtn: isBn ? 'লগইন' : 'Login',
+    thanksMsg: isBn ? 'আপনার মতামত পাঠানো হয়েছে' : 'Your feedback has been sent',
+    loginRequired: isBn ? 'মতামত দিতে লগইন করুন' : 'Login to submit feedback',
+    login: isBn ? 'লগইন' : 'Login',
+    cancel: isBn ? 'বাতিল' : 'Cancel',
   };
-
-  const feedbackTypes: { type: FeedbackType; label: string; emoji: string }[] = [
-    { type: 'general', label: t.general, emoji: '💬' },
-    { type: 'bug', label: t.bug, emoji: '🐛' },
-    { type: 'feature', label: t.feature, emoji: '💡' },
-    { type: 'doctor', label: t.doctor, emoji: '👨‍⚕️' },
-    { type: 'complaint', label: t.complaint, emoji: '😤' },
-  ];
 
   const handleOpen = () => {
-    if (!isLoggedIn) {
+    if (!isAuthenticated) {
       setShowLoginPrompt(true);
-    } else {
-      setIsOpen(true);
-      setIsExpanded(false);
+      return;
     }
-  };
-
-  const handleSubmit = async () => {
-    if (!message.trim() || !isLoggedIn) return;
-    setIsSubmitting(true);
-
-    const feedbackData: FeedbackData = {
-      id: 'fb_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      type: feedbackType,
-      mood: mood || 'neutral',
-      message: message.trim(),
-      email: userData.email,
-      phone: userData.phone,
-      page: window.location.pathname,
-      userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString(),
-      userId: userData.id || userData.phone,
-      userRole: userRole || undefined,
-      userName: userData.name,
-      status: 'new',
-    };
-
-    try {
-      saveFeedback(feedbackData);
-      setSubmitted(true);
-    } catch (error) {
-      console.error('Failed to save feedback:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const resetForm = () => {
+    setIsOpen(true);
     setStep(1);
     setMood(null);
-    setFeedbackType('general');
     setMessage('');
     setSubmitted(false);
   };
 
-  const handleClose = () => {
-    setIsOpen(false);
-    setShowLoginPrompt(false);
-    setTimeout(resetForm, 300);
+  const handleSubmit = async () => {
+    if (!mood || !message.trim()) return;
+    
+    setIsSubmitting(true);
+    
+    const feedback: FeedbackData = {
+      id: Date.now().toString(),
+      type: feedbackType,
+      mood,
+      message: message.trim(),
+      page: location.pathname,
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+      userId: user?.id,
+      userRole: user?.role,
+      userName: user?.name,
+      status: 'new',
+    };
+    
+    saveFeedback(feedback);
+    
+    await new Promise(r => setTimeout(r, 500));
+    setIsSubmitting(false);
+    setSubmitted(true);
+    
+    setTimeout(() => {
+      setIsOpen(false);
+      setSubmitted(false);
+    }, 2000);
   };
 
   if (shouldHide) return null;
 
   return (
     <>
-      {/* Floating Button - Bottom Right */}
-      <div className="fixed bottom-24 right-4 z-30 flex items-center">
-        <div className={`transition-all duration-300 mr-2 ${isExpanded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
-          <button onClick={handleOpen} className="px-3 py-2 bg-slate-800/90 backdrop-blur-sm text-white text-sm rounded-lg shadow-lg hover:bg-slate-700 transition whitespace-nowrap">
-            {t.subtitle}
-          </button>
-        </div>
-        <button
-          onClick={() => isExpanded ? handleOpen() : setIsExpanded(true)}
-          onMouseEnter={() => setIsExpanded(true)}
-          className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all flex items-center justify-center"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Login Prompt */}
+      {/* Login Prompt Modal */}
       {showLoginPrompt && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={handleClose}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-5 text-center" onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg className="w-7 h-7 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1">{t.loginRequired}</h3>
-            <p className="text-slate-500 text-sm mb-4">{t.loginMessage}</p>
-            <div className="flex gap-2">
-              <button onClick={handleClose} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition text-sm">
-                {isBn ? 'বাতিল' : 'Cancel'}
-              </button>
-              <button onClick={() => { handleClose(); navigate('/login'); }} className="flex-1 py-2.5 bg-purple-500 text-white rounded-xl font-medium hover:bg-purple-600 transition text-sm">
-                {t.loginBtn}
-              </button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
+            <div className="text-4xl mb-3">🔐</div>
+            <h3 className="font-bold text-slate-800 mb-2">{t.loginRequired}</h3>
+            <div className="flex gap-3 mt-4">
+              <button onClick={() => setShowLoginPrompt(false)} className="flex-1 py-2 border border-slate-200 rounded-xl text-slate-600">{t.cancel}</button>
+              <button onClick={() => { setShowLoginPrompt(false); navigate('/patient-auth'); }} className="flex-1 py-2 bg-teal-500 text-white rounded-xl font-bold">{t.login}</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Feedback Button */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <button
+          onClick={handleOpen}
+          onMouseEnter={() => setIsExpanded(true)}
+          onMouseLeave={() => !isOpen && setIsExpanded(false)}
+          className={`flex items-center gap-2 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${isExpanded ? 'px-4 py-3' : 'w-12 h-12 justify-center'}`}
+        >
+          <span className="text-lg">💬</span>
+          {isExpanded && <span className="text-sm font-medium whitespace-nowrap">{t.title}</span>}
+        </button>
+      </div>
+
       {/* Feedback Modal */}
-      {isOpen && isLoggedIn && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={handleClose}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            {submitted ? (
-              <div className="p-6 text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] overflow-hidden shadow-2xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-teal-500 to-emerald-500 p-4 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-lg">{t.title}</h3>
+                  <p className="text-sm text-white/80">{t.subtitle}</p>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-1">{t.thanks}</h3>
-                <p className="text-slate-500 text-sm mb-4">{t.thanksMessage}</p>
-                <button onClick={handleClose} className="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition text-sm">
-                  {isBn ? 'বন্ধ করুন' : 'Close'}
-                </button>
+                <button onClick={() => setIsOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30">✕</button>
               </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                    </div>
-                    <span className="font-bold text-slate-800">{t.title}</span>
-                  </div>
-                  <button onClick={handleClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4">
+              {submitted ? (
+                <div className="text-center py-8">
+                  <div className="text-5xl mb-3">✅</div>
+                  <h4 className="font-bold text-slate-800 text-lg">{t.thanks}</h4>
+                  <p className="text-slate-500">{t.thanksMsg}</p>
                 </div>
-                <div className="p-4 space-y-4">
-                  {step === 1 ? (
-                    <>
-                      <div>
-                        <p className="text-sm text-slate-500 mb-2">{t.howFeeling}</p>
-                        <div className="flex gap-2">
-                          {[
-                            { m: 'happy' as FeedbackMood, emoji: '😊', label: t.happy },
-                            { m: 'neutral' as FeedbackMood, emoji: '😐', label: t.neutral },
-                            { m: 'sad' as FeedbackMood, emoji: '😞', label: t.sad },
-                          ].map((item) => (
-                            <button key={item.m} onClick={() => setMood(item.m)} className={`flex-1 py-3 rounded-xl border-2 transition text-center ${mood === item.m ? 'border-purple-500 bg-purple-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                              <span className="text-2xl block mb-1">{item.emoji}</span>
-                              <span className="text-xs text-slate-600">{item.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-500 mb-2">{t.whatType}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {feedbackTypes.map((item) => (
-                            <button key={item.type} onClick={() => setFeedbackType(item.type)} className={`px-3 py-1.5 rounded-lg text-sm transition ${feedbackType === item.type ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                              {item.emoji} {item.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <button onClick={() => setStep(2)} disabled={!mood} className="w-full py-2.5 bg-purple-500 text-white rounded-xl font-medium hover:bg-purple-600 transition disabled:opacity-50 text-sm">
-                        {isBn ? 'পরবর্তী' : 'Next'}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <button onClick={() => setStep(1)} className="text-slate-400 hover:text-slate-600">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                          </button>
-                          <p className="text-sm text-slate-500">{t.tellMore}</p>
-                        </div>
-                        <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder={t.placeholder} rows={3} className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:border-purple-500 outline-none transition resize-none text-sm" autoFocus />
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg text-xs text-slate-500">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <span>{userData.name || userData.phone || userRole}</span>
-                      </div>
-                      <button onClick={handleSubmit} disabled={!message.trim() || isSubmitting} className="w-full py-2.5 bg-purple-500 text-white rounded-xl font-medium hover:bg-purple-600 transition disabled:opacity-50 text-sm flex items-center justify-center gap-2">
-                        {isSubmitting ? t.submitting : t.submit}
-                      </button>
-                    </>
+              ) : step === 1 ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700 mb-3">{t.howFeeling}</p>
+                    <div className="flex justify-center gap-4">
+                      {[
+                        { value: 'happy' as FeedbackMood, emoji: '😊', label: t.happy },
+                        { value: 'neutral' as FeedbackMood, emoji: '😐', label: t.neutral },
+                        { value: 'sad' as FeedbackMood, emoji: '😞', label: t.sad },
+                      ].map(item => (
+                        <button
+                          key={item.value}
+                          onClick={() => setMood(item.value)}
+                          className={`flex flex-col items-center p-3 rounded-xl transition ${mood === item.value ? 'bg-teal-100 ring-2 ring-teal-500' : 'hover:bg-slate-100'}`}
+                        >
+                          <span className="text-3xl">{item.emoji}</span>
+                          <span className="text-xs text-slate-600 mt-1">{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-slate-700 mb-2">{t.whatType}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: 'general' as FeedbackType, label: t.general },
+                        { value: 'bug' as FeedbackType, label: t.bug },
+                        { value: 'feature' as FeedbackType, label: t.feature },
+                        { value: 'doctor' as FeedbackType, label: t.doctor },
+                        { value: 'complaint' as FeedbackType, label: t.complaint },
+                      ].map(item => (
+                        <button
+                          key={item.value}
+                          onClick={() => setFeedbackType(item.value)}
+                          className={`px-3 py-1.5 rounded-full text-sm transition ${feedbackType === item.value ? 'bg-teal-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {mood && (
+                    <button onClick={() => setStep(2)} className="w-full py-3 bg-teal-500 text-white rounded-xl font-bold">
+                      {isBn ? 'পরবর্তী' : 'Next'} →
+                    </button>
                   )}
                 </div>
-              </>
-            )}
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700 mb-2">{t.tellMore}</p>
+                    <textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder={t.placeholder}
+                      className="w-full h-32 p-3 border border-slate-200 rounded-xl resize-none focus:ring-2 focus:ring-teal-500 outline-none"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button onClick={() => setStep(1)} className="flex-1 py-3 border border-slate-200 rounded-xl text-slate-600">
+                      ← {isBn ? 'পিছনে' : 'Back'}
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting || !message.trim()}
+                      className="flex-1 py-3 bg-teal-500 text-white rounded-xl font-bold disabled:opacity-50"
+                    >
+                      {isSubmitting ? t.submitting : t.submit}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

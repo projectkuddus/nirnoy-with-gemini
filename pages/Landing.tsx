@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
 import { MOCK_DOCTORS } from '../data/mockData';
 import Navbar from '../components/Navbar';
@@ -55,12 +56,19 @@ const SpecialtyCard: React.FC<{
 };
 
 interface LandingProps {
-  onLogin: (role: UserRole) => void;
-  userRole: UserRole;
-  onLogout: () => void;
+  onLogin?: (role: UserRole) => void;
+  userRole?: UserRole;
+  onLogout?: () => void;
 }
 
-export const Landing: React.FC<LandingProps> = ({ onLogin, userRole, onLogout }) => {
+export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRole, onLogout }) => {
+  const { user, logout, isAuthenticated } = useAuth();
+  const userRole = propUserRole || (user?.role === 'PATIENT' ? UserRole.PATIENT : user?.role === 'DOCTOR' ? UserRole.DOCTOR : UserRole.GUEST);
+  
+  const handleLogout = () => {
+    logout();
+    if (onLogout) onLogout();
+  };
   const navigate = useNavigate();
   const { language, t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,7 +96,7 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole, onLogout })
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Navbar userRole={userRole} onLogout={onLogout} />
+      <Navbar userRole={userRole} onLogout={handleLogout} />
 
       {/* Hero Section */}
       <section className="pt-24 pb-16 px-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
@@ -285,10 +293,10 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole, onLogout })
               <i className="fas fa-code"></i> Dev Mode
             </p>
             <div className="space-y-2">
-              <button onClick={() => onLogin(UserRole.PATIENT)} className="w-full py-2 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl text-sm font-bold">
+              <button onClick={() => navigate("/patient-auth")} className="w-full py-2 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl text-sm font-bold">
                 Patient Login
               </button>
-              <button onClick={() => onLogin(UserRole.DOCTOR)} className="w-full py-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl text-sm font-bold">
+              <button onClick={() => navigate("/doctor-registration")} className="w-full py-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl text-sm font-bold">
                 Doctor Login
               </button>
             </div>
