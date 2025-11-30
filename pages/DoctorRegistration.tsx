@@ -254,7 +254,7 @@ export const DoctorRegistration: React.FC = () => {
     nameEn: '',
     nameBn: '',
     gender: '',
-    dateOfBirth: '',
+    dateOfBirth: new Date().toISOString().split('T')[0], // Default to today
     phone: '',
     email: '',
     qualifications: [initialQualification],
@@ -726,17 +726,52 @@ export const DoctorRegistration: React.FC = () => {
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">
                           {t.dateOfBirth} <span className="text-red-500">*</span>
+                          <span className="text-xs text-slate-400 ml-2 font-normal">({isBn ? 'ডাক্তার কমপক্ষে ২২ বছর হতে হবে' : 'Doctor must be at least 22 years old'})</span>
                         </label>
+                        
+                        {/* Quick Decade Buttons for Doctors (1950-2002) */}
+                        <div className="mb-3">
+                          <div className="flex flex-wrap gap-1">
+                            {[2000, 1990, 1980, 1970, 1960, 1950].map(decade => {
+                              const currentDobYear = data.dateOfBirth ? parseInt(data.dateOfBirth.split('-')[0]) : 0;
+                              return (
+                                <button
+                                  key={decade}
+                                  type="button"
+                                  onClick={() => {
+                                    const newDate = `${decade}-${data.dateOfBirth?.split('-')[1] || '01'}-${data.dateOfBirth?.split('-')[2] || '01'}`;
+                                    updateData('dateOfBirth', newDate);
+                                  }}
+                                  className={`px-3 py-1.5 text-xs rounded-lg font-medium transition ${
+                                    currentDobYear >= decade && currentDobYear < decade + 10
+                                      ? 'bg-blue-500 text-white'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  {decade}s
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        
                         <input
                           type="date"
-                      max={maxDOB}
-                      min={minDOB}
-                      value={data.dateOfBirth}
+                          max={maxDOB}
+                          min={minDOB}
+                          value={data.dateOfBirth}
                           onChange={(e) => updateData('dateOfBirth', e.target.value)}
                           className={`w-full p-4 border-2 rounded-xl outline-none transition ${
                             errors.dateOfBirth ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
                           }`}
                         />
+                        
+                        {/* Show age */}
+                        {data.dateOfBirth && (
+                          <p className="text-sm text-blue-600 font-medium mt-2 text-center">
+                            {isBn ? `বয়স: ${today.getFullYear() - parseInt(data.dateOfBirth.split('-')[0])} বছর` : `Age: ${today.getFullYear() - parseInt(data.dateOfBirth.split('-')[0])} years`}
+                          </p>
+                        )}
                         {errors.dateOfBirth && <p className="text-red-500 text-sm mt-1">{errors.dateOfBirth}</p>}
                       </div>
                     </div>

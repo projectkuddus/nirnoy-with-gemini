@@ -29,9 +29,11 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   // Registration fields
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
-  const [dobYear, setDobYear] = useState('');
-  const [dobMonth, setDobMonth] = useState('');
-  const [dobDay, setDobDay] = useState('');
+  // Default DOB to today (user will change to their actual birth date)
+  const todayDate = new Date();
+  const [dobYear, setDobYear] = useState(String(todayDate.getFullYear()));
+  const [dobMonth, setDobMonth] = useState(String(todayDate.getMonth() + 1).padStart(2, '0'));
+  const [dobDay, setDobDay] = useState(String(todayDate.getDate()).padStart(2, '0'));
   const [bloodGroup, setBloodGroup] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
 
@@ -517,29 +519,61 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                     </div>
                   </div>
 
-                  {/* DOB - Easy Dropdown Selection */}
+                  {/* DOB - Modern Easy Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">{t.dobLabel}</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {/* Year Dropdown */}
-                      <select
-                        value={dobYear}
-                        onChange={(e) => setDobYear(e.target.value)}
-                        className="px-3 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition text-sm font-medium"
-                      >
-                        <option value="">{isBn ? 'বছর' : 'Year'}</option>
-                        {yearOptions.map(year => (
-                          <option key={year} value={year}>{year}</option>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      {t.dobLabel}
+                      <span className="text-xs text-slate-400 ml-2">({isBn ? 'আপনার জন্ম তারিখ নির্বাচন করুন' : 'Select your birth date'})</span>
+                    </label>
+                    
+                    {/* Quick Decade Buttons */}
+                    <div className="mb-3">
+                      <p className="text-xs text-slate-500 mb-2">{isBn ? 'দ্রুত বছর নির্বাচন:' : 'Quick year select:'}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {[2020, 2010, 2000, 1990, 1980, 1970, 1960, 1950].map(decade => (
+                          <button
+                            key={decade}
+                            type="button"
+                            onClick={() => setDobYear(String(decade))}
+                            className={`px-3 py-1.5 text-xs rounded-lg font-medium transition ${
+                              parseInt(dobYear) >= decade && parseInt(dobYear) < decade + 10
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {decade}s
+                          </button>
                         ))}
-                      </select>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                      {/* Year - Number Input with arrows */}
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={dobYear}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (val >= 1900 && val <= currentYear) setDobYear(e.target.value);
+                          }}
+                          min="1900"
+                          max={currentYear}
+                          className="w-full px-3 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition text-sm font-bold text-center"
+                          placeholder={isBn ? 'বছর' : 'Year'}
+                        />
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
+                          <button type="button" onClick={() => setDobYear(String(Math.min(currentYear, parseInt(dobYear || '2000') + 1)))} className="text-slate-400 hover:text-blue-500 text-xs px-1">▲</button>
+                          <button type="button" onClick={() => setDobYear(String(Math.max(1900, parseInt(dobYear || '2000') - 1)))} className="text-slate-400 hover:text-blue-500 text-xs px-1">▼</button>
+                        </div>
+                      </div>
                       
                       {/* Month Dropdown */}
                       <select
                         value={dobMonth}
                         onChange={(e) => setDobMonth(e.target.value)}
-                        className="px-3 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition text-sm font-medium"
+                        className="px-2 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition text-sm font-medium"
                       >
-                        <option value="">{isBn ? 'মাস' : 'Month'}</option>
                         {monthOptions.map(month => (
                           <option key={month.value} value={month.value}>{month.label}</option>
                         ))}
@@ -549,24 +583,28 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                       <select
                         value={dobDay}
                         onChange={(e) => setDobDay(e.target.value)}
-                        className="px-3 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition text-sm font-medium"
+                        className="px-2 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition text-sm font-medium"
                       >
-                        <option value="">{isBn ? 'দিন' : 'Day'}</option>
                         {dayOptions.map(day => (
                           <option key={day} value={day}>{parseInt(day)}</option>
                         ))}
                       </select>
                     </div>
                     
-                    {/* Show selected date */}
+                    {/* Show selected date with age */}
                     {dateOfBirth && (
-                      <p className="mt-2 text-sm text-slate-500 text-center">
-                        📅 {new Date(dateOfBirth).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        })}
-                      </p>
+                      <div className="mt-3 p-3 bg-slate-50 rounded-xl text-center">
+                        <p className="text-sm text-slate-600">
+                          📅 {new Date(dateOfBirth).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </p>
+                        <p className="text-xs text-blue-600 font-medium mt-1">
+                          {isBn ? `বয়স: ${currentYear - parseInt(dobYear)} বছর` : `Age: ${currentYear - parseInt(dobYear)} years`}
+                        </p>
+                      </div>
                     )}
                     
                     {isKidAccount && (
@@ -585,6 +623,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
                     <select
                       value={bloodGroup}
                       onChange={(e) => setBloodGroup(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition"
                       className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition"
                     >
                       <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
