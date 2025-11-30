@@ -46,13 +46,44 @@ interface RegistrationData {
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
+// All Medical Specialties in Bangladesh
 const SPECIALTIES = [
-  'Cardiology', 'Medicine', 'Gynecology', 'Pediatrics', 'Orthopedics',
-  'Neurology', 'Dermatology', 'ENT', 'Ophthalmology', 'Psychiatry',
-  'Gastroenterology', 'Urology', 'Nephrology', 'Pulmonology', 'Oncology',
-  'Endocrinology', 'Rheumatology', 'Surgery', 'Plastic Surgery', 'Dental'
+  // Internal Medicine & Subspecialties
+  'Medicine', 'Cardiology', 'Gastroenterology', 'Nephrology', 'Pulmonology',
+  'Endocrinology', 'Rheumatology', 'Neurology', 'Hematology', 'Infectious Disease',
+  'Oncology', 'Geriatric Medicine', 'Critical Care Medicine', 'Hepatology',
+  // Surgery & Subspecialties
+  'General Surgery', 'Orthopedics', 'Neurosurgery', 'Cardiac Surgery',
+  'Thoracic Surgery', 'Vascular Surgery', 'Plastic Surgery', 'Pediatric Surgery',
+  'Urology', 'Colorectal Surgery', 'Hepatobiliary Surgery', 'Transplant Surgery',
+  // Women's Health
+  'Gynecology', 'Obstetrics', 'Gynecologic Oncology', 'Reproductive Medicine',
+  'Maternal-Fetal Medicine',
+  // Pediatrics
+  'Pediatrics', 'Neonatology', 'Pediatric Cardiology', 'Pediatric Neurology',
+  'Pediatric Oncology', 'Pediatric Pulmonology',
+  // Eyes, Ears, Nose, Throat
+  'Ophthalmology', 'ENT', 'Otology', 'Rhinology', 'Laryngology',
+  // Skin
+  'Dermatology', 'Venereology', 'Cosmetology',
+  // Mental Health
+  'Psychiatry', 'Child Psychiatry', 'Addiction Medicine', 'Clinical Psychology',
+  // Dental
+  'Dental Surgery', 'Orthodontics', 'Periodontics', 'Prosthodontics',
+  'Endodontics', 'Oral & Maxillofacial Surgery', 'Pedodontics',
+  // Radiology & Imaging
+  'Radiology', 'Interventional Radiology', 'Nuclear Medicine',
+  // Anesthesia & Pain
+  'Anesthesiology', 'Pain Medicine', 'Palliative Care',
+  // Physical Medicine
+  'Physical Medicine', 'Rehabilitation', 'Sports Medicine',
+  // Pathology & Lab
+  'Pathology', 'Microbiology', 'Biochemistry', 'Transfusion Medicine',
+  // Other Specialties
+  'Emergency Medicine', 'Family Medicine', 'Occupational Medicine',
+  'Forensic Medicine', 'Community Medicine', 'Public Health',
+  'Tropical Medicine', 'Allergy & Immunology', 'Genetics',
 ];
-
 const DEGREES = [
   'MBBS', 'BDS', 'FCPS', 'MD', 'MS', 'MRCP', 'FRCP', 'MRCS', 'FRCS',
   'PhD', 'DM', 'MCh', 'DNB', 'Diploma', 'Other'
@@ -1076,16 +1107,30 @@ export const DoctorRegistration: React.FC = () => {
                       <label className="block text-sm font-bold text-slate-700 mb-2">
                         {t.bmdcNumber} <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={data.bmdcNumber}
-                        onChange={(e) => updateData('bmdcNumber', e.target.value.toUpperCase())}
-                        className={`w-full p-4 border-2 rounded-xl outline-none transition ${
-                          errors.bmdcNumber ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
-                        }`}
-                        placeholder="A-12345"
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={data.bmdcNumber}
+                          onChange={(e) => updateData('bmdcNumber', e.target.value.toUpperCase())}
+                          className={`w-full p-4 border-2 rounded-xl outline-none transition pr-12 ${
+                            errors.bmdcNumber ? 'border-red-300 bg-red-50' : 
+                            data.bmdcNumber.match(/^[A-Z]-\d{4,6}$/) ? 'border-green-500 bg-green-50' : 
+                            'border-slate-200 focus:border-blue-500'
+                          }`}
+                          placeholder="A-12345"
+                        />
+                        {data.bmdcNumber.match(/^[A-Z]-\d{4,6}$/) && (
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500">
+                            <i className="fas fa-check-circle text-xl"></i>
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-slate-400 mt-1">{t.bmdcNote}</p>
+                      {data.bmdcNumber.match(/^[A-Z]-\d{4,6}$/) && (
+                        <p className="text-green-600 text-sm mt-1 flex items-center gap-1">
+                          <i className="fas fa-check"></i> {isBn ? 'সঠিক ফরম্যাট' : 'Valid format'}
+                        </p>
+                      )}
                       {errors.bmdcNumber && <p className="text-red-500 text-sm mt-1">{errors.bmdcNumber}</p>}
                     </div>
 
@@ -1093,17 +1138,36 @@ export const DoctorRegistration: React.FC = () => {
                       <label className="block text-sm font-bold text-slate-700 mb-2">
                         {t.nidNumber} <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={data.nidNumber}
-                        onChange={(e) => updateData('nidNumber', e.target.value.replace(/\D/g, ''))}
-                        className={`w-full p-4 border-2 rounded-xl outline-none transition ${
-                          errors.nidNumber ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:border-blue-500'
-                        }`}
-                        placeholder="1234567890"
-                        maxLength={17}
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={data.nidNumber}
+                          onChange={(e) => updateData('nidNumber', e.target.value.replace(/\D/g, ''))}
+                          className={`w-full p-4 border-2 rounded-xl outline-none transition pr-12 ${
+                            errors.nidNumber ? 'border-red-300 bg-red-50' : 
+                            (data.nidNumber.length === 10 || data.nidNumber.length === 17) ? 'border-green-500 bg-green-50' : 
+                            'border-slate-200 focus:border-blue-500'
+                          }`}
+                          placeholder="1234567890 or 12345678901234567"
+                          maxLength={17}
+                        />
+                        {(data.nidNumber.length === 10 || data.nidNumber.length === 17) && (
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500">
+                            <i className="fas fa-check-circle text-xl"></i>
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-slate-400 mt-1">{t.nidNote}</p>
+                      {(data.nidNumber.length === 10 || data.nidNumber.length === 17) && (
+                        <p className="text-green-600 text-sm mt-1 flex items-center gap-1">
+                          <i className="fas fa-check"></i> {isBn ? `সঠিক (${data.nidNumber.length} সংখ্যা)` : `Valid (${data.nidNumber.length} digits)`}
+                        </p>
+                      )}
+                      {data.nidNumber.length > 0 && data.nidNumber.length !== 10 && data.nidNumber.length !== 17 && (
+                        <p className="text-amber-600 text-sm mt-1 flex items-center gap-1">
+                          <i className="fas fa-info-circle"></i> {isBn ? `${data.nidNumber.length}/10 বা 17 সংখ্যা` : `${data.nidNumber.length}/10 or 17 digits`}
+                        </p>
+                      )}
                       {errors.nidNumber && <p className="text-red-500 text-sm mt-1">{errors.nidNumber}</p>}
                     </div>
 

@@ -236,19 +236,26 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   }
   
   // Use real doctor data - NO DEMO DATA
+  // Use real doctor data - with safe fallbacks
   const doctorProfile = {
     id: user.id,
     name: user.name,
     nameBn: user.nameBn || user.name,
-    specialty: doctorUser.specializations[0] || 'General',
-    specialtyBn: doctorUser.specializations[0] || 'সাধারণ চিকিৎসা',
-    degrees: doctorUser.qualifications.map(q => q.degree).join(', ') || 'MBBS',
+    specialty: (Array.isArray(doctorUser.specializations) && doctorUser.specializations.length > 0) 
+      ? (typeof doctorUser.specializations[0] === 'string' ? doctorUser.specializations[0] : doctorUser.specializations[0]?.name || 'General')
+      : 'General',
+    specialtyBn: (Array.isArray(doctorUser.specializations) && doctorUser.specializations.length > 0) 
+      ? (typeof doctorUser.specializations[0] === 'string' ? doctorUser.specializations[0] : doctorUser.specializations[0]?.name || 'সাধারণ চিকিৎসা')
+      : 'সাধারণ চিকিৎসা',
+    degrees: (Array.isArray(doctorUser.qualifications) && doctorUser.qualifications.length > 0)
+      ? doctorUser.qualifications.map(q => typeof q === 'string' ? q : q.degree).join(', ')
+      : 'MBBS',
     image: user.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=0d9488&color=fff&size=200',
-    hospital: doctorUser.chambers[0]?.name || 'Chamber',
-    hospitalBn: doctorUser.chambers[0]?.name || 'চেম্বার',
+    hospital: (Array.isArray(doctorUser.chambers) && doctorUser.chambers.length > 0) ? doctorUser.chambers[0]?.name : 'Chamber',
+    hospitalBn: (Array.isArray(doctorUser.chambers) && doctorUser.chambers.length > 0) ? doctorUser.chambers[0]?.name : 'চেম্বার',
     experience: doctorUser.experienceYears || 0,
     bmdcNo: doctorUser.bmdcNumber || '',
-    chamberAddress: doctorUser.chambers[0]?.address || '',
+    chamberAddress: (Array.isArray(doctorUser.chambers) && doctorUser.chambers.length > 0) ? doctorUser.chambers[0]?.address : '',
     chamberPhone: user.phone,
     consultationFee: doctorUser.consultationFee || 500,
   };
