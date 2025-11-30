@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, STORAGE_KEYS, DoctorProfile } from '../contexts/AuthContext';
 import PageHeader from '../components/PageHeader';
 
-type Step = 'personal' | 'professional' | 'verification' | 'review';
+type Step = 'phone' | 'otp' | 'personal' | 'professional' | 'verification' | 'review';
+
+// Test OTP bypass
+const TEST_BYPASS_CODE = '000000';
 
 // Qualification/Degree interface
 interface Qualification {
@@ -224,12 +227,19 @@ const INSTITUTION_GROUPS = {
 };
 
 export const DoctorRegistration: React.FC = () => {
-  const { registerDoctor, user } = useAuth();
+  const { registerDoctor, user, sendOTP, verifyOTP } = useAuth();
+  
+  // Phone-first auth state
+  const [authPhone, setAuthPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [isExistingDoctor, setIsExistingDoctor] = useState(false);
+  const [existingDoctorData, setExistingDoctorData] = useState<DoctorProfile | null>(null);
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
 
-  const [step, setStep] = useState<Step>('personal');
+  const [step, setStep] = useState<Step>('phone');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   
@@ -412,7 +422,8 @@ export const DoctorRegistration: React.FC = () => {
     benefit4: isBn ? 'সম্পূর্ণ বিনামূল্যে শুরু করুন' : 'Start completely free',
   };
 
-  const steps: Step[] = ['personal', 'professional', 'verification', 'review'];
+  const registrationSteps: Step[] = ['personal', 'professional', 'verification', 'review'];
+  const steps: Step[] = ['phone', 'otp', ...registrationSteps];
   const currentStepIndex = steps.indexOf(step);
 
   const updateData = (field: keyof RegistrationData, value: string) => {
@@ -629,40 +640,194 @@ export const DoctorRegistration: React.FC = () => {
                 <p className="text-slate-400">{t.subtitle}</p>
               </div>
 
-              {/* Progress Steps */}
-              <div className="p-6 border-b border-slate-100">
-                <div className="flex items-center justify-between">
-                  {steps.map((s, i) => (
-                    <React.Fragment key={s}>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                          i < currentStepIndex ? 'bg-green-500 text-white' :
-                          i === currentStepIndex ? 'bg-blue-600 text-white' :
-                          'bg-slate-200 text-slate-500'
-                        }`}>
-                          {i < currentStepIndex ? <i className="fas fa-check"></i> : i + 1}
-                        </div>
-                        <span className={`hidden sm:block text-sm font-medium ${
-                          i <= currentStepIndex ? 'text-slate-800' : 'text-slate-400'
-                        }`}>
-                          {s === 'personal' && t.step1}
-                          {s === 'professional' && t.step2}
-                          {s === 'verification' && t.step3}
-                          {s === 'review' && t.step4}
-                        </span>
-                      </div>
-                      {i < steps.length - 1 && (
-                        <div className={`flex-1 h-1 mx-2 rounded ${
-                          i < currentStepIndex ? 'bg-green-500' : 'bg-slate-200'
-                        }`}></div>
-                      )}
-                    </React.Fragment>
-                  ))}
+              {/* Progress Steps - Only show for registration steps */}
+              {(step !== 'phone' && step !== 'otp') && (
+                <div className="p-6 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
+                    {registrationSteps.map((s, i) => {
+                      const regStepIndex = registrationSteps.indexOf(step as any);
+                      return (
+                        <React.Fragment key={s}>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                              i < regStepIndex ? 'bg-green-500 text-white' :
+                              i === regStepIndex ? 'bg-blue-600 text-white' :
+                              'bg-slate-200 text-slate-500'
+                            }`}>
+                              {i < regStepIndex ? <i className="fas fa-check"></i> : i + 1}
+                            </div>
+                            <span className={`hidden sm:block text-sm font-medium ${
+                              i <= regStepIndex ? 'text-slate-800' : 'text-slate-400'
+                            }`}>
+                              {s === 'personal' && t.step1}
+                              {s === 'professional' && t.step2}
+                              {s === 'verification' && t.step3}
+                              {s === 'review' && t.step4}
+                            </span>
+                          </div>
+                          {i < registrationSteps.length - 1 && (
+                            <div className={`flex-1 h-1 mx-2 rounded ${
+                              i < regStepIndex ? 'bg-green-500' : 'bg-slate-200'
+                            }`}></div>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-
+              )}
               {/* Form Content */}
               <div className="p-6 md:p-8">
+                
+                {/* Phone Step */}
+                {step === 'phone' && (
+                  <div className="space-y-6 animate-fade-in max-w-md mx-auto">
+                    <div className="text-center mb-8">
+                      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i className="fas fa-user-md text-white text-3xl"></i>
+                      </div>
+                      <h2 className="text-2xl font-bold text-slate-800">{isBn ? 'ডাক্তার লগইন / রেজিস্ট্রেশন' : 'Doctor Login / Registration'}</h2>
+                      <p className="text-slate-500 mt-2">{isBn ? 'আপনার মোবাইল নম্বর দিন' : 'Enter your mobile number'}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">
+                        {isBn ? 'মোবাইল নম্বর' : 'Mobile Number'} <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">+880</span>
+                        <input
+                          type="tel"
+                          value={authPhone}
+                          onChange={(e) => setAuthPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                          className="w-full pl-16 pr-4 py-4 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none text-lg"
+                          placeholder="01XXXXXXXXX"
+                          maxLength={11}
+                        />
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        if (authPhone.length >= 10) {
+                          // Check if doctor already exists
+                          const doctors: DoctorProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCTORS) || '[]');
+                          const existingDoc = doctors.find(d => d.phone === authPhone || d.phone === `+880${authPhone.replace(/^0/, '')}`);
+                          
+                          if (existingDoc) {
+                            setIsExistingDoctor(true);
+                            setExistingDoctorData(existingDoc);
+                          } else {
+                            setIsExistingDoctor(false);
+                            setExistingDoctorData(null);
+                          }
+                          
+                          // Generate OTP
+                          const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                          setGeneratedOtp(newOtp);
+                          setStep('otp');
+                        }
+                      }}
+                      disabled={authPhone.length < 10}
+                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isBn ? 'OTP পাঠান' : 'Send OTP'}
+                    </button>
+                    
+                    <p className="text-center text-sm text-slate-500">
+                      {isBn ? 'রোগী হিসেবে লগইন করতে চান?' : 'Want to login as patient?'}{' '}
+                      <button onClick={() => navigate('/patient-auth')} className="text-blue-600 font-medium hover:underline">
+                        {isBn ? 'এখানে ক্লিক করুন' : 'Click here'}
+                      </button>
+                    </p>
+                  </div>
+                )}
+                
+                {/* OTP Step */}
+                {step === 'otp' && (
+                  <div className="space-y-6 animate-fade-in max-w-md mx-auto">
+                    <div className="text-center mb-8">
+                      <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i className="fas fa-shield-alt text-white text-3xl"></i>
+                      </div>
+                      <h2 className="text-2xl font-bold text-slate-800">{isBn ? 'OTP যাচাই' : 'Verify OTP'}</h2>
+                      <p className="text-slate-500 mt-2">
+                        {isBn ? `+880${authPhone} এ পাঠানো কোড দিন` : `Enter code sent to +880${authPhone}`}
+                      </p>
+                    </div>
+                    
+                    {/* Test Mode OTP Display */}
+                    <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 text-center">
+                      <p className="text-amber-600 text-sm font-medium mb-1">🧪 {isBn ? 'টেস্ট মোড' : 'Test Mode'}</p>
+                      <p className="text-amber-800 text-2xl font-mono font-bold tracking-widest">{generatedOtp}</p>
+                      <p className="text-amber-600 text-xs mt-1">{isBn ? 'অথবা 000000 দিন' : 'Or use 000000'}</p>
+                    </div>
+                    
+                    {isExistingDoctor && existingDoctorData && (
+                      <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                            <i className="fas fa-check text-white text-xl"></i>
+                          </div>
+                          <div>
+                            <p className="text-green-800 font-bold">{isBn ? 'স্বাগতম!' : 'Welcome back!'}</p>
+                            <p className="text-green-600 text-sm">{existingDoctorData.name}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <input
+                        type="text"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        className="w-full px-4 py-4 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 outline-none text-center text-2xl font-mono tracking-widest"
+                        placeholder="000000"
+                        maxLength={6}
+                      />
+                    </div>
+                    
+                    <button
+                      onClick={async () => {
+                        if (otp === generatedOtp || otp === TEST_BYPASS_CODE) {
+                          if (isExistingDoctor && existingDoctorData) {
+                            // Login existing doctor
+                            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(existingDoctorData));
+                            localStorage.setItem(STORAGE_KEYS.ROLE, 'DOCTOR');
+                            navigate('/doctor-dashboard');
+                          } else {
+                            // New doctor - proceed to registration
+                            updateData('phone', authPhone);
+                            setStep('personal');
+                          }
+                        } else {
+                          alert(isBn ? 'ভুল OTP!' : 'Incorrect OTP!');
+                        }
+                      }}
+                      disabled={otp.length !== 6}
+                      className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isExistingDoctor ? (isBn ? 'লগইন করুন' : 'Login') : (isBn ? 'যাচাই করুন' : 'Verify')}
+                    </button>
+                    
+                    <div className="flex justify-between text-sm">
+                      <button onClick={() => { setStep('phone'); setOtp(''); }} className="text-slate-500 hover:text-slate-700">
+                        ← {isBn ? 'নম্বর পরিবর্তন' : 'Change number'}
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                          setGeneratedOtp(newOtp);
+                          setOtp('');
+                        }}
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        {isBn ? 'নতুন OTP' : 'Resend OTP'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Step 1: Personal Info */}
                 {step === 'personal' && (
