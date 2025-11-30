@@ -200,7 +200,7 @@ const ProfileEditModal: React.FC<{
         
         <div className="sticky bottom-0 bg-white border-t border-slate-100 p-4 flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-medium">বাতিল</button>
-          <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 bg-teal-500 text-white rounded-xl font-bold disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold disabled:opacity-50">
             {saving ? 'সংরক্ষণ হচ্ছে...' : 'সংরক্ষণ'}
           </button>
         </div>
@@ -427,57 +427,82 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   
   // ============ RENDER HOME ============
   const renderHome = () => (
-    <div className="space-y-4">
-      {/* Premium Badge */}
-      <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-3 text-white flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">👑</span>
-          <div>
-            <p className="font-bold text-sm">প্রিমিয়াম সদস্য</p>
-            <p className="text-xs text-white/80">সব ফিচার আনলক</p>
-          </div>
+    <div className="space-y-6">
+      {/* Welcome Header - Clean & Minimal */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">
+            {isBn ? 'স্বাগতম' : 'Welcome back'}, {patientUser.name?.split(' ')[0] || 'User'}!
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            {isBn ? 'আপনার স্বাস্থ্যের সারসংক্ষেপ' : 'Your health at a glance'}
+          </p>
         </div>
-        <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-bold">PREMIUM</span>
+        <span className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-orange-400 text-white text-xs font-bold rounded-full shadow-sm">
+          👑 PREMIUM
+        </span>
       </div>
       
-      {/* Profile Card */}
-      <div className="bg-gradient-to-br from-teal-500 to-emerald-600 rounded-2xl p-4 text-white">
-        <div className="flex items-center gap-3">
+      {/* Stats Cards - Clean Grid */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl p-4 border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-xs">{isBn ? 'স্কোর' : 'Score'}</span>
+            <span className="text-green-500 text-xs">↗ +5%</span>
+          </div>
+          <p className="text-2xl font-bold text-slate-800">{patientUser.healthScore || 85}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-xs">{isBn ? 'অ্যাপয়েন্টমেন্ট' : 'Appointments'}</span>
+          </div>
+          <p className="text-2xl font-bold text-slate-800">0</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-slate-400 text-xs">{isBn ? 'কুইজ' : 'Quizzes'}</span>
+          </div>
+          <p className="text-2xl font-bold text-slate-800">0</p>
+        </div>
+      </div>
+      
+      {/* Profile Card - Minimal Dark */}
+      <div className="bg-slate-900 rounded-2xl p-5 text-white">
+        <div className="flex items-center gap-4">
           <img 
-            src={patientUser.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(patientUser.name) + '&background=0d9488&color=fff'} 
+            src={patientUser.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(patientUser.name || 'U') + '&background=3b82f6&color=fff'} 
             alt="" 
-            className="w-14 h-14 rounded-xl border-2 border-white/30" 
+            className="w-14 h-14 rounded-xl" 
           />
           <div className="flex-1">
-            <h1 className="text-lg font-bold">{patientUser.nameBn || patientUser.name}</h1>
-            <p className="text-sm text-white/80">{age} বছর {patientUser.bloodGroup && '• ' + patientUser.bloodGroup}</p>
+            <h2 className="font-bold">{patientUser.nameBn || patientUser.name}</h2>
+            <p className="text-sm text-slate-400">{age} {isBn ? 'বছর' : 'yrs'} {patientUser.bloodGroup && '• ' + patientUser.bloodGroup}</p>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold">{patientUser.healthScore || 100}</p>
-            <p className="text-xs text-white/70">স্কোর</p>
-          </div>
+          <button onClick={() => setActiveTab('profile')} className="p-2 bg-white/10 rounded-lg hover:bg-white/20">
+            <i className="fas fa-pen text-xs"></i>
+          </button>
         </div>
       </div>
       
-      {/* Quick Actions */}
-      <div className="grid grid-cols-4 gap-2">
+      {/* Quick Actions - Cleaner */}
+      <div className="grid grid-cols-4 gap-3">
         {[
-          { icon: '🤖', label: 'AI', tab: 'ai' as TabType },
-          { icon: '🍽️', label: 'খাবার', tab: 'food' as TabType },
-          { icon: '💊', label: 'ওষুধ', tab: 'meds' as TabType },
-          { icon: '🎮', label: 'কুইজ', tab: 'quiz' as TabType },
+          { icon: '🤖', label: isBn ? 'AI' : 'AI', tab: 'ai' as TabType },
+          { icon: '🍽️', label: isBn ? 'খাবার' : 'Food', tab: 'food' as TabType },
+          { icon: '💊', label: isBn ? 'ওষুধ' : 'Meds', tab: 'meds' as TabType },
+          { icon: '🎮', label: isBn ? 'কুইজ' : 'Quiz', tab: 'quiz' as TabType },
         ].map((item, i) => (
-          <button key={i} onClick={() => setActiveTab(item.tab)} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 text-center hover:border-teal-200 transition">
-            <span className="text-2xl">{item.icon}</span>
-            <p className="text-xs text-slate-600 mt-1">{item.label}</p>
+          <button key={i} onClick={() => setActiveTab(item.tab)} className="bg-white rounded-xl p-4 border border-slate-100 text-center hover:border-blue-200 hover:shadow-md transition">
+            <span className="text-2xl block">{item.icon}</span>
+            <p className="text-xs text-slate-600 mt-2 font-medium">{item.label}</p>
           </button>
         ))}
       </div>
       
-      {/* Health Alerts */}
+      {/* Health Alerts - Cleaner */}
       {patientUser.chronicConditions && patientUser.chronicConditions.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <h3 className="font-bold text-amber-800 text-sm mb-2">⚠️ স্বাস্থ্য সতর্কতা</h3>
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <h3 className="font-semibold text-amber-800 text-sm mb-2">⚠️ {isBn ? 'স্বাস্থ্য সতর্কতা' : 'Health Alerts'}</h3>
           <div className="flex flex-wrap gap-2">
             {patientUser.chronicConditions.map((c, i) => (
               <span key={i} className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs">{c}</span>
@@ -486,35 +511,18 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         </div>
       )}
       
-      {/* Today's Tasks */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-        <h3 className="font-bold text-slate-800 text-sm mb-3">📅 আজকের কাজ</h3>
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 p-2 bg-teal-50 rounded-lg">
-            <span className="text-lg">😊</span>
-            <span className="flex-1 text-sm">মেজাজ পরীক্ষা করুন</span>
-            <button onClick={() => setActiveTab('quiz')} className="text-xs text-teal-600 font-bold">শুরু</button>
-          </div>
-          <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg">
-            <span className="text-lg">💊</span>
-            <span className="flex-1 text-sm">ওষুধ খেয়েছেন?</span>
-            <button onClick={() => setActiveTab('meds')} className="text-xs text-blue-600 font-bold">দেখুন</button>
-          </div>
-        </div>
-      </div>
-      
-      {/* Find Doctor CTA */}
-      <button onClick={() => navigate('/search')} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white p-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
-        👨‍⚕️ ডাক্তার খুঁজুন
+      {/* Find Doctor CTA - Cleaner */}
+      <button onClick={() => navigate('/search')} className="w-full bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-xl font-semibold transition flex items-center justify-center gap-2">
+        <i className="fas fa-search"></i>
+        {isBn ? 'ডাক্তার খুঁজুন' : 'Find a Doctor'}
       </button>
     </div>
   );
-  
   // ============ RENDER AI ASSISTANT ============
   const renderAI = () => (
     <div className="flex flex-col h-[calc(100vh-180px)]">
       {/* Chat Header */}
-      <div className="bg-gradient-to-r from-teal-500 to-emerald-500 rounded-t-xl p-3 text-white flex items-center gap-3">
+      <div className="bg-slate-900 rounded-t-xl p-3 text-white flex items-center gap-3">
         <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl">🤖</div>
         <div>
           <h3 className="font-bold">নির্ণয় AI সহকারী</h3>
@@ -527,7 +535,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-              msg.role === 'user' ? 'bg-teal-500 text-white rounded-tr-md' : 'bg-white text-slate-800 rounded-tl-md shadow-sm'
+              msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-md' : 'bg-white text-slate-800 rounded-tl-md shadow-sm'
             }`}>
               <p className="whitespace-pre-wrap">{msg.text}</p>
             </div>
@@ -551,7 +559,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       <div className="bg-white border-t border-slate-100 px-3 py-2">
         <div className="flex gap-2 overflow-x-auto pb-2">
           {['ডাক্তার খুঁজুন', 'মাথা ব্যথা', 'বুকে ব্যথা', 'জ্বর', 'পেটে ব্যথা'].map((q, i) => (
-            <button key={i} onClick={() => setChatInput(q)} className="px-3 py-1.5 bg-slate-100 rounded-full text-xs whitespace-nowrap hover:bg-slate-200">{q}</button>
+            <button key={i} onClick={() => setChatInput(q)} className="px-3 py-1.5 bg-slate-50 rounded-full text-xs whitespace-nowrap hover:bg-slate-200">{q}</button>
           ))}
         </div>
       </div>
@@ -564,9 +572,9 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           onChange={(e) => setChatInput(e.target.value)} 
           onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()} 
           placeholder="সমস্যা লিখুন বা ডাক্তার খুঁজুন..." 
-          className="flex-1 bg-slate-100 rounded-xl px-4 py-3 text-sm outline-none" 
+          className="flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none" 
         />
-        <button onClick={handleSendMessage} disabled={isTyping || !chatInput.trim()} className="w-11 h-11 bg-teal-500 text-white rounded-xl disabled:opacity-50 flex items-center justify-center">
+        <button onClick={handleSendMessage} disabled={isTyping || !chatInput.trim()} className="w-11 h-11 bg-blue-600 text-white rounded-xl disabled:opacity-50 flex items-center justify-center">
           ➤
         </button>
       </div>
@@ -630,7 +638,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800">💊 ওষুধ ব্যবস্থাপনা</h2>
-        <button className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-xs font-bold">+ যোগ করুন</button>
+        <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold">+ যোগ করুন</button>
       </div>
       
       {/* Current Medications */}
@@ -679,7 +687,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800">👨‍⚕️ আমার ডাক্তারগণ</h2>
-        <button onClick={() => navigate('/search')} className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-xs font-bold">+ নতুন</button>
+        <button onClick={() => navigate('/search')} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold">+ নতুন</button>
       </div>
       
       {patientUser.healthRecords?.consultations && patientUser.healthRecords.consultations.length > 0 ? (
@@ -697,8 +705,8 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                 <strong>রোগ:</strong> {c.diagnosis}
               </div>
               <div className="flex gap-2">
-                <button className="flex-1 py-2 bg-teal-500 text-white rounded-lg text-xs font-bold">আবার বুক করুন</button>
-                <button className="py-2 px-3 bg-slate-100 text-slate-600 rounded-lg text-xs">📋 প্রেসক্রিপশন</button>
+                <button className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">আবার বুক করুন</button>
+                <button className="py-2 px-3 bg-slate-50 text-slate-600 rounded-lg text-xs">📋 প্রেসক্রিপশন</button>
               </div>
             </div>
           ))}
@@ -708,7 +716,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           <div className="text-5xl mb-3">👨‍⚕️</div>
           <h3 className="font-bold text-slate-800 mb-1">এখনো কোনো ডাক্তার নেই</h3>
           <p className="text-sm text-slate-500 mb-4">ডাক্তার খুঁজুন এবং অ্যাপয়েন্টমেন্ট নিন</p>
-          <button onClick={() => navigate('/search')} className="px-6 py-2 bg-teal-500 text-white rounded-xl font-bold">ডাক্তার খুঁজুন</button>
+          <button onClick={() => navigate('/search')} className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold">ডাক্তার খুঁজুন</button>
         </div>
       )}
     </div>
@@ -729,7 +737,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             key={cat.id}
             onClick={() => setSelectedQuizCategory(cat.id)}
             className={`px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap flex items-center gap-1 ${
-              selectedQuizCategory === cat.id ? 'bg-teal-500 text-white' : 'bg-white text-slate-600 border border-slate-200'
+              selectedQuizCategory === cat.id ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
             }`}
           >
             <span>{cat.icon}</span> {cat.label}
@@ -740,7 +748,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       {/* Quiz Grid */}
       <div className="grid grid-cols-2 gap-3">
         {filteredQuizzes.map(quiz => (
-          <button key={quiz.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-left hover:border-teal-200 transition">
+          <button key={quiz.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 text-left hover:border-blue-200 transition">
             <div className="text-3xl mb-2">{quiz.icon}</div>
             <h3 className="font-bold text-slate-800 text-sm">{quiz.titleBn}</h3>
             <p className="text-xs text-slate-500 mt-1">{quiz.duration} • {quiz.questions} প্রশ্ন</p>
@@ -797,7 +805,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             <button 
               onClick={handleFeedbackSubmit}
               disabled={!feedbackText.trim()}
-              className="w-full mt-3 py-3 bg-teal-500 text-white rounded-xl font-bold disabled:opacity-50"
+              className="w-full mt-3 py-3 bg-blue-600 text-white rounded-xl font-bold disabled:opacity-50"
             >
               পাঠান
             </button>
@@ -815,7 +823,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               <button 
                 key={i}
                 onClick={() => setFeedbackText(option)}
-                className="w-full p-3 bg-slate-50 rounded-xl text-left text-sm text-slate-700 hover:bg-slate-100 transition"
+                className="w-full p-3 bg-slate-50 rounded-xl text-left text-sm text-slate-700 hover:bg-slate-50 transition"
               >
                 {option}
               </button>
@@ -841,11 +849,11 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         
         <div className="flex justify-center gap-2 mt-3 flex-wrap">
           {patientUser.bloodGroup && <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-bold">{patientUser.bloodGroup}</span>}
-          {age > 0 && <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-sm">{age} বছর</span>}
+          {age > 0 && <span className="px-3 py-1 bg-slate-50 text-slate-600 rounded-full text-sm">{age} বছর</span>}
           <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-bold">👑 Premium</span>
         </div>
         
-        <button onClick={() => setShowEditProfile(true)} className="mt-4 px-6 py-2 bg-teal-500 text-white rounded-xl font-bold text-sm">
+        <button onClick={() => setShowEditProfile(true)} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm">
           ✏️ সম্পাদনা
         </button>
       </div>
@@ -883,11 +891,11 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   
   // ============ MAIN LAYOUT ============
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-slate-50">
       <ProfileEditModal isOpen={showEditProfile} onClose={() => setShowEditProfile(false)} user={patientUser} onSave={handleProfileSave} />
       
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-lg border-b border-slate-200 px-4 py-3 sticky top-0 z-40">
+      <div className="bg-white border-b border-slate-100 px-4 py-3 sticky top-0 z-40">
         <div className="flex items-center justify-between max-w-3xl mx-auto">
           <button onClick={() => navigate('/')} className="w-10 h-10 flex items-center justify-center">
             <i className="fas fa-arrow-left text-slate-600"></i>
@@ -905,7 +913,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               key={t.id} 
               onClick={() => setActiveTab(t.id)} 
               className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap flex items-center gap-1 ${
-                activeTab === t.id ? 'bg-teal-500 text-white' : 'text-slate-600 hover:bg-slate-100'
+                activeTab === t.id ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
               <span>{t.icon}</span> {t.label}

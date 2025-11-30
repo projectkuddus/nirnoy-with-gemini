@@ -227,7 +227,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
               ? 'আপনার ডাক্তার অ্যাকাউন্ট এখনো অনুমোদিত হয়নি। অনুগ্রহ করে অপেক্ষা করুন।'
               : doctorUser.rejectionReason || 'আপনার আবেদন প্রত্যাখ্যান করা হয়েছে।'}
           </p>
-          <button onClick={() => { logout(); navigate('/'); }} className="px-6 py-3 bg-teal-500 text-white rounded-xl font-bold hover:bg-teal-600 transition">
+          <button onClick={() => { logout(); navigate('/'); }} className="px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-700 transition">
             হোমে ফিরে যান
           </button>
         </div>
@@ -478,7 +478,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
   const renderOverview = () => (
     <div className="space-y-6">
       {/* Welcome & Quick Stats */}
-      <div className="bg-gradient-to-r from-teal-500 to-cyan-600 rounded-2xl p-6 text-white">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">{doctorProfile.nameBn}</h1>
@@ -524,7 +524,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 <p className="text-slate-500 text-sm">সিরিয়াল #{currentPatient.serial} • {currentPatient.type}</p>
                 <p className="text-slate-600 text-sm mt-1">{currentPatient.chiefComplaint}</p>
               </div>
-              <button onClick={() => startConsultation(currentPatient)} className="px-4 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600">
+              <button onClick={() => startConsultation(currentPatient)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700">
                 কনসাল্ট
               </button>
             </div>
@@ -616,7 +616,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           <p className="text-slate-500">{new Date().toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={callNextPatient} disabled={!nextInQueue} className="px-4 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+          <button onClick={callNextPatient} disabled={!nextInQueue} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
             <span>📢</span> পরবর্তী রোগী ডাকুন
           </button>
         </div>
@@ -726,7 +726,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               <div className="flex gap-2">
                 {apt.status === 'Waiting' && (
                   <>
-                    <button onClick={() => startConsultation(apt)} className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600">
+                    <button onClick={() => startConsultation(apt)} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
                       শুরু
                     </button>
                     <button onClick={() => markNoShow(apt.id)} className="px-3 py-1.5 bg-red-100 text-red-600 rounded-lg text-sm font-medium hover:bg-red-200">
@@ -772,7 +772,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
         {['all', 'Waiting', 'In-Progress', 'Completed', 'No-Show', 'Cancelled'].map(status => (
-          <button key={status} onClick={() => setStatusFilter(status)} className={`px-4 py-2 rounded-full text-sm font-medium transition ${statusFilter === status ? 'bg-teal-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+          <button key={status} onClick={() => setStatusFilter(status)} className={`px-4 py-2 rounded-full text-sm font-medium transition ${statusFilter === status ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
             {status === 'all' ? 'সব' : status === 'Waiting' ? 'অপেক্ষমান' : status === 'In-Progress' ? 'চলমান' : status === 'Completed' ? 'সম্পন্ন' : status === 'No-Show' ? 'নো-শো' : 'বাতিল'}
           </button>
         ))}
@@ -884,13 +884,13 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               <div key={day.day} className={`p-4 ${!day.enabled ? 'bg-slate-50' : ''}`}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <button onClick={() => toggleScheduleDay(day.day)} className={`w-10 h-6 rounded-full transition ${day.enabled ? 'bg-teal-500' : 'bg-slate-300'}`}>
+                    <button onClick={() => toggleScheduleDay(day.day)} className={`w-10 h-6 rounded-full transition ${day.enabled ? 'bg-blue-500' : 'bg-slate-300'}`}>
                       <div className={`w-4 h-4 bg-white rounded-full shadow transition transform ${day.enabled ? 'translate-x-5' : 'translate-x-1'}`}></div>
                     </button>
                     <span className={`font-bold ${day.enabled ? 'text-slate-800' : 'text-slate-400'}`}>{day.dayBn}</span>
                   </div>
                   {day.enabled && (
-                    <span className="text-sm text-teal-600 font-medium">সর্বোচ্চ {day.maxPatients} জন</span>
+                    <span className="text-sm text-blue-600 font-medium">সর্বোচ্চ {day.maxPatients} জন</span>
                   )}
                 </div>
                 
@@ -928,7 +928,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
             <h3 className="font-bold text-slate-800">ছুটির দিন</h3>
-            <button onClick={() => setShowAddHoliday(true)} className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600">
+            <button onClick={() => setShowAddHoliday(true)} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
               + যোগ করুন
             </button>
           </div>
@@ -972,7 +972,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 </div>
                 <div className="flex gap-3 mt-6">
                   <button onClick={() => setShowAddHoliday(false)} className="flex-1 px-4 py-2 border rounded-lg">বাতিল</button>
-                  <button onClick={addHoliday} className="flex-1 px-4 py-2 bg-teal-500 text-white rounded-lg">যোগ করুন</button>
+                  <button onClick={addHoliday} className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg">যোগ করুন</button>
                 </div>
               </div>
             </div>
@@ -989,7 +989,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         <div className="flex flex-col items-center justify-center h-96 text-slate-400">
           <div className="text-6xl mb-4">👨‍⚕️</div>
           <p>কনসাল্টেশন শুরু করতে কিউ থেকে রোগী নির্বাচন করুন</p>
-          <button onClick={() => setActiveTab('queue')} className="mt-4 px-4 py-2 bg-teal-500 text-white rounded-lg">
+          <button onClick={() => setActiveTab('queue')} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg">
             কিউতে যান
           </button>
         </div>
@@ -1001,7 +1001,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         {/* Left: Patient Info & SOAP */}
         <div className="lg:col-span-2 space-y-6">
           {/* Patient Header */}
-          <div className="bg-gradient-to-r from-teal-500 to-cyan-600 rounded-2xl p-6 text-white">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white">
             <div className="flex items-center gap-4">
               <img src={selectedAppointment.patientImage} alt="" className="w-20 h-20 rounded-xl border-4 border-white/30" />
               <div className="flex-1">
@@ -1073,7 +1073,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                     <option key={t.name} value={t.name}>{t.name}</option>
                   ))}
                 </select>
-                <button onClick={() => addMedicine()} className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-sm font-medium">
+                <button onClick={() => addMedicine()} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium">
                   + ওষুধ যোগ করুন
                 </button>
               </div>
@@ -1149,7 +1149,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
             <button onClick={generatePrescription} className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2">
               <span>🖨️</span> প্রেসক্রিপশন প্রিন্ট
             </button>
-            <button onClick={completeConsultation} className="flex-1 px-6 py-3 bg-teal-500 text-white rounded-xl font-bold hover:bg-teal-600 flex items-center justify-center gap-2">
+            <button onClick={completeConsultation} className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
               <span>✓</span> কনসাল্টেশন সম্পন্ন
             </button>
           </div>
@@ -1350,7 +1350,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         {/* Monthly Stats */}
         <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
           <div className="bg-white rounded-xl border p-4">
-            <div className="text-2xl font-bold text-teal-600">{monthlyStats.totalPatients}</div>
+            <div className="text-2xl font-bold text-blue-600">{monthlyStats.totalPatients}</div>
             <div className="text-sm text-slate-500">মোট রোগী</div>
           </div>
           <div className="bg-white rounded-xl border p-4">
@@ -1464,7 +1464,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                   <span className="font-medium">98%</span>
                 </div>
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-teal-500 rounded-full" style={{ width: '98%' }}></div>
+                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '98%' }}></div>
                 </div>
               </div>
             </div>
@@ -1741,7 +1741,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 key={item.id}
                 onClick={() => setSettingsTab(item.id as any)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-left ${
-                  settingsTab === item.id ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'
+                  settingsTab === item.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <span>{item.icon}</span>
@@ -1759,7 +1759,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 <div className="flex items-center gap-6">
                   <div className="relative">
                     <img src={profileImage} alt="" className="w-24 h-24 rounded-2xl object-cover" />
-                    <label className="absolute -bottom-2 -right-2 w-8 h-8 bg-teal-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-teal-600 transition">
+                    <label className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-700 transition">
                       <span className="text-white text-sm">📷</span>
                       <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                     </label>
@@ -1825,7 +1825,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                     <textarea value={profileForm.bio} onChange={(e) => setProfileForm(p => ({...p, bio: e.target.value}))} rows={3} className="w-full px-4 py-2 border rounded-lg mt-1" />
                   </div>
                 </div>
-                <button onClick={handleProfileSave} className="mt-4 px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600">
+                <button onClick={handleProfileSave} className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700">
                   সংরক্ষণ করুন
                 </button>
               </div>
@@ -1848,7 +1848,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                   <label className="text-sm text-slate-600">নতুন পাসওয়ার্ড নিশ্চিত করুন</label>
                   <input type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm(p => ({...p, confirm: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
                 </div>
-                <button onClick={handlePasswordChange} className="px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600">
+                <button onClick={handlePasswordChange} className="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700">
                   পাসওয়ার্ড পরিবর্তন করুন
                 </button>
               </div>
@@ -1879,7 +1879,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                     <input type="number" value={profileForm.followUpFee} onChange={(e) => setProfileForm(p => ({...p, followUpFee: parseInt(e.target.value)}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
                   </div>
                 </div>
-                <button onClick={handleProfileSave} className="mt-4 px-6 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600">সংরক্ষণ করুন</button>
+                <button onClick={handleProfileSave} className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700">সংরক্ষণ করুন</button>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h3 className="font-bold text-slate-800 mb-4">পেমেন্ট মেথড</h3>
@@ -1898,7 +1898,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                     </div>
                     <button className="text-blue-600 text-sm font-medium">এডিট</button>
                   </div>
-                  <button className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-teal-500 hover:text-teal-600 transition">+ নতুন পেমেন্ট মেথড যোগ করুন</button>
+                  <button className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-teal-500 hover:text-blue-600 transition">+ নতুন পেমেন্ট মেথড যোগ করুন</button>
                 </div>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
@@ -1925,7 +1925,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 ].map((item, i) => (
                   <div key={i} className="flex items-center justify-between p-4 border rounded-xl">
                     <div><p className="font-medium text-slate-800">{item.label}</p><p className="text-sm text-slate-500">{item.desc}</p></div>
-                    <button className={`w-12 h-6 rounded-full transition ${item.enabled ? 'bg-teal-500' : 'bg-slate-300'}`}>
+                    <button className={`w-12 h-6 rounded-full transition ${item.enabled ? 'bg-blue-500' : 'bg-slate-300'}`}>
                       <div className={`w-5 h-5 bg-white rounded-full shadow transform transition ${item.enabled ? 'translate-x-6' : 'translate-x-0.5'}`}></div>
                     </button>
                   </div>
@@ -1959,7 +1959,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         {/* Logo */}
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
               <span className="text-white font-bold text-lg">ন</span>
             </div>
             <div>
@@ -1988,7 +1988,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               onClick={() => setActiveTab(item.id as TabType)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
                 activeTab === item.id
-                  ? 'bg-teal-50 text-teal-700'
+                  ? 'bg-blue-50 text-blue-700'
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
