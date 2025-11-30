@@ -13,7 +13,7 @@ interface PatientAuthProps {
 export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { sendOTP, verifyOTP, registerPatient, user } = useAuth();
+  const { sendOTP, verifyOTP, registerPatient, user, isLoading: authLoading } = useAuth();
   const isBn = language === 'bn';
 
   // State
@@ -47,6 +47,26 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Translations
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user && user.role === 'PATIENT') {
+      console.log('Already logged in, redirecting to dashboard');
+      navigate('/patient-dashboard');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">{isBn ? 'লোড হচ্ছে...' : 'Loading...'}</p>
+        </div>
+      </div>
+    );
+  }
+
   const t = {
     title: isBn ? 'নির্ণয়তে স্বাগতম' : 'Welcome to Nirnoy',
     subtitle: isBn ? 'আপনার স্বাস্থ্য, আপনার হাতে' : 'Your health, in your hands',
@@ -98,6 +118,7 @@ export const PatientAuth: React.FC<PatientAuthProps> = ({ onLogin }) => {
 
   // Handle phone submission
   const handlePhoneSubmit = async () => {
+    console.log('handlePhoneSubmit called with phone:', phone);
     if (!isValidPhone(phone)) {
       setError(t.invalidPhone);
       return;
