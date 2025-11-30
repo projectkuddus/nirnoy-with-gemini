@@ -160,27 +160,43 @@ const db = {
     }
     
     const normalized = normalizePhone(phone);
-    console.log('[DB] Finding phone:', normalized);
+    console.log('[DB] Finding phone:', normalized, 'original:', phone);
     
     try {
-      const { data, error } = await supabase
+      // Try exact match first
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .or(`phone.eq.${normalized},phone.eq.0${normalized}`)
-        .limit(1);
+        .eq('phone', normalized)
+        .maybeSingle();
+      
+      console.log('[DB] Query 1 result:', data ? data.name : 'not found', error?.message || 'no error');
+      
+      // If not found, try with leading 0
+      if (!data) {
+        console.log('[DB] Trying with 0 prefix');
+        const result = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('phone', '0' + normalized)
+          .maybeSingle();
+        data = result.data;
+        error = result.error;
+        console.log('[DB] Query 2 result:', data ? data.name : 'not found', error?.message || 'no error');
+      }
       
       if (error) {
         console.error('[DB] Query error:', error.message);
         return null;
       }
       
-      if (!data || data.length === 0) {
-        console.log('[DB] No profile found');
+      if (!data) {
+        console.log('[DB] No profile found for:', normalized);
         return null;
       }
       
-      console.log('[DB] Found profile:', data[0].name, data[0].id);
-      return data[0];
+      console.log('[DB] Found profile:', data.name, data.id, data.phone);
+      return data;
     } catch (e) {
       console.error('[DB] Exception:', e);
       return null;
