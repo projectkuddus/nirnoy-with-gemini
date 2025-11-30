@@ -213,11 +213,11 @@ const ProfileEditModal: React.FC<{
 export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { user, logout, isLoading, updateProfile, addAIInsight } = useAuth();
+  const { user, role, logout, isLoading, updateProfile } = useAuth();
   
   // Redirect if not logged in
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'PATIENT')) {
+    if (!isLoading && (!user || role !== 'patient')) {
       navigate('/patient-auth');
     }
   }, [user, isLoading, navigate]);
@@ -230,7 +230,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     );
   }
   
-  if (!user || user.role !== 'PATIENT') return null;
+  if (!user || role !== 'patient') return null;
   
   const patientUser = user as PatientProfile;
   const age = patientUser.age || (patientUser.dateOfBirth ? new Date().getFullYear() - new Date(patientUser.dateOfBirth).getFullYear() : 0);

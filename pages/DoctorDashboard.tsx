@@ -181,7 +181,7 @@ interface DoctorDashboardProps {
 
 export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) => {
   const navigate = useNavigate();
-  const { user, logout, isLoading } = useAuth();
+  const { user, role, logout, isLoading } = useAuth();
   
   // Debug: Log user state
   console.log('DoctorDashboard - user:', user);
@@ -189,7 +189,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   
   // Redirect if not logged in as doctor (after loading completes)
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'DOCTOR')) {
+    if (!isLoading && (!user || role !== 'doctor')) {
       console.log('Redirecting to doctor-registration - no valid doctor user');
       navigate('/doctor-registration');
     }
@@ -208,7 +208,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   }
   
   // If no user after loading, show nothing (will redirect)
-  if (!user || user.role !== 'DOCTOR') {
+  if (!user || role !== 'doctor') {
     return null;
   }
   
