@@ -77,7 +77,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   // Doctor visits (mock for now, will be from Supabase)
   const [doctorVisits, setDoctorVisits] = useState<any[]>([]);
   
-  const patientUser = useMemo(() => (user && role === 'patient') ? user as PatientProfile : null, [user, role]);
+  const patientUser = useMemo(() => (user && (role === 'patient' || role === 'PATIENT')) ? user as PatientProfile : null, [user, role]);
 
   // Health score calculation
   const healthScore = useMemo(() => {
@@ -109,7 +109,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
   // Auth check
   useEffect(() => {
-    if (!isLoading && (!user || role !== 'patient')) {
+    if (!isLoading && (!user || (role !== 'patient' && role !== 'PATIENT'))) {
       navigate('/patient-auth', { replace: true });
     }
   }, [user, role, isLoading, navigate]);

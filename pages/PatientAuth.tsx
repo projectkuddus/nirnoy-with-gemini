@@ -1,40 +1,40 @@
-/**
- * PatientAuth - Simple, bulletproof authentication
- * Handles login for existing users and registration for new users
- */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 
 type Step = 'phone' | 'otp' | 'register' | 'success';
 
-export const PatientAuth: React.FC = () => {
-  const navigate = useNavigate();
+export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => {
   const { language } = useLanguage();
-  const { checkPhone, loginPatient, registerPatient, user, role, isLoading: authLoading } = useAuth();
   const isBn = language === 'bn';
-
-  // State
-  const [step, setStep] = useState<Step>('phone');
+  
+  const navigate = useNavigate();
+  const otpInputRef = useRef<HTMLInputElement>(null);
+  const { checkPhone, loginPatient, registerPatient, user, role, isLoading: authLoading } = useAuth();
+  
+  // Form state
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState('');
-  const [name, setName] = useState('');
-  const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
-  const [dobYear, setDobYear] = useState(1995);
-  const [dobMonth, setDobMonth] = useState(1);
-  const [dobDay, setDobDay] = useState(1);
-  const [bloodGroup, setBloodGroup] = useState('');
-  const [isNewUser, setIsNewUser] = useState(true);
+  const [step, setStep] = useState<Step>('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(0);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  
+  // Registration fields
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [gender, setGender] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
 
-  // If already logged in as patient, go to dashboard
+  // Redirect if already logged in
   useEffect(() => {
-    if (!authLoading && user && role === 'patient') {
-      console.log('[PatientAuth] Already logged in, going to dashboard');
+    console.log('[PatientAuth] Auth state:', { user: user?.name, role, authLoading });
+    if (!authLoading && user && (role === 'patient' || role === 'PATIENT')) {
+      console.log('[PatientAuth] Already logged in, redirecting...');
       navigate('/patient-dashboard', { replace: true });
     }
   }, [user, role, authLoading, navigate]);
@@ -42,19 +42,26 @@ export const PatientAuth: React.FC = () => {
   // Countdown timer
   useEffect(() => {
     if (countdown > 0) {
-      const t = setTimeout(() => setCountdown(c => c - 1), 1000);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
     }
   }, [countdown]);
 
-  // Date of birth string
-  const dateOfBirth = `${dobYear}-${String(dobMonth).padStart(2, '0')}-${String(dobDay).padStart(2, '0')}`;
+  // Normalize phone number - remove all non-digits and leading 0 or 880
+  const normalizePhone = (p: string): string => {
+    let n = p.replace(/[^0-9]/g, '');
+    if (n.startsWith('880')) n = n.substring(3);
+    if (n.startsWith('0')) n = n.substring(1);
+    return n;
+  };
 
-  // Handle Send OTP
-  const handleSendOtp = async () => {
-    const cleanPhone = phone.replace(/\D/g, '');
+  // Handle Phone Submit
+  const handlePhoneSubmit = async () => {
+    const cleanPhone = normalizePhone(phone);
+    console.log('[PatientAuth] Phone input:', phone, '→ normalized:', cleanPhone);
+    
     if (cleanPhone.length < 10) {
-      setError(isBn ? 'সঠিক ফোন নম্বর দিন' : 'Enter valid phone number');
+      setError(isBn ? 'সঠিক মোবাইল নম্বর দিন' : 'Enter valid mobile number');
       return;
     }
 
@@ -66,15 +73,21 @@ export const PatientAuth: React.FC = () => {
       const result = await checkPhone(cleanPhone);
       console.log('[PatientAuth] Check result:', result);
       
-      setIsNewUser(!result.exists || result.type !== 'patient');
+      // User exists if result.exists is true AND type is patient
+      const userExists = result.exists && result.type === 'patient';
+      setIsNewUser(!userExists);
+      console.log('[PatientAuth] User exists:', userExists, 'isNewUser:', !userExists);
       
-      // Generate OTP (test mode)
+      // Generate OTP (test mode - in production use SMS)
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(newOtp);
-      console.log('[PatientAuth] OTP:', newOtp);
+      console.log('[PatientAuth] Generated OTP:', newOtp);
       
       setStep('otp');
       setCountdown(60);
+      
+      // Focus OTP input after step change
+      setTimeout(() => otpInputRef.current?.focus(), 100);
     } catch (e: any) {
       console.error('[PatientAuth] Error:', e);
       setError(e.message || 'Error checking phone');
@@ -85,7 +98,7 @@ export const PatientAuth: React.FC = () => {
 
   // Handle OTP Verification
   const handleVerifyOtp = async () => {
-    // Accept generated OTP or 000000
+    // Accept generated OTP or 000000 (test bypass)
     if (otp !== generatedOtp && otp !== '000000') {
       setError(isBn ? 'ভুল OTP' : 'Wrong OTP');
       return;
@@ -95,23 +108,29 @@ export const PatientAuth: React.FC = () => {
     setLoading(true);
 
     try {
+      const cleanPhone = normalizePhone(phone);
+      
       if (isNewUser) {
         // New user - show registration form
-        console.log('[PatientAuth] New user, showing registration');
+        console.log('[PatientAuth] New user, showing registration form');
         setStep('register');
       } else {
-        // Existing user - login
-        console.log('[PatientAuth] Existing user, logging in');
-        const result = await loginPatient(phone);
+        // Existing user - login directly
+        console.log('[PatientAuth] Existing user, logging in with phone:', cleanPhone);
+        const result = await loginPatient(cleanPhone);
         console.log('[PatientAuth] Login result:', result);
         
         if (result.success) {
+          console.log('[PatientAuth] Login SUCCESS, setting step to success');
           setStep('success');
-          // Wait for localStorage to be written
-          await new Promise(r => setTimeout(r, 500));
-          console.log('[PatientAuth] Navigating to dashboard');
+          
+          // Give time for session to be saved
+          await new Promise(r => setTimeout(r, 800));
+          
+          console.log('[PatientAuth] Navigating to dashboard...');
           navigate('/patient-dashboard', { replace: true });
         } else {
+          console.error('[PatientAuth] Login FAILED:', result.error);
           setError(result.error || 'Login failed');
         }
       }
@@ -128,7 +147,7 @@ export const PatientAuth: React.FC = () => {
     e.preventDefault();
     
     if (!name.trim()) {
-      setError(isBn ? 'নাম দিন' : 'Enter your name');
+      setError(isBn ? 'নাম দিন' : 'Enter name');
       return;
     }
 
@@ -136,125 +155,125 @@ export const PatientAuth: React.FC = () => {
     setLoading(true);
 
     try {
-      console.log('[PatientAuth] Registering:', phone, name);
+      const cleanPhone = normalizePhone(phone);
+      console.log('[PatientAuth] Registering new user:', { phone: cleanPhone, name });
+      
       const result = await registerPatient({
-        phone,
+        phone: cleanPhone,
         name: name.trim(),
-        gender,
-        dateOfBirth,
-        bloodGroup: bloodGroup || undefined,
+        email: email.trim() || undefined,
+        dateOfBirth: dateOfBirth || undefined,
+        gender: gender || undefined,
+        bloodGroup: bloodGroup || undefined
       });
-      console.log('[PatientAuth] Register result:', result);
+      
+      console.log('[PatientAuth] Registration result:', result);
       
       if (result.success) {
+        console.log('[PatientAuth] Registration SUCCESS');
         setStep('success');
-        // Wait for localStorage to be written
-        await new Promise(r => setTimeout(r, 500));
-        console.log('[PatientAuth] Navigating to dashboard');
+        
+        // Give time for session to be saved
+        await new Promise(r => setTimeout(r, 800));
+        
+        console.log('[PatientAuth] Navigating to dashboard...');
         navigate('/patient-dashboard', { replace: true });
       } else {
+        console.error('[PatientAuth] Registration FAILED:', result.error);
         setError(result.error || 'Registration failed');
       }
     } catch (e: any) {
-      console.error('[PatientAuth] Register error:', e);
+      console.error('[PatientAuth] Registration error:', e);
       setError(e.message || 'Registration failed');
     }
     
     setLoading(false);
   };
 
-  // Loading state
+  // Show loading while checking auth
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">{isBn ? 'লোড হচ্ছে...' : 'Loading...'}</p>
+        </div>
       </div>
     );
   }
 
-  const years = Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-white text-xl font-bold">ন</span>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center gap-2 cursor-pointer justify-center mb-4" onClick={() => navigate('/')}>
+            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-2xl">ন</span>
             </div>
-            <div>
-              <span className="font-bold text-xl">Nirnoy</span>
-              <span className="text-xs text-blue-600 block">HEALTH SYNCHRONIZED</span>
-            </div>
+            <span className="font-bold text-2xl text-gray-800">নির্ণয়</span>
           </div>
-          <button onClick={() => navigate('/')} className="text-gray-600 hover:text-blue-600">
-            {isBn ? 'হোম' : 'Home'}
+          <h1 className="text-2xl font-bold text-gray-800">
+            {step === 'register' ? (isBn ? 'রেজিস্ট্রেশন' : 'Registration') : (isBn ? 'লগইন' : 'Login')}
+          </h1>
+          <button onClick={() => navigate('/')} className="text-gray-500 hover:text-blue-600 text-sm mt-2">
+            ← {isBn ? 'হোমে ফিরুন' : 'Back to Home'}
           </button>
         </div>
-      </header>
 
-      {/* Main */}
-      <main className="max-w-md mx-auto px-4 py-12">
+        {/* Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          {/* Logo */}
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-white text-3xl font-bold">ন</span>
-            </div>
-            <h1 className="text-2xl font-bold">{isBn ? 'নির্ণয়তে স্বাগতম' : 'Welcome to Nirnoy'}</h1>
-            <p className="text-gray-500">{isBn ? 'আপনার স্বাস্থ্য, আপনার হাতে' : 'Your health, in your hands'}</p>
-          </div>
-
-          {/* Test Mode Notice */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 text-center text-sm text-green-700">
-            ✓ {isBn ? 'টেস্ট মোড: OTP হিসেবে 000000 ব্যবহার করুন' : 'Test Mode: Use 000000 as OTP'}
-          </div>
-
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6 text-center text-sm text-red-700">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
             </div>
           )}
 
           {/* Step: Phone */}
           {step === 'phone' && (
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {isBn ? 'মোবাইল নম্বর' : 'Mobile Number'}
-              </label>
-              <div className="flex">
-                <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 rounded-l-lg text-gray-500">
-                  🇧🇩 +880
-                </span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                  placeholder="01712345678"
-                  className="flex-1 border rounded-r-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {isBn ? 'মোবাইল নম্বর' : 'Mobile Number'}
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-4 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-gray-600 font-medium">
+                    +880
+                  </span>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="1XXXXXXXXX"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                    maxLength={11}
+                    autoFocus
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {isBn ? 'আপনার মোবাইলে OTP পাঠানো হবে' : 'OTP will be sent to your mobile'}
+                </p>
               </div>
+
               <button
-                onClick={handleSendOtp}
-                disabled={loading || phone.length < 10}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+                onClick={handlePhoneSubmit}
+                disabled={loading || phone.replace(/\D/g, '').length < 10}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                     {isBn ? 'অপেক্ষা করুন...' : 'Please wait...'}
                   </span>
                 ) : (
-                  <span>{isBn ? 'OTP পাঠান' : 'Send OTP'} →</span>
+                  isBn ? 'OTP পাঠান' : 'Send OTP'
                 )}
               </button>
-              <div className="text-center pt-4 border-t">
-                <span className="text-gray-600">{isBn ? 'ডাক্তার?' : 'Doctor?'} </span>
-                <button onClick={() => navigate('/doctor-registration')} className="text-blue-600 font-medium">
+
+              <div className="text-center text-sm text-gray-500">
+                <p>{isBn ? 'ডাক্তার?' : 'Are you a doctor?'}</p>
+                <button onClick={() => navigate('/doctor-registration')} className="text-blue-600 font-medium hover:underline">
                   {isBn ? 'এখানে রেজিস্টার করুন' : 'Register here'}
                 </button>
               </div>
@@ -263,50 +282,55 @@ export const PatientAuth: React.FC = () => {
 
           {/* Step: OTP */}
           {step === 'otp' && (
-            <div className="space-y-4">
-              <div className="text-center mb-4">
-                <p className="text-gray-600">
-                  {isBn ? 'OTP পাঠানো হয়েছে' : 'OTP sent to'} <strong>+880{phone}</strong>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {isBn ? 'OTP কোড' : 'OTP Code'}
+                </label>
+                <input
+                  ref={otpInputRef}
+                  type="text"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-center text-2xl tracking-widest font-mono"
+                  maxLength={6}
+                />
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  {isBn ? `${phone} এ পাঠানো কোড দিন` : `Enter code sent to ${phone}`}
                 </p>
-                <p className="text-sm text-blue-600 mt-2 bg-blue-50 py-2 rounded">
-                  Test OTP: <strong>{generatedOtp}</strong> (or 000000)
+                {/* Debug: Show OTP in dev */}
+                <p className="text-xs text-blue-600 mt-1 text-center">
+                  🔑 Test OTP: {generatedOtp} (or 000000)
                 </p>
               </div>
-              <input
-                type="text"
-                value={otp}
-                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
-                maxLength={6}
-                className="w-full border rounded-lg px-4 py-3 text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+
               <button
                 onClick={handleVerifyOtp}
-                disabled={loading || otp.length < 6}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+                disabled={loading || otp.length !== 6}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-lg disabled:bg-gray-300 hover:bg-blue-700 transition-colors"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                     {isBn ? 'যাচাই হচ্ছে...' : 'Verifying...'}
                   </span>
                 ) : (
-                  <span>{isBn ? 'যাচাই করুন' : 'Verify'}</span>
+                  isBn ? 'যাচাই করুন' : 'Verify'
                 )}
               </button>
-              <div className="flex justify-between text-sm">
-                <button onClick={() => setStep('phone')} className="text-gray-600">← {isBn ? 'পিছনে' : 'Back'}</button>
-                <button
-                  onClick={() => {
-                    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-                    setGeneratedOtp(newOtp);
-                    setCountdown(60);
-                  }}
-                  disabled={countdown > 0}
-                  className={countdown > 0 ? 'text-gray-400' : 'text-blue-600'}
-                >
-                  {countdown > 0 ? `Resend (${countdown}s)` : 'Resend OTP'}
+
+              <div className="flex justify-between items-center text-sm">
+                <button onClick={() => setStep('phone')} className="text-gray-600 hover:text-blue-600">
+                  ← {isBn ? 'পিছনে' : 'Back'}
                 </button>
+                {countdown > 0 ? (
+                  <span className="text-gray-500">{countdown}s</span>
+                ) : (
+                  <button onClick={handlePhoneSubmit} className="text-blue-600 font-medium hover:underline">
+                    {isBn ? 'আবার পাঠান' : 'Resend'}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -314,77 +338,86 @@ export const PatientAuth: React.FC = () => {
           {/* Step: Register */}
           {step === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
-              <h2 className="text-lg font-semibold text-center">{isBn ? 'প্রোফাইল তৈরি করুন' : 'Create Profile'}</h2>
-              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{isBn ? 'নাম' : 'Name'} *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {isBn ? 'আপনার নাম *' : 'Your Name *'}
+                </label>
                 <input
                   type="text"
                   value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder={isBn ? 'আপনার নাম' : 'Your name'}
-                  className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={isBn ? 'নাম লিখুন' : 'Enter your name'}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  autoFocus
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{isBn ? 'লিঙ্গ' : 'Gender'} *</label>
-                <div className="flex gap-2">
-                  {(['male', 'female', 'other'] as const).map(g => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setGender(g)}
-                      className={`flex-1 py-2 rounded-lg border transition ${
-                        gender === g ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300'
-                      }`}
-                    >
-                      {g === 'male' ? (isBn ? 'পুরুষ' : 'Male') : g === 'female' ? (isBn ? 'মহিলা' : 'Female') : (isBn ? 'অন্যান্য' : 'Other')}
-                    </button>
-                  ))}
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {isBn ? 'ইমেইল (ঐচ্ছিক)' : 'Email (optional)'}
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@email.com"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{isBn ? 'জন্ম তারিখ' : 'Date of Birth'} *</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <select value={dobYear} onChange={e => setDobYear(Number(e.target.value))} className="border rounded-lg px-2 py-2">
-                    {years.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <select value={dobMonth} onChange={e => setDobMonth(Number(e.target.value))} className="border rounded-lg px-2 py-2">
-                    {months.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  <select value={dobDay} onChange={e => setDobDay(Number(e.target.value))} className="border rounded-lg px-2 py-2">
-                    {days.map(d => <option key={d} value={d}>{d}</option>)}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {isBn ? 'লিঙ্গ' : 'Gender'}
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">{isBn ? 'বাছাই করুন' : 'Select'}</option>
+                    <option value="male">{isBn ? 'পুরুষ' : 'Male'}</option>
+                    <option value="female">{isBn ? 'মহিলা' : 'Female'}</option>
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{isBn ? 'রক্তের গ্রুপ' : 'Blood Group'}</label>
-                <select value={bloodGroup} onChange={e => setBloodGroup(e.target.value)} className="w-full border rounded-lg px-4 py-2">
-                  <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
-                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => <option key={bg} value={bg}>{bg}</option>)}
-                </select>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {isBn ? 'রক্তের গ্রুপ' : 'Blood Group'}
+                  </label>
+                  <select
+                    value={bloodGroup}
+                    onChange={(e) => setBloodGroup(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">{isBn ? 'বাছাই করুন' : 'Select'}</option>
+                    {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+                disabled={loading || !name.trim()}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-lg disabled:bg-gray-300 hover:bg-blue-700 transition-colors"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    {isBn ? 'তৈরি হচ্ছে...' : 'Creating...'}
+                    <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    {isBn ? 'রেজিস্টার হচ্ছে...' : 'Registering...'}
                   </span>
                 ) : (
-                  <span>{isBn ? 'অ্যাকাউন্ট তৈরি করুন' : 'Create Account'}</span>
+                  isBn ? 'রেজিস্টার করুন' : 'Register'
                 )}
               </button>
 
-              <button type="button" onClick={() => setStep('otp')} className="w-full text-gray-600 text-sm">
+              <button 
+                type="button" 
+                onClick={() => setStep('otp')} 
+                className="w-full text-gray-600 text-sm hover:text-blue-600"
+              >
                 ← {isBn ? 'পিছনে' : 'Back'}
               </button>
             </form>
@@ -394,16 +427,28 @@ export const PatientAuth: React.FC = () => {
           {step === 'success' && (
             <div className="text-center py-8">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-4xl text-green-600">✓</span>
+                <span className="text-4xl">✓</span>
               </div>
-              <h2 className="text-2xl font-bold mb-2">{isBn ? 'স্বাগতম! 🎉' : 'Welcome! 🎉'}</h2>
-              <p className="text-gray-600 mb-4">{isBn ? 'আপনার অ্যাকাউন্ট প্রস্তুত' : 'Your account is ready'}</p>
-              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-sm text-gray-500 mt-4">{isBn ? 'ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...' : 'Going to dashboard...'}</p>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                {isBn ? 'সফল!' : 'Success!'}
+              </h2>
+              <p className="text-gray-600 mb-4">
+                {isBn ? 'ড্যাশবোর্ডে যাচ্ছেন...' : 'Redirecting to dashboard...'}
+              </p>
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
             </div>
           )}
         </div>
-      </main>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-500 mt-6">
+          {isBn ? 'লগইন করে আপনি আমাদের ' : 'By logging in, you agree to our '}
+          <button onClick={() => navigate('/terms')} className="text-blue-600 hover:underline">
+            {isBn ? 'শর্তাবলী' : 'Terms'}
+          </button>
+          {isBn ? ' মেনে নিচ্ছেন' : ''}
+        </p>
+      </div>
     </div>
   );
 };
