@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,7 +28,6 @@ export interface FeedbackData {
 
 /**
  * Get ALL feedbacks from Supabase (for Admin Panel)
- * This is the central hub - all feedback types come here
  */
 export async function getFeedbacksAsync(): Promise<FeedbackData[]> {
   console.log('[Feedback] Loading ALL feedbacks from Supabase...');
@@ -46,7 +45,7 @@ export async function getFeedbacksAsync(): Promise<FeedbackData[]> {
       .limit(500);
     
     if (error) {
-      console.error('[Feedback] Load error:', error.message, error.details);
+      console.error('[Feedback] Load error:', error.message);
       return [];
     }
     
@@ -94,8 +93,6 @@ export async function getUserFeedbacks(userId: string): Promise<FeedbackData[]> 
       return [];
     }
     
-    console.log('[Feedback] ✅ Loaded', data?.length || 0, 'user feedbacks');
-    
     return (data || []).map(fb => ({
       id: fb.id,
       type: fb.type || 'general',
@@ -117,22 +114,26 @@ export async function getUserFeedbacks(userId: string): Promise<FeedbackData[]> 
   }
 }
 
-// Legacy sync function - returns empty, use async version
+// Legacy sync function
 export function getFeedbacks(): FeedbackData[] {
-  console.warn('[Feedback] ⚠️ Using deprecated sync getFeedbacks - use getFeedbacksAsync');
   return [];
 }
 
 /**
- * Save feedback to Supabase - ALL feedback goes to same table
- * Works for: Patients, Doctors, Guests, Anyone
+ * Save feedback to Supabase - ONLY for registered users
  */
 export async function saveFeedback(feedback: FeedbackData): Promise<boolean> {
+  // Must have valid user ID (registered user only)
+  if (!feedback.userId || feedback.userId.length !== 36) {
+    console.error('[Feedback] ❌ No valid user ID - only registered users can submit feedback');
+    return false;
+  }
+  
   console.log('[Feedback] 💾 Saving feedback:', {
     id: feedback.id,
     type: feedback.type,
     userRole: feedback.userRole,
-    message: feedback.message.substring(0, 50) + '...'
+    userId: feedback.userId
   });
   
   if (!isSupabaseConfigured()) {
@@ -141,34 +142,29 @@ export async function saveFeedback(feedback: FeedbackData): Promise<boolean> {
   }
   
   try {
-    const insertData = {
-      id: feedback.id,
-      type: feedback.type,
-      mood: feedback.mood,
-      message: feedback.message,
-      page: feedback.page,
-      user_agent: feedback.userAgent,
-      // Only set user_id if it's a valid UUID (36 chars)
-      user_id: feedback.userId && feedback.userId.length === 36 ? feedback.userId : null,
-      user_role: feedback.userRole || 'guest',
-      user_name: feedback.userName || 'Anonymous',
-      status: 'new',
-      created_at: new Date().toISOString()
-    };
-    
-    console.log('[Feedback] Insert data:', insertData);
-    
     const { data, error } = await supabase
       .from('feedback')
-      .insert(insertData)
+      .insert({
+        id: feedback.id,
+        type: feedback.type,
+        mood: feedback.mood,
+        message: feedback.message,
+        page: feedback.page,
+        user_agent: feedback.userAgent,
+        user_id: feedback.userId,
+        user_role: feedback.userRole || 'patient',
+        user_name: feedback.userName || 'User',
+        status: 'new',
+        created_at: new Date().toISOString()
+      })
       .select();
     
     if (error) {
-      console.error('[Feedback] ❌ Save error:', error.message, error.details, error.hint);
+      console.error('[Feedback] ❌ Save error:', error.message);
       return false;
     }
     
-    console.log('[Feedback] ✅ Saved successfully to Supabase:', data);
+    console.log('[Feedback] ✅ Saved successfully:', data);
     return true;
   } catch (e) {
     console.error('[Feedback] ❌ Exception:', e);
@@ -178,15 +174,12 @@ export async function saveFeedback(feedback: FeedbackData): Promise<boolean> {
 
 /**
  * Update feedback status and optionally add admin reply
- * Used by Admin Panel
  */
 export async function updateFeedbackStatus(
   id: string, 
   status: FeedbackData['status'], 
   adminReply?: string
 ): Promise<boolean> {
-  console.log('[Feedback] Updating status:', id, status, adminReply ? '(with reply)' : '');
-  
   if (!isSupabaseConfigured()) return false;
   
   try {
@@ -210,7 +203,6 @@ export async function updateFeedbackStatus(
       return false;
     }
     
-    console.log('[Feedback] ✅ Status updated:', id, status);
     return true;
   } catch (e) {
     console.error('[Feedback] Update exception:', e);
@@ -236,8 +228,11 @@ export const FeedbackWidget: React.FC = () => {
   const [error, setError] = useState('');
 
   // Hide on dashboard pages (they have their own feedback tabs)
-  const hiddenPages = ['/admin', '/doctor-dashboard', '/patient-dashboard'];
+  const hiddenPages = ['/admin', '/doctor-dashboard', '/patient-dashboard', '/faq'];
   const shouldHide = hiddenPages.some(page => location.pathname.startsWith(page));
+
+  // Check if user is registered (patient or doctor)
+  const isRegisteredUser = isAuthenticated && user?.id && (role === 'PATIENT' || role === 'patient' || role === 'DOCTOR' || role === 'doctor');
 
   const t = {
     title: isBn ? 'মতামত দিন' : 'Give Feedback',
@@ -258,18 +253,18 @@ export const FeedbackWidget: React.FC = () => {
     thanks: isBn ? 'ধন্যবাদ!' : 'Thanks!',
     thanksMsg: isBn ? 'আপনার মতামত পাঠানো হয়েছে' : 'Your feedback has been sent',
     errorMsg: isBn ? 'সমস্যা হয়েছে, আবার চেষ্টা করুন' : 'Error, please try again',
+    loginRequired: isBn ? 'মতামত দিতে লগইন করুন' : 'Login to give feedback',
+    guestMsg: isBn ? 'প্রশ্ন আছে? FAQ দেখুন' : 'Have questions? Check FAQ',
+    goToFaq: isBn ? 'FAQ দেখুন' : 'View FAQ',
+    login: isBn ? 'লগইন' : 'Login',
   };
 
   const handleSubmit = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() || !isRegisteredUser) return;
     setIsSubmitting(true);
     setError('');
 
-    // Determine user role
-    let userRole = 'guest';
-    if (role === 'PATIENT' || role === 'patient') userRole = 'patient';
-    else if (role === 'DOCTOR' || role === 'doctor') userRole = 'doctor';
-    else if (isAuthenticated) userRole = 'user';
+    const userRole = (role === 'DOCTOR' || role === 'doctor') ? 'doctor' : 'patient';
 
     const feedback: FeedbackData = {
       id: `fb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -281,7 +276,7 @@ export const FeedbackWidget: React.FC = () => {
       timestamp: new Date().toISOString(),
       userId: user?.id,
       userRole: userRole,
-      userName: user?.name || 'Anonymous',
+      userName: user?.name || 'User',
       status: 'new'
     };
 
@@ -313,7 +308,7 @@ export const FeedbackWidget: React.FC = () => {
           onClick={() => setIsOpen(true)}
           className="w-14 h-14 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-all transform hover:scale-105"
         >
-          <span className="text-2xl">💬</span>
+          <span className="text-2xl">{isRegisteredUser ? '💬' : '❓'}</span>
         </button>
       </div>
 
@@ -324,20 +319,43 @@ export const FeedbackWidget: React.FC = () => {
             {/* Header */}
             <div className="bg-gradient-to-r from-teal-500 to-emerald-500 p-4 text-white">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold">{t.title}</h2>
+                <h2 className="text-lg font-bold">{isRegisteredUser ? t.title : (isBn ? 'সাহায্য' : 'Help')}</h2>
                 <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white text-xl">✕</button>
               </div>
             </div>
 
             {/* Content */}
             <div className="p-5">
-              {submitted ? (
+              {/* Guest users - redirect to FAQ */}
+              {!isRegisteredUser ? (
+                <div className="text-center py-6">
+                  <div className="text-5xl mb-4">❓</div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-2">{t.guestMsg}</h3>
+                  <p className="text-gray-500 text-sm mb-4">
+                    {isBn ? 'মতামত দিতে রেজিস্ট্রেশন করুন অথবা FAQ পড়ুন' : 'Register to give feedback or read our FAQ'}
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <button 
+                      onClick={() => { setIsOpen(false); navigate('/faq'); }}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium"
+                    >
+                      {t.goToFaq}
+                    </button>
+                    <button 
+                      onClick={() => { setIsOpen(false); navigate('/patient-auth'); }}
+                      className="px-6 py-2 border border-blue-600 text-blue-600 rounded-lg font-medium"
+                    >
+                      {t.login}
+                    </button>
+                  </div>
+                </div>
+              ) : submitted ? (
                 <div className="text-center py-8">
                   <div className="text-5xl mb-3">🎉</div>
                   <h3 className="text-xl font-bold text-gray-800">{t.thanks}</h3>
                   <p className="text-gray-500 mt-1">{t.thanksMsg}</p>
                   <p className="text-sm text-blue-600 mt-2">
-                    {isBn ? 'আপনার প্রোফাইলে মতামত দেখতে পাবেন' : 'View your feedback in your profile'}
+                    {isBn ? 'আপনার প্রোফাইলে মতামত দেখতে পাবেন' : 'View in your profile'}
                   </p>
                 </div>
               ) : step === 1 ? (
@@ -355,9 +373,7 @@ export const FeedbackWidget: React.FC = () => {
                           key={option.value}
                           onClick={() => setMood(option.value)}
                           className={`flex-1 p-3 rounded-xl border-2 transition-all ${
-                            mood === option.value
-                              ? 'border-teal-500 bg-teal-50'
-                              : 'border-gray-200 hover:border-gray-300'
+                            mood === option.value ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
                           }`}
                         >
                           <span className="text-2xl block">{option.emoji}</span>
@@ -382,9 +398,7 @@ export const FeedbackWidget: React.FC = () => {
                           key={type.value}
                           onClick={() => setFeedbackType(type.value)}
                           className={`px-4 py-2 rounded-full text-sm transition-all ${
-                            feedbackType === type.value
-                              ? 'bg-teal-500 text-white'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            feedbackType === type.value ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                           }`}
                         >
                           {type.label}
