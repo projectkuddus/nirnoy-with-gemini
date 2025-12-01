@@ -12,6 +12,7 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
   const navigate = useNavigate();
   const otpInputRef = useRef<HTMLInputElement>(null);
   const { checkPhone, loginPatient, registerPatient, user, role, isLoading: authLoading } = useAuth();
+  const hasRedirected = useRef(false);
   
   // Form state
   const [phone, setPhone] = useState('');
@@ -26,16 +27,20 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
   // Registration fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
   const [gender, setGender] = useState('');
   const [bloodGroup, setBloodGroup] = useState('');
 
-  // Redirect if already logged in
+  // Redirect if already logged in - ONLY ONCE
   useEffect(() => {
-    console.log('[PatientAuth] Auth state:', { user: user?.name, role, authLoading });
-    if (!authLoading && user && (role === 'patient' || role === 'PATIENT')) {
-      console.log('[PatientAuth] Already logged in, redirecting...');
-      navigate('/patient-dashboard', { replace: true });
+    if (!authLoading && user && !hasRedirected.current) {
+      const isPatient = role === 'patient' || role === 'PATIENT';
+      console.log('[PatientAuth] Check redirect:', { user: user?.name, role, isPatient });
+      
+      if (isPatient) {
+        hasRedirected.current = true;
+        console.log('[PatientAuth] Redirecting to dashboard (once)');
+        navigate('/patient-dashboard', { replace: true });
+      }
     }
   }, [user, role, authLoading, navigate]);
 
@@ -47,7 +52,7 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
     }
   }, [countdown]);
 
-  // Normalize phone number - remove all non-digits and leading 0 or 880
+  // Normalize phone number
   const normalizePhone = (p: string): string => {
     let n = p.replace(/[^0-9]/g, '');
     if (n.startsWith('880')) n = n.substring(3);
@@ -58,7 +63,6 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
   // Handle Phone Submit
   const handlePhoneSubmit = async () => {
     const cleanPhone = normalizePhone(phone);
-    console.log('[PatientAuth] Phone input:', phone, '→ normalized:', cleanPhone);
     
     if (cleanPhone.length < 10) {
       setError(isBn ? 'সঠিক মোবাইল নম্বর দিন' : 'Enter valid mobile number');
@@ -73,20 +77,16 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
       const result = await checkPhone(cleanPhone);
       console.log('[PatientAuth] Check result:', result);
       
-      // User exists if result.exists is true AND type is patient
       const userExists = result.exists && result.type === 'patient';
       setIsNewUser(!userExists);
-      console.log('[PatientAuth] User exists:', userExists, 'isNewUser:', !userExists);
       
-      // Generate OTP (test mode - in production use SMS)
+      // Generate OTP
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(newOtp);
-      console.log('[PatientAuth] Generated OTP:', newOtp);
+      console.log('[PatientAuth] OTP:', newOtp);
       
       setStep('otp');
       setCountdown(60);
-      
-      // Focus OTP input after step change
       setTimeout(() => otpInputRef.current?.focus(), 100);
     } catch (e: any) {
       console.error('[PatientAuth] Error:', e);
@@ -98,7 +98,6 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
 
   // Handle OTP Verification
   const handleVerifyOtp = async () => {
-    // Accept generated OTP or 000000 (test bypass)
     if (otp !== generatedOtp && otp !== '000000') {
       setError(isBn ? 'ভুল OTP' : 'Wrong OTP');
       return;
@@ -111,31 +110,29 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
       const cleanPhone = normalizePhone(phone);
       
       if (isNewUser) {
-        // New user - show registration form
-        console.log('[PatientAuth] New user, showing registration form');
+        console.log('[PatientAuth] New user, showing registration');
         setStep('register');
-      } else {
-        // Existing user - login directly
-        console.log('[PatientAuth] Existing user, logging in with phone:', cleanPhone);
-        const result = await loginPatient(cleanPhone);
-        console.log('[PatientAuth] Login result:', result);
-        
-        if (result.success) {
-          console.log('[PatientAuth] Login SUCCESS, setting step to success');
-          setStep('success');
-          
-          // Give time for session to be saved
-          await new Promise(r => setTimeout(r, 800));
-          
-          console.log('[PatientAuth] Navigating to dashboard...');
+        setLoading(false);
+        return;
+      }
+      
+      // Existing user - login
+      console.log('[PatientAuth] Logging in:', cleanPhone);
+      const result = await loginPatient(cleanPhone);
+      console.log('[PatientAuth] Login result:', result);
+      
+      if (result.success) {
+        setStep('success');
+        hasRedirected.current = true;
+        // Navigate after short delay
+        setTimeout(() => {
           navigate('/patient-dashboard', { replace: true });
-        } else {
-          console.error('[PatientAuth] Login FAILED:', result.error);
-          setError(result.error || 'Login failed');
-        }
+        }, 500);
+      } else {
+        setError(result.error || 'Login failed');
       }
     } catch (e: any) {
-      console.error('[PatientAuth] Verify error:', e);
+      console.error('[PatientAuth] Error:', e);
       setError(e.message || 'Verification failed');
     }
     
@@ -156,34 +153,29 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
 
     try {
       const cleanPhone = normalizePhone(phone);
-      console.log('[PatientAuth] Registering new user:', { phone: cleanPhone, name });
+      console.log('[PatientAuth] Registering:', { phone: cleanPhone, name });
       
       const result = await registerPatient({
         phone: cleanPhone,
         name: name.trim(),
         email: email.trim() || undefined,
-        dateOfBirth: dateOfBirth || undefined,
         gender: gender || undefined,
         bloodGroup: bloodGroup || undefined
       });
       
-      console.log('[PatientAuth] Registration result:', result);
+      console.log('[PatientAuth] Register result:', result);
       
       if (result.success) {
-        console.log('[PatientAuth] Registration SUCCESS');
         setStep('success');
-        
-        // Give time for session to be saved
-        await new Promise(r => setTimeout(r, 800));
-        
-        console.log('[PatientAuth] Navigating to dashboard...');
-        navigate('/patient-dashboard', { replace: true });
+        hasRedirected.current = true;
+        setTimeout(() => {
+          navigate('/patient-dashboard', { replace: true });
+        }, 500);
       } else {
-        console.error('[PatientAuth] Registration FAILED:', result.error);
         setError(result.error || 'Registration failed');
       }
     } catch (e: any) {
-      console.error('[PatientAuth] Registration error:', e);
+      console.error('[PatientAuth] Error:', e);
       setError(e.message || 'Registration failed');
     }
     
@@ -197,6 +189,18 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">{isBn ? 'লোড হচ্ছে...' : 'Loading...'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If already logged in and redirecting, show loading
+  if (user && (role === 'patient' || role === 'PATIENT')) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">{isBn ? 'ড্যাশবোর্ডে যাচ্ছে...' : 'Going to dashboard...'}</p>
         </div>
       </div>
     );
@@ -223,7 +227,6 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          {/* Error */}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
@@ -259,7 +262,7 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
               <button
                 onClick={handlePhoneSubmit}
                 disabled={loading || phone.replace(/\D/g, '').length < 10}
-                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-lg disabled:bg-gray-300 hover:bg-blue-700 transition-colors"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -299,9 +302,8 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
                 <p className="text-xs text-gray-500 mt-2 text-center">
                   {isBn ? `${phone} এ পাঠানো কোড দিন` : `Enter code sent to ${phone}`}
                 </p>
-                {/* Debug: Show OTP in dev */}
                 <p className="text-xs text-blue-600 mt-1 text-center">
-                  🔑 Test OTP: {generatedOtp} (or 000000)
+                  🔑 Test: {generatedOtp} (or 000000)
                 </p>
               </div>
 
@@ -413,11 +415,7 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
                 )}
               </button>
 
-              <button 
-                type="button" 
-                onClick={() => setStep('otp')} 
-                className="w-full text-gray-600 text-sm hover:text-blue-600"
-              >
+              <button type="button" onClick={() => setStep('otp')} className="w-full text-gray-600 text-sm hover:text-blue-600">
                 ← {isBn ? 'পিছনে' : 'Back'}
               </button>
             </form>
@@ -433,14 +431,13 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
                 {isBn ? 'সফল!' : 'Success!'}
               </h2>
               <p className="text-gray-600 mb-4">
-                {isBn ? 'ড্যাশবোর্ডে যাচ্ছেন...' : 'Redirecting to dashboard...'}
+                {isBn ? 'ড্যাশবোর্ডে যাচ্ছেন...' : 'Redirecting...'}
               </p>
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <p className="text-center text-xs text-gray-500 mt-6">
           {isBn ? 'লগইন করে আপনি আমাদের ' : 'By logging in, you agree to our '}
           <button onClick={() => navigate('/terms')} className="text-blue-600 hover:underline">
