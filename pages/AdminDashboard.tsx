@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { getFeedbacks, updateFeedbackStatus } from '../components/FeedbackWidget';
+import { getFeedbacksAsync, updateFeedbackStatus } from '../components/FeedbackWidget';
+import { authService } from '../services/supabaseAuth';
 import { useAuth, DoctorProfile, PatientProfile } from '../contexts/AuthContext';
 
 // ============ TYPES ============
@@ -111,9 +112,9 @@ const saveTransaction = (tx: Transaction) => {
 };
 
 // Auto-collect usage stats from across the app
-const collectUsageStats = (): UsageStats => {
-  const patients = getStoredPatients();
-  const doctors = getStoredDoctors();
+const collectUsageStats = async (): Promise<UsageStats> => {
+  const patients = await authService.getAllPatients();
+  const doctors = await authService.getAllDoctors();
   const now = new Date();
   const today = now.toISOString().split('T')[0];
   const thisMonth = now.toISOString().slice(0, 7);
@@ -367,22 +368,22 @@ export const AdminDashboard: React.FC = () => {
     setPendingDoctors(pending);
     
     // Load all doctors from storage
-    const doctors = getStoredDoctors();
+    const doctors = await authService.getAllDoctors();
     setAllDoctors(doctors);
     
     // Load all patients from storage
-    const patients = getStoredPatients();
+    const patients = await authService.getAllPatients();
     setAllPatients(patients);
     
     // Load feedbacks
-    const fbs = getFeedbacks();
+    const fbs = await getFeedbacksAsync();
     setFeedbacks(fbs);
     
     // Load settings
     setAdminSettings(getAdminSettings());
     
     // Auto-calculate finance data
-    const stats = collectUsageStats();
+    const stats = await collectUsageStats();
     setUsageStats(stats);
     
     const txs = getTransactions();
