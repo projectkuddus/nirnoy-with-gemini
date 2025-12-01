@@ -499,7 +499,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                     </div>
                     <h3 className="text-lg font-medium text-gray-700">কোনো ডাক্তার ভিজিট নেই</h3>
                     <p className="text-gray-500 mt-2">ডাক্তারের কাছে গেলে তথ্য এখানে দেখা যাবে</p>
-                    <button onClick={() => navigate('/doctor-search')} className="mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors">
+                    <button onClick={() => navigate('/search')} className="mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors">
                       ডাক্তার খুঁজুন
                     </button>
                   </div>
