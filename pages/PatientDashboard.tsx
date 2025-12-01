@@ -107,9 +107,6 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     return parts.join(', ');
   }, [patientUser]);
 
-    }
-  }, [user, role, isLoading, navigate]);
-
   // Load profile into form
   useEffect(() => {
     if (patientUser) {
