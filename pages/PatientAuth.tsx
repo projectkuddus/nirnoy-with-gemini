@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,7 +10,6 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
   const isBn = language === 'bn';
   
   const navigate = useNavigate();
-  const location = useLocation();
   const otpInputRef = useRef<HTMLInputElement>(null);
   const { checkPhone, loginPatient, registerPatient, user, role, isLoading: authLoading } = useAuth();
   
@@ -65,6 +64,7 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
       
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(newOtp);
+      console.log('[PatientAuth] OTP generated:', newOtp);
       
       setStep('otp');
       setCountdown(60);
@@ -95,14 +95,17 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
         return;
       }
       
+      console.log('[PatientAuth] Logging in with phone:', cleanPhone);
       const result = await loginPatient(cleanPhone);
+      console.log('[PatientAuth] Login result:', result);
       
       if (result.success) {
         setStep('success');
-        // Wait for state to settle, then navigate
+        // Give time for context to update, then navigate
         setTimeout(() => {
+          console.log('[PatientAuth] Navigating to dashboard...');
           navigate('/patient-dashboard', { replace: true });
-        }, 500);
+        }, 800);
       } else {
         setError(result.error || 'Login failed');
       }
@@ -128,6 +131,7 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
     try {
       const cleanPhone = normalizePhone(phone);
       
+      console.log('[PatientAuth] Registering:', { phone: cleanPhone, name });
       const result = await registerPatient({
         phone: cleanPhone,
         name: name.trim(),
@@ -135,12 +139,14 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
         gender: gender || undefined,
         bloodGroup: bloodGroup || undefined
       });
+      console.log('[PatientAuth] Register result:', result);
       
       if (result.success) {
         setStep('success');
         setTimeout(() => {
+          console.log('[PatientAuth] Navigating to dashboard after registration...');
           navigate('/patient-dashboard', { replace: true });
-        }, 500);
+        }, 800);
       } else {
         setError(result.error || 'Registration failed');
       }
@@ -163,19 +169,11 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
     );
   }
 
-  // If already logged in as patient, show success and redirect
-  // But ONLY if we're not already in success step (to avoid loops)
-  if (user && (role === 'patient' || role === 'PATIENT') && step === 'phone') {
-    // Already logged in, go to dashboard
+  // If already logged in as patient, redirect to dashboard
+  if (user && (role === 'patient' || role === 'PATIENT')) {
+    console.log('[PatientAuth] Already logged in, redirecting to dashboard');
     navigate('/patient-dashboard', { replace: true });
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">{isBn ? 'ড্যাশবোর্ডে যাচ্ছে...' : 'Going to dashboard...'}</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -269,7 +267,7 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
                   maxLength={6}
                 />
                 <p className="text-xs text-blue-600 mt-2 text-center">
-                  🔑 Test: {generatedOtp} (or 000000)
+                  🔑 Test OTP: {generatedOtp} (or 000000)
                 </p>
               </div>
 
