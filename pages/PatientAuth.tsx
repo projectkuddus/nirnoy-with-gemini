@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,9 +10,9 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
   const isBn = language === 'bn';
   
   const navigate = useNavigate();
+  const location = useLocation();
   const otpInputRef = useRef<HTMLInputElement>(null);
   const { checkPhone, loginPatient, registerPatient, user, role, isLoading: authLoading } = useAuth();
-  const hasRedirected = useRef(false);
   
   // Form state
   const [phone, setPhone] = useState('');
@@ -30,19 +30,8 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
   const [gender, setGender] = useState('');
   const [bloodGroup, setBloodGroup] = useState('');
 
-  // Redirect if already logged in - ONLY ONCE
-  useEffect(() => {
-    if (!authLoading && user && !hasRedirected.current) {
-      const isPatient = role === 'patient' || role === 'PATIENT';
-      console.log('[PatientAuth] Check redirect:', { user: user?.name, role, isPatient });
-      
-      if (isPatient) {
-        hasRedirected.current = true;
-        console.log('[PatientAuth] Redirecting to dashboard (once)');
-        navigate('/patient-dashboard', { replace: true });
-      }
-    }
-  }, [user, role, authLoading, navigate]);
+  // Check if we're on the auth page (not already redirecting)
+  const isOnAuthPage = location.pathname === '/patient-auth' || location.pathname === '/register';
 
   // Countdown timer
   useEffect(() => {
@@ -73,23 +62,17 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
     setLoading(true);
 
     try {
-      console.log('[PatientAuth] Checking phone:', cleanPhone);
       const result = await checkPhone(cleanPhone);
-      console.log('[PatientAuth] Check result:', result);
-      
       const userExists = result.exists && result.type === 'patient';
       setIsNewUser(!userExists);
       
-      // Generate OTP
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(newOtp);
-      console.log('[PatientAuth] OTP:', newOtp);
       
       setStep('otp');
       setCountdown(60);
       setTimeout(() => otpInputRef.current?.focus(), 100);
     } catch (e: any) {
-      console.error('[PatientAuth] Error:', e);
       setError(e.message || 'Error checking phone');
     }
     
@@ -110,29 +93,23 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
       const cleanPhone = normalizePhone(phone);
       
       if (isNewUser) {
-        console.log('[PatientAuth] New user, showing registration');
         setStep('register');
         setLoading(false);
         return;
       }
       
-      // Existing user - login
-      console.log('[PatientAuth] Logging in:', cleanPhone);
       const result = await loginPatient(cleanPhone);
-      console.log('[PatientAuth] Login result:', result);
       
       if (result.success) {
         setStep('success');
-        hasRedirected.current = true;
-        // Navigate after short delay
+        // Use window.location for clean navigation (no React re-render loop)
         setTimeout(() => {
-          navigate('/patient-dashboard', { replace: true });
-        }, 500);
+          window.location.href = '/patient-dashboard';
+        }, 300);
       } else {
         setError(result.error || 'Login failed');
       }
     } catch (e: any) {
-      console.error('[PatientAuth] Error:', e);
       setError(e.message || 'Verification failed');
     }
     
@@ -153,7 +130,6 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
 
     try {
       const cleanPhone = normalizePhone(phone);
-      console.log('[PatientAuth] Registering:', { phone: cleanPhone, name });
       
       const result = await registerPatient({
         phone: cleanPhone,
@@ -163,19 +139,16 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
         bloodGroup: bloodGroup || undefined
       });
       
-      console.log('[PatientAuth] Register result:', result);
-      
       if (result.success) {
         setStep('success');
-        hasRedirected.current = true;
+        // Use window.location for clean navigation
         setTimeout(() => {
-          navigate('/patient-dashboard', { replace: true });
-        }, 500);
+          window.location.href = '/patient-dashboard';
+        }, 300);
       } else {
         setError(result.error || 'Registration failed');
       }
     } catch (e: any) {
-      console.error('[PatientAuth] Error:', e);
       setError(e.message || 'Registration failed');
     }
     
@@ -194,8 +167,10 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
     );
   }
 
-  // If already logged in and redirecting, show loading
-  if (user && (role === 'patient' || role === 'PATIENT')) {
+  // If user is already logged in and we're on auth page, redirect using window.location
+  if (user && (role === 'patient' || role === 'PATIENT') && isOnAuthPage && step !== 'success') {
+    // Use window.location to avoid React Router loop
+    window.location.href = '/patient-dashboard';
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
@@ -254,9 +229,6 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
                     autoFocus
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {isBn ? 'আপনার মোবাইলে OTP পাঠানো হবে' : 'OTP will be sent to your mobile'}
-                </p>
               </div>
 
               <button
@@ -299,10 +271,7 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-center text-2xl tracking-widest font-mono"
                   maxLength={6}
                 />
-                <p className="text-xs text-gray-500 mt-2 text-center">
-                  {isBn ? `${phone} এ পাঠানো কোড দিন` : `Enter code sent to ${phone}`}
-                </p>
-                <p className="text-xs text-blue-600 mt-1 text-center">
+                <p className="text-xs text-blue-600 mt-2 text-center">
                   🔑 Test: {generatedOtp} (or 000000)
                 </p>
               </div>
