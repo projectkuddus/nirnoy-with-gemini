@@ -111,6 +111,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={<Landing />} />
       <Route path="/patient-auth" element={<PatientAuth />} />
       <Route path="/register" element={<PatientAuth />} />
+      <Route path="/login" element={<PatientAuth />} />
       <Route path="/doctor-registration" element={<DoctorRegistration />} />
       <Route path="/search" element={<DoctorSearch />} />
       <Route path="/doctors" element={<DoctorSearch />} />
