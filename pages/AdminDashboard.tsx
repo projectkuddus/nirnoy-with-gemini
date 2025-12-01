@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { getFeedbacksAsync, updateFeedbackStatus } from '../components/FeedbackWidget';
-import { authService } from '../services/supabaseAuth';
-import { useAuth, DoctorProfile, PatientProfile } from '../contexts/AuthContext';
+import { getFeedbacksAsync, updateFeedbackStatus, FeedbackData } from '../components/FeedbackWidget';
+import { useAuth, DoctorProfile, PatientProfile, STORAGE_KEYS } from '../contexts/AuthContext';
 
 // ============ TYPES ============
 type AdminTab = 'overview' | 'doctor-requests' | 'doctors' | 'patients' | 'subscribers' | 'feedback' | 'analytics' | 'finance' | 'settings';
@@ -112,9 +111,7 @@ const saveTransaction = (tx: Transaction) => {
 };
 
 // Auto-collect usage stats from across the app
-const collectUsageStats = async (): Promise<UsageStats> => {
-  const patients = await authService.getAllPatients();
-  const doctors = await authService.getAllDoctors();
+const collectUsageStats = (patients: PatientProfile[] = [], doctors: DoctorProfile[] = []): UsageStats => {
   const now = new Date();
   const today = now.toISOString().split('T')[0];
   const thisMonth = now.toISOString().slice(0, 7);
@@ -277,12 +274,13 @@ const saveFinanceData = (data: FinanceData) => {
 };
 
 // ============ HELPER FUNCTIONS ============
-const getStoredPatients = (): PatientProfile[] => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.PATIENTS) || '[]'); } catch { return []; }
+// These now load from Supabase via AuthContext
+const getStoredPatients = async (getAllPatients: () => Promise<PatientProfile[]>): Promise<PatientProfile[]> => {
+  try { return await getAllPatients(); } catch { return []; }
 };
 
-const getStoredDoctors = (): DoctorProfile[] => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCTORS) || '[]'); } catch { return []; }
+const getStoredDoctors = async (getAllDoctors: () => Promise<DoctorProfile[]>): Promise<DoctorProfile[]> => {
+  try { return await getAllDoctors(); } catch { return []; }
 };
 
 const getAdminSettings = (): AdminSettings => {
@@ -306,7 +304,7 @@ const saveAdminSettings = (settings: AdminSettings) => {
 
 // ============ COMPONENT ============
 export const AdminDashboard: React.FC = () => {
-  const { getAllPendingDoctors, approveDoctor, rejectDoctor } = useAuth();
+  const { getAllPendingDoctors, approveDoctor, rejectDoctor, getAllPatients, getAllDoctors } = useAuth();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
@@ -332,7 +330,7 @@ export const AdminDashboard: React.FC = () => {
   const [editingExpenses, setEditingExpenses] = useState(false);
   const [incomeEntry, setIncomeEntry] = useState({ type: 'subscriptions', amount: 0, description: '' });
   const [expenseEntry, setExpenseEntry] = useState({ type: 'other', amount: 0, description: '' });
-  const [usageStats, setUsageStats] = useState<UsageStats>(collectUsageStats());
+  const [usageStats, setUsageStats] = useState<UsageStats>(collectUsageStats([], []));
   const [transactions, setTransactions] = useState<Transaction[]>(getTransactions());
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   
@@ -367,23 +365,24 @@ export const AdminDashboard: React.FC = () => {
     const pending = await getAllPendingDoctors();
     setPendingDoctors(pending);
     
-    // Load all doctors from storage
-    const doctors = await authService.getAllDoctors();
+    // Load all doctors from Supabase
+    const doctors = await getStoredDoctors(getAllDoctors);
     setAllDoctors(doctors);
     
-    // Load all patients from storage
-    const patients = await authService.getAllPatients();
+    // Load all patients from Supabase
+    const patients = await getStoredPatients(getAllPatients);
     setAllPatients(patients);
     
-    // Load feedbacks
+    // Load feedbacks from Supabase
     const fbs = await getFeedbacksAsync();
+    console.log('[Admin] Loaded feedbacks:', fbs.length);
     setFeedbacks(fbs);
     
     // Load settings
     setAdminSettings(getAdminSettings());
     
-    // Auto-calculate finance data
-    const stats = await collectUsageStats();
+    // Auto-calculate finance data with loaded patients/doctors
+    const stats = collectUsageStats(patients, doctors);
     setUsageStats(stats);
     
     const txs = getTransactions();
@@ -398,9 +397,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleAdminLogin = () => {
-    console.log("[Admin] Login attempt with password:", adminPassword);
     const settings = getAdminSettings();
-    console.log("[Admin] Stored settings:", settings);
     if (adminPassword === settings.adminPassword) {
       localStorage.setItem(ADMIN_STORAGE.AUTH, 'authenticated');
       setIsAuthenticated(true);
@@ -437,9 +434,10 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleUpdateFeedbackStatus = (feedbackId: string, status: string) => {
-    updateFeedbackStatus(feedbackId, status);
-    setFeedbacks(getFeedbacks());
+  const handleUpdateFeedbackStatus = async (feedbackId: string, status: string, adminReply?: string) => {
+    await updateFeedbackStatus(feedbackId, status as any, adminReply);
+    const fbs = await getFeedbacksAsync();
+    setFeedbacks(fbs);
   };
 
   const handleSaveSettings = () => {
@@ -1067,7 +1065,7 @@ export const AdminDashboard: React.FC = () => {
 
                 {feedbacks.length === 0 ? (
                   <div className="bg-white/5 backdrop-blur rounded-2xl p-12 border border-white/10 text-center">
-                    <i className="fas fa-comments text-4xl text-slate-500 mb-4"></i>
+                    <div className="text-4xl mb-4">💬</div>
                     <p className="text-xl font-bold text-white mb-2">{isBn ? 'কোনো ফিডব্যাক নেই' : 'No Feedback Yet'}</p>
                     <p className="text-slate-400">{isBn ? 'ইউজাররা এখনো কোনো ফিডব্যাক দেননি' : 'Users have not submitted any feedback yet'}</p>
                   </div>
@@ -1075,43 +1073,85 @@ export const AdminDashboard: React.FC = () => {
                   <div className="space-y-4">
                     {feedbacks.map((fb) => (
                       <div key={fb.id} className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between mb-4">
                           <div className="flex items-start gap-4">
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                               fb.type === 'bug' ? 'bg-red-500/20' :
-                              fb.type === 'feature' ? 'bg-blue-500/20' :
-                              fb.type === 'praise' ? 'bg-green-500/20' :
-                              'bg-slate-500/20'
+                              fb.type === 'feature' ? 'bg-purple-500/20' :
+                              fb.type === 'complaint' ? 'bg-orange-500/20' :
+                              'bg-blue-500/20'
                             }`}>
-                              <i className={`fas ${
-                                fb.type === 'bug' ? 'fa-bug text-red-400' :
-                                fb.type === 'feature' ? 'fa-lightbulb text-blue-400' :
-                                fb.type === 'praise' ? 'fa-heart text-green-400' :
-                                'fa-comment text-slate-400'
-                              } text-xl`}></i>
+                              <span className="text-2xl">
+                                {fb.type === 'bug' ? '🐛' :
+                                 fb.type === 'feature' ? '✨' :
+                                 fb.type === 'complaint' ? '⚠️' : '💬'}
+                              </span>
                             </div>
-                            <div>
-                              <p className="text-white">{fb.message}</p>
+                            <div className="flex-1">
+                              <p className="text-white text-lg">{fb.message}</p>
                               <div className="flex items-center gap-4 mt-2 text-sm text-slate-400">
-                                <span><i className="fas fa-user mr-1"></i>{fb.userName || 'Anonymous'}</span>
-                                <span><i className="fas fa-phone mr-1"></i>{fb.userPhone || 'N/A'}</span>
-                                <span><i className="fas fa-calendar mr-1"></i>{new Date(fb.createdAt).toLocaleDateString()}</span>
+                                <span>👤 {fb.userName || 'Anonymous'}</span>
+                                <span>📅 {new Date(fb.timestamp).toLocaleDateString('bn-BD')}</span>
+                                <span className={`px-2 py-0.5 rounded text-xs ${
+                                  fb.type === 'bug' ? 'bg-red-500/30 text-red-300' :
+                                  fb.type === 'feature' ? 'bg-purple-500/30 text-purple-300' :
+                                  fb.type === 'complaint' ? 'bg-orange-500/30 text-orange-300' :
+                                  'bg-blue-500/30 text-blue-300'
+                                }`}>{fb.type}</span>
                               </div>
                             </div>
                           </div>
                           <select
                             value={fb.status}
                             onChange={(e) => handleUpdateFeedbackStatus(fb.id, e.target.value)}
-                            className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                              fb.status === 'resolved' ? 'bg-green-500/20 text-green-400' :
-                              fb.status === 'in-progress' ? 'bg-blue-500/20 text-blue-400' :
-                              'bg-amber-500/20 text-amber-400'
-                            }`}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium bg-slate-700 text-white border border-slate-600`}
                           >
-                            <option value="pending">{isBn ? 'অপেক্ষমাণ' : 'Pending'}</option>
-                            <option value="in-progress">{isBn ? 'প্রক্রিয়াধীন' : 'In Progress'}</option>
-                            <option value="resolved">{isBn ? 'সমাধান' : 'Resolved'}</option>
+                            <option value="new">{isBn ? '🕐 নতুন' : '🕐 New'}</option>
+                            <option value="reviewed">{isBn ? '👀 দেখা হয়েছে' : '👀 Reviewed'}</option>
+                            <option value="resolved">{isBn ? '✅ সমাধান' : '✅ Resolved'}</option>
                           </select>
+                        </div>
+                        
+                        {/* Admin Reply Section */}
+                        <div className="mt-4 pt-4 border-t border-white/10">
+                          {fb.adminReply ? (
+                            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                              <div className="flex items-center gap-2 text-green-400 text-sm mb-1">
+                                <span>✅ উত্তর দেওয়া হয়েছে</span>
+                                {fb.adminRepliedAt && <span className="text-xs">({new Date(fb.adminRepliedAt).toLocaleDateString('bn-BD')})</span>}
+                              </div>
+                              <p className="text-white">{fb.adminReply}</p>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder={isBn ? 'উত্তর লিখুন...' : 'Write reply...'}
+                                className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const input = e.target as HTMLInputElement;
+                                    if (input.value.trim()) {
+                                      handleUpdateFeedbackStatus(fb.id, 'resolved', input.value.trim());
+                                      input.value = '';
+                                    }
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={(e) => {
+                                  const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement;
+                                  if (input?.value?.trim()) {
+                                    handleUpdateFeedbackStatus(fb.id, 'resolved', input.value.trim());
+                                    input.value = '';
+                                  }
+                                }}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium"
+                              >
+                                {isBn ? 'উত্তর দিন' : 'Reply'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}

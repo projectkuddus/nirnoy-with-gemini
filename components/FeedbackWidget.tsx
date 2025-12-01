@@ -24,11 +24,14 @@ export interface FeedbackData {
   adminRepliedAt?: string;
 }
 
-// ============ FEEDBACK STORAGE - SUPABASE ============
+// ============ FEEDBACK STORAGE - ALL TO SUPABASE ============
 
-// Get all feedbacks from Supabase (for admin)
+/**
+ * Get ALL feedbacks from Supabase (for Admin Panel)
+ * This is the central hub - all feedback types come here
+ */
 export async function getFeedbacksAsync(): Promise<FeedbackData[]> {
-  console.log('[Feedback] Loading all feedbacks...');
+  console.log('[Feedback] Loading ALL feedbacks from Supabase...');
   
   if (!isSupabaseConfigured()) {
     console.error('[Feedback] Supabase not configured!');
@@ -70,7 +73,9 @@ export async function getFeedbacksAsync(): Promise<FeedbackData[]> {
   }
 }
 
-// Get feedbacks for a specific user
+/**
+ * Get feedbacks for a specific user (for Patient/Doctor Dashboard)
+ */
 export async function getUserFeedbacks(userId: string): Promise<FeedbackData[]> {
   console.log('[Feedback] Loading feedbacks for user:', userId);
   
@@ -88,6 +93,8 @@ export async function getUserFeedbacks(userId: string): Promise<FeedbackData[]> 
       console.error('[Feedback] User load error:', error);
       return [];
     }
+    
+    console.log('[Feedback] ✅ Loaded', data?.length || 0, 'user feedbacks');
     
     return (data || []).map(fb => ({
       id: fb.id,
@@ -110,18 +117,22 @@ export async function getUserFeedbacks(userId: string): Promise<FeedbackData[]> 
   }
 }
 
-// Legacy sync function
+// Legacy sync function - returns empty, use async version
 export function getFeedbacks(): FeedbackData[] {
+  console.warn('[Feedback] ⚠️ Using deprecated sync getFeedbacks - use getFeedbacksAsync');
   return [];
 }
 
-// Save feedback to Supabase
+/**
+ * Save feedback to Supabase - ALL feedback goes to same table
+ * Works for: Patients, Doctors, Guests, Anyone
+ */
 export async function saveFeedback(feedback: FeedbackData): Promise<boolean> {
-  console.log('[Feedback] Saving feedback:', {
+  console.log('[Feedback] 💾 Saving feedback:', {
     id: feedback.id,
     type: feedback.type,
-    message: feedback.message.substring(0, 30) + '...',
-    userId: feedback.userId
+    userRole: feedback.userRole,
+    message: feedback.message.substring(0, 50) + '...'
   });
   
   if (!isSupabaseConfigured()) {
@@ -137,10 +148,12 @@ export async function saveFeedback(feedback: FeedbackData): Promise<boolean> {
       message: feedback.message,
       page: feedback.page,
       user_agent: feedback.userAgent,
+      // Only set user_id if it's a valid UUID (36 chars)
       user_id: feedback.userId && feedback.userId.length === 36 ? feedback.userId : null,
       user_role: feedback.userRole || 'guest',
       user_name: feedback.userName || 'Anonymous',
-      status: 'new'
+      status: 'new',
+      created_at: new Date().toISOString()
     };
     
     console.log('[Feedback] Insert data:', insertData);
@@ -155,7 +168,7 @@ export async function saveFeedback(feedback: FeedbackData): Promise<boolean> {
       return false;
     }
     
-    console.log('[Feedback] ✅ Saved successfully:', data);
+    console.log('[Feedback] ✅ Saved successfully to Supabase:', data);
     return true;
   } catch (e) {
     console.error('[Feedback] ❌ Exception:', e);
@@ -163,8 +176,17 @@ export async function saveFeedback(feedback: FeedbackData): Promise<boolean> {
   }
 }
 
-// Update feedback status (for admin)
-export async function updateFeedbackStatus(id: string, status: FeedbackData['status'], adminReply?: string): Promise<boolean> {
+/**
+ * Update feedback status and optionally add admin reply
+ * Used by Admin Panel
+ */
+export async function updateFeedbackStatus(
+  id: string, 
+  status: FeedbackData['status'], 
+  adminReply?: string
+): Promise<boolean> {
+  console.log('[Feedback] Updating status:', id, status, adminReply ? '(with reply)' : '');
+  
   if (!isSupabaseConfigured()) return false;
   
   try {
@@ -201,7 +223,7 @@ export const FeedbackWidget: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language } = useLanguage();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, role } = useAuth();
   const isBn = language === 'bn';
 
   const [isOpen, setIsOpen] = useState(false);
@@ -213,11 +235,12 @@ export const FeedbackWidget: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
+  // Hide on dashboard pages (they have their own feedback tabs)
   const hiddenPages = ['/admin', '/doctor-dashboard', '/patient-dashboard'];
   const shouldHide = hiddenPages.some(page => location.pathname.startsWith(page));
 
   const t = {
-    title: isBn ? 'মতামত' : 'Feedback',
+    title: isBn ? 'মতামত দিন' : 'Give Feedback',
     howFeeling: isBn ? 'আপনার অভিজ্ঞতা কেমন?' : 'How was your experience?',
     happy: isBn ? 'ভালো' : 'Great',
     neutral: isBn ? 'ঠিকঠাক' : 'Okay',
@@ -227,6 +250,7 @@ export const FeedbackWidget: React.FC = () => {
     feature: isBn ? 'ফিচার' : 'Feature',
     general: isBn ? 'সাধারণ' : 'General',
     complaint: isBn ? 'অভিযোগ' : 'Complaint',
+    doctor: isBn ? 'ডাক্তার' : 'Doctor',
     tellMore: isBn ? 'বিস্তারিত' : 'Details',
     placeholder: isBn ? 'আপনার মতামত লিখুন...' : 'Write your feedback...',
     submit: isBn ? 'পাঠান' : 'Submit',
@@ -241,6 +265,12 @@ export const FeedbackWidget: React.FC = () => {
     setIsSubmitting(true);
     setError('');
 
+    // Determine user role
+    let userRole = 'guest';
+    if (role === 'PATIENT' || role === 'patient') userRole = 'patient';
+    else if (role === 'DOCTOR' || role === 'doctor') userRole = 'doctor';
+    else if (isAuthenticated) userRole = 'user';
+
     const feedback: FeedbackData = {
       id: `fb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type: feedbackType,
@@ -250,7 +280,7 @@ export const FeedbackWidget: React.FC = () => {
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
       userId: user?.id,
-      userRole: isAuthenticated ? 'patient' : 'guest',
+      userRole: userRole,
       userName: user?.name || 'Anonymous',
       status: 'new'
     };
@@ -277,16 +307,21 @@ export const FeedbackWidget: React.FC = () => {
 
   return (
     <>
+      {/* Floating Button */}
       <div className="fixed bottom-6 right-6 z-50">
-        <button onClick={() => setIsOpen(true)}
-          className="w-14 h-14 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-all transform hover:scale-105">
+        <button
+          onClick={() => setIsOpen(true)}
+          className="w-14 h-14 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-all transform hover:scale-105"
+        >
           <span className="text-2xl">💬</span>
         </button>
       </div>
 
+      {/* Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Header */}
             <div className="bg-gradient-to-r from-teal-500 to-emerald-500 p-4 text-white">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold">{t.title}</h2>
@@ -294,16 +329,20 @@ export const FeedbackWidget: React.FC = () => {
               </div>
             </div>
 
+            {/* Content */}
             <div className="p-5">
               {submitted ? (
                 <div className="text-center py-8">
                   <div className="text-5xl mb-3">🎉</div>
                   <h3 className="text-xl font-bold text-gray-800">{t.thanks}</h3>
                   <p className="text-gray-500 mt-1">{t.thanksMsg}</p>
-                  <p className="text-sm text-blue-600 mt-2">আপনার প্রোফাইলে মতামত দেখতে পাবেন</p>
+                  <p className="text-sm text-blue-600 mt-2">
+                    {isBn ? 'আপনার প্রোফাইলে মতামত দেখতে পাবেন' : 'View your feedback in your profile'}
+                  </p>
                 </div>
               ) : step === 1 ? (
                 <div className="space-y-5">
+                  {/* Mood Selection */}
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-3">{t.howFeeling}</p>
                     <div className="flex gap-3">
@@ -312,14 +351,23 @@ export const FeedbackWidget: React.FC = () => {
                         { value: 'neutral' as FeedbackMood, emoji: '😐', label: t.neutral },
                         { value: 'sad' as FeedbackMood, emoji: '😞', label: t.sad },
                       ].map((option) => (
-                        <button key={option.value} onClick={() => setMood(option.value)}
-                          className={`flex-1 p-3 rounded-xl border-2 transition-all ${mood === option.value ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                        <button
+                          key={option.value}
+                          onClick={() => setMood(option.value)}
+                          className={`flex-1 p-3 rounded-xl border-2 transition-all ${
+                            mood === option.value
+                              ? 'border-teal-500 bg-teal-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
                           <span className="text-2xl block">{option.emoji}</span>
                           <span className="text-xs text-gray-600 mt-1">{option.label}</span>
                         </button>
                       ))}
                     </div>
                   </div>
+
+                  {/* Type Selection */}
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-3">{t.whatType}</p>
                     <div className="flex flex-wrap gap-2">
@@ -328,16 +376,28 @@ export const FeedbackWidget: React.FC = () => {
                         { value: 'bug' as FeedbackType, label: t.bug },
                         { value: 'feature' as FeedbackType, label: t.feature },
                         { value: 'complaint' as FeedbackType, label: t.complaint },
+                        { value: 'doctor' as FeedbackType, label: t.doctor },
                       ].map((type) => (
-                        <button key={type.value} onClick={() => setFeedbackType(type.value)}
-                          className={`px-4 py-2 rounded-full text-sm transition-all ${feedbackType === type.value ? 'bg-teal-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                        <button
+                          key={type.value}
+                          onClick={() => setFeedbackType(type.value)}
+                          className={`px-4 py-2 rounded-full text-sm transition-all ${
+                            feedbackType === type.value
+                              ? 'bg-teal-500 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
                           {type.label}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <button onClick={() => setStep(2)} disabled={!mood}
-                    className="w-full py-3 bg-teal-500 text-white rounded-xl font-medium disabled:bg-gray-300">
+
+                  <button
+                    onClick={() => setStep(2)}
+                    disabled={!mood}
+                    className="w-full py-3 bg-teal-500 text-white rounded-xl font-medium disabled:bg-gray-300"
+                  >
                     {isBn ? 'পরবর্তী' : 'Next'} →
                   </button>
                 </div>
@@ -345,16 +405,26 @@ export const FeedbackWidget: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">{t.tellMore}</p>
-                    <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder={t.placeholder}
-                      className="w-full h-32 p-3 border rounded-xl resize-none focus:ring-2 focus:ring-teal-500" autoFocus />
+                    <textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder={t.placeholder}
+                      className="w-full h-32 p-3 border rounded-xl resize-none focus:ring-2 focus:ring-teal-500"
+                      autoFocus
+                    />
                   </div>
+                  
                   {error && <p className="text-red-500 text-sm">{error}</p>}
+
                   <div className="flex gap-3">
                     <button onClick={() => setStep(1)} className="flex-1 py-3 border rounded-xl text-gray-600">
                       ← {isBn ? 'পেছনে' : 'Back'}
                     </button>
-                    <button onClick={handleSubmit} disabled={!message.trim() || isSubmitting}
-                      className="flex-1 py-3 bg-teal-500 text-white rounded-xl font-medium disabled:bg-gray-300">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!message.trim() || isSubmitting}
+                      className="flex-1 py-3 bg-teal-500 text-white rounded-xl font-medium disabled:bg-gray-300"
+                    >
                       {isSubmitting ? t.submitting : t.submit}
                     </button>
                   </div>
