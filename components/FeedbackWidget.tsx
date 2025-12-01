@@ -8,13 +8,11 @@ import { supabase, isSupabaseConfigured } from '../services/supabaseAuth';
 type FeedbackType = 'bug' | 'feature' | 'general' | 'doctor' | 'complaint';
 type FeedbackMood = 'happy' | 'neutral' | 'sad';
 
-interface FeedbackData {
+export interface FeedbackData {
   id: string;
   type: FeedbackType;
   mood: FeedbackMood;
   message: string;
-  email?: string;
-  phone?: string;
   page: string;
   userAgent: string;
   timestamp: string;
@@ -22,14 +20,18 @@ interface FeedbackData {
   userRole?: string;
   userName?: string;
   status: 'new' | 'reviewed' | 'resolved';
+  adminReply?: string;
+  adminRepliedAt?: string;
 }
 
 // ============ FEEDBACK STORAGE - SUPABASE ============
 
-// Get all feedbacks from Supabase (async)
+// Get all feedbacks from Supabase (for admin)
 export async function getFeedbacksAsync(): Promise<FeedbackData[]> {
+  console.log('[Feedback] Loading all feedbacks...');
+  
   if (!isSupabaseConfigured()) {
-    console.log('[Feedback] Supabase not configured');
+    console.error('[Feedback] Supabase not configured!');
     return [];
   }
   
@@ -41,11 +43,11 @@ export async function getFeedbacksAsync(): Promise<FeedbackData[]> {
       .limit(500);
     
     if (error) {
-      console.error('[Feedback] Load error:', error);
+      console.error('[Feedback] Load error:', error.message, error.details);
       return [];
     }
     
-    console.log('[Feedback] Loaded', data?.length || 0, 'feedbacks from Supabase');
+    console.log('[Feedback] ✅ Loaded', data?.length || 0, 'feedbacks');
     
     return (data || []).map(fb => ({
       id: fb.id,
@@ -58,7 +60,9 @@ export async function getFeedbacksAsync(): Promise<FeedbackData[]> {
       userId: fb.user_id,
       userRole: fb.user_role,
       userName: fb.user_name,
-      status: fb.status || 'new'
+      status: fb.status || 'new',
+      adminReply: fb.admin_reply,
+      adminRepliedAt: fb.admin_replied_at
     }));
   } catch (e) {
     console.error('[Feedback] Exception:', e);
@@ -66,57 +70,117 @@ export async function getFeedbacksAsync(): Promise<FeedbackData[]> {
   }
 }
 
-// Legacy sync function - returns empty, use getFeedbacksAsync
+// Get feedbacks for a specific user
+export async function getUserFeedbacks(userId: string): Promise<FeedbackData[]> {
+  console.log('[Feedback] Loading feedbacks for user:', userId);
+  
+  if (!isSupabaseConfigured() || !userId) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from('feedback')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (error) {
+      console.error('[Feedback] User load error:', error);
+      return [];
+    }
+    
+    return (data || []).map(fb => ({
+      id: fb.id,
+      type: fb.type || 'general',
+      mood: fb.mood || 'neutral',
+      message: fb.message,
+      page: fb.page,
+      userAgent: fb.user_agent || '',
+      timestamp: fb.created_at,
+      userId: fb.user_id,
+      userRole: fb.user_role,
+      userName: fb.user_name,
+      status: fb.status || 'new',
+      adminReply: fb.admin_reply,
+      adminRepliedAt: fb.admin_replied_at
+    }));
+  } catch (e) {
+    console.error('[Feedback] Exception:', e);
+    return [];
+  }
+}
+
+// Legacy sync function
 export function getFeedbacks(): FeedbackData[] {
   return [];
 }
 
 // Save feedback to Supabase
 export async function saveFeedback(feedback: FeedbackData): Promise<boolean> {
-  console.log('[Feedback] Saving:', feedback.message.substring(0, 30));
+  console.log('[Feedback] Saving feedback:', {
+    id: feedback.id,
+    type: feedback.type,
+    message: feedback.message.substring(0, 30) + '...',
+    userId: feedback.userId
+  });
   
   if (!isSupabaseConfigured()) {
-    console.error('[Feedback] Supabase not configured');
+    console.error('[Feedback] ❌ Supabase not configured!');
     return false;
   }
   
   try {
-    const { error } = await supabase
+    const insertData = {
+      id: feedback.id,
+      type: feedback.type,
+      mood: feedback.mood,
+      message: feedback.message,
+      page: feedback.page,
+      user_agent: feedback.userAgent,
+      user_id: feedback.userId && feedback.userId.length === 36 ? feedback.userId : null,
+      user_role: feedback.userRole || 'guest',
+      user_name: feedback.userName || 'Anonymous',
+      status: 'new'
+    };
+    
+    console.log('[Feedback] Insert data:', insertData);
+    
+    const { data, error } = await supabase
       .from('feedback')
-      .insert({
-        id: feedback.id,
-        type: feedback.type,
-        mood: feedback.mood,
-        message: feedback.message,
-        page: feedback.page,
-        user_agent: feedback.userAgent,
-        user_id: feedback.userId && feedback.userId.length === 36 ? feedback.userId : null,
-        user_role: feedback.userRole,
-        user_name: feedback.userName,
-        status: feedback.status || 'new'
-      });
+      .insert(insertData)
+      .select();
     
     if (error) {
-      console.error('[Feedback] Save error:', error);
+      console.error('[Feedback] ❌ Save error:', error.message, error.details, error.hint);
       return false;
     }
     
-    console.log('[Feedback] ✅ Saved to Supabase');
+    console.log('[Feedback] ✅ Saved successfully:', data);
     return true;
   } catch (e) {
-    console.error('[Feedback] Save exception:', e);
+    console.error('[Feedback] ❌ Exception:', e);
     return false;
   }
 }
 
-// Update feedback status in Supabase
-export async function updateFeedbackStatus(id: string, status: FeedbackData['status']): Promise<boolean> {
+// Update feedback status (for admin)
+export async function updateFeedbackStatus(id: string, status: FeedbackData['status'], adminReply?: string): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
   
   try {
+    const updateData: any = { 
+      status, 
+      updated_at: new Date().toISOString() 
+    };
+    
+    if (adminReply) {
+      updateData.admin_reply = adminReply;
+      updateData.admin_replied_at = new Date().toISOString();
+    }
+    
     const { error } = await supabase
       .from('feedback')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', id);
     
     if (error) {
@@ -124,7 +188,7 @@ export async function updateFeedbackStatus(id: string, status: FeedbackData['sta
       return false;
     }
     
-    console.log('[Feedback] Status updated:', id, status);
+    console.log('[Feedback] ✅ Status updated:', id, status);
     return true;
   } catch (e) {
     console.error('[Feedback] Update exception:', e);
@@ -140,7 +204,6 @@ export const FeedbackWidget: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const isBn = language === 'bn';
 
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('general');
@@ -148,20 +211,13 @@ export const FeedbackWidget: React.FC = () => {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
 
   const hiddenPages = ['/admin', '/doctor-dashboard', '/patient-dashboard'];
   const shouldHide = hiddenPages.some(page => location.pathname.startsWith(page));
 
-  useEffect(() => {
-    if (isExpanded && !isOpen) {
-      const timer = setTimeout(() => setIsExpanded(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [isExpanded, isOpen]);
-
   const t = {
     title: isBn ? 'মতামত' : 'Feedback',
-    subtitle: isBn ? 'আপনার মতামত দিন' : 'Share your thoughts',
     howFeeling: isBn ? 'আপনার অভিজ্ঞতা কেমন?' : 'How was your experience?',
     happy: isBn ? 'ভালো' : 'Great',
     neutral: isBn ? 'ঠিকঠাক' : 'Okay',
@@ -177,11 +233,13 @@ export const FeedbackWidget: React.FC = () => {
     submitting: isBn ? 'পাঠানো হচ্ছে...' : 'Sending...',
     thanks: isBn ? 'ধন্যবাদ!' : 'Thanks!',
     thanksMsg: isBn ? 'আপনার মতামত পাঠানো হয়েছে' : 'Your feedback has been sent',
+    errorMsg: isBn ? 'সমস্যা হয়েছে, আবার চেষ্টা করুন' : 'Error, please try again',
   };
 
   const handleSubmit = async () => {
     if (!message.trim()) return;
     setIsSubmitting(true);
+    setError('');
 
     const feedback: FeedbackData = {
       id: `fb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -192,8 +250,8 @@ export const FeedbackWidget: React.FC = () => {
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
       userId: user?.id,
-      userRole: isAuthenticated ? 'user' : 'guest',
-      userName: user?.name,
+      userRole: isAuthenticated ? 'patient' : 'guest',
+      userName: user?.name || 'Anonymous',
       status: 'new'
     };
 
@@ -209,7 +267,9 @@ export const FeedbackWidget: React.FC = () => {
         setMood(null);
         setMessage('');
         setFeedbackType('general');
-      }, 2000);
+      }, 2500);
+    } else {
+      setError(t.errorMsg);
     }
   };
 
@@ -218,12 +278,7 @@ export const FeedbackWidget: React.FC = () => {
   return (
     <>
       <div className="fixed bottom-6 right-6 z-50">
-        {isExpanded && !isOpen && (
-          <div className="absolute bottom-full right-0 mb-2 bg-white rounded-lg shadow-lg p-3 whitespace-nowrap">
-            <p className="text-sm font-medium text-gray-700">{t.subtitle}</p>
-          </div>
-        )}
-        <button onClick={() => setIsOpen(true)} onMouseEnter={() => setIsExpanded(true)}
+        <button onClick={() => setIsOpen(true)}
           className="w-14 h-14 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-all transform hover:scale-105">
           <span className="text-2xl">💬</span>
         </button>
@@ -245,6 +300,7 @@ export const FeedbackWidget: React.FC = () => {
                   <div className="text-5xl mb-3">🎉</div>
                   <h3 className="text-xl font-bold text-gray-800">{t.thanks}</h3>
                   <p className="text-gray-500 mt-1">{t.thanksMsg}</p>
+                  <p className="text-sm text-blue-600 mt-2">আপনার প্রোফাইলে মতামত দেখতে পাবেন</p>
                 </div>
               ) : step === 1 ? (
                 <div className="space-y-5">
@@ -292,6 +348,7 @@ export const FeedbackWidget: React.FC = () => {
                     <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder={t.placeholder}
                       className="w-full h-32 p-3 border rounded-xl resize-none focus:ring-2 focus:ring-teal-500" autoFocus />
                   </div>
+                  {error && <p className="text-red-500 text-sm">{error}</p>}
                   <div className="flex gap-3">
                     <button onClick={() => setStep(1)} className="flex-1 py-3 border rounded-xl text-gray-600">
                       ← {isBn ? 'পেছনে' : 'Back'}
