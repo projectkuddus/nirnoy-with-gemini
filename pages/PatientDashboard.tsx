@@ -109,7 +109,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
   // Auth check
   useEffect(() => {
-    if (!isLoading && (!user || (role !== 'patient' && role !== 'PATIENT'))) {
+    if (!isLoading && !user) {
       navigate('/patient-auth', { replace: true });
     }
   }, [user, role, isLoading, navigate]);

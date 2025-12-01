@@ -30,9 +30,6 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
   const [gender, setGender] = useState('');
   const [bloodGroup, setBloodGroup] = useState('');
 
-  // Check if we're on the auth page (not already redirecting)
-  const isOnAuthPage = location.pathname === '/patient-auth' || location.pathname === '/register';
-
   // Countdown timer
   useEffect(() => {
     if (countdown > 0) {
@@ -102,10 +99,10 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
       
       if (result.success) {
         setStep('success');
-        // Use window.location for clean navigation (no React re-render loop)
+        // Wait for state to settle, then navigate
         setTimeout(() => {
-          window.location.href = '/patient-dashboard';
-        }, 300);
+          navigate('/patient-dashboard', { replace: true });
+        }, 500);
       } else {
         setError(result.error || 'Login failed');
       }
@@ -141,10 +138,9 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
       
       if (result.success) {
         setStep('success');
-        // Use window.location for clean navigation
         setTimeout(() => {
-          window.location.href = '/patient-dashboard';
-        }, 300);
+          navigate('/patient-dashboard', { replace: true });
+        }, 500);
       } else {
         setError(result.error || 'Registration failed');
       }
@@ -167,10 +163,11 @@ export const PatientAuth: React.FC<{ onLogin?: () => void }> = ({ onLogin }) => 
     );
   }
 
-  // If user is already logged in and we're on auth page, redirect using window.location
-  if (user && (role === 'patient' || role === 'PATIENT') && isOnAuthPage && step !== 'success') {
-    // Use window.location to avoid React Router loop
-    window.location.href = '/patient-dashboard';
+  // If already logged in as patient, show success and redirect
+  // But ONLY if we're not already in success step (to avoid loops)
+  if (user && (role === 'patient' || role === 'PATIENT') && step === 'phone') {
+    // Already logged in, go to dashboard
+    navigate('/patient-dashboard', { replace: true });
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
