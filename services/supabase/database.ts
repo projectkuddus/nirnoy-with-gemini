@@ -57,7 +57,7 @@ export interface Profile {
 
 export interface Doctor {
   id: string;
-  user_id: string;
+  profile_id: string;  // References profiles.id
   bmdc_number: string;
   nid_number?: string;
   degrees: string[];
@@ -111,7 +111,7 @@ export interface Schedule {
 
 export interface Patient {
   id: string;
-  user_id: string;
+  profile_id: string;  // References profiles.id
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   emergency_contact_relation?: string;
@@ -332,7 +332,7 @@ export const patientService = {
         profile:profiles(*),
         family_members(*)
       `)
-      .eq('user_id', userId)
+      .eq('profile_id', userId)
       .single();
 
     if (error) {
@@ -347,7 +347,7 @@ export const patientService = {
     const { data: patient, error } = await supabase
       .from('patients')
       .insert({
-        user_id: userId,
+        profile_id: userId,
         ...data,
       })
       .select()
@@ -500,7 +500,7 @@ export const doctorService = {
         profile:profiles(*),
         chambers(*, schedules(*))
       `)
-      .eq('user_id', userId)
+      .eq('profile_id', userId)
       .single();
 
     if (error) {
@@ -515,7 +515,7 @@ export const doctorService = {
     const { data: doctor, error } = await supabase
       .from('doctors')
       .insert({
-        user_id: userId,
+        profile_id: userId,
         is_verified: false, // Needs admin approval
         ...data,
       })

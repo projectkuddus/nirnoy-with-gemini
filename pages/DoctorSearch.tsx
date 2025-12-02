@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useDoctors } from '../hooks/useDoctors';
 import { MOCK_DOCTORS } from '../data/mockData';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageToggle from '../components/LanguageToggle';
 
+// Static lists for UI (from mock data for now, will be dynamic later)
 const ALL_SPECIALTIES = [...new Set(MOCK_DOCTORS.flatMap(d => d.specialties))].sort();
 const ALL_LOCATIONS = [...new Set(MOCK_DOCTORS.map(d => d.chambers[0]?.area).filter(Boolean))].sort();
 
@@ -34,6 +36,9 @@ export const DoctorSearch: React.FC = () => {
   const [selectedGender, setSelectedGender] = useState('');
   const [sortBy, setSortBy] = useState('rating');
 
+  // Fetch doctors from database (with mock fallback)
+  const { doctors: allDoctors, loading, isFromDatabase } = useDoctors();
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (searchTerm) params.set('q', searchTerm);
@@ -42,7 +47,7 @@ export const DoctorSearch: React.FC = () => {
   }, [searchTerm, selectedSpecialty, setSearchParams]);
 
   const filteredDoctors = useMemo(() => {
-    let results = MOCK_DOCTORS.filter(d => {
+    let results = allDoctors.filter(d => {
       const matchesSearch = !searchTerm || 
         d.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         d.specialties.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -59,13 +64,13 @@ export const DoctorSearch: React.FC = () => {
       case 'fee-high': results.sort((a, b) => (b.chambers[0]?.fee || 0) - (a.chambers[0]?.fee || 0)); break;
     }
     return results;
-  }, [searchTerm, selectedSpecialty, selectedLocation, selectedGender, sortBy]);
+  }, [allDoctors, searchTerm, selectedSpecialty, selectedLocation, selectedGender, sortBy]);
 
   const specialtyCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    MOCK_DOCTORS.forEach(d => d.specialties.forEach(s => { counts[s] = (counts[s] || 0) + 1; }));
+    allDoctors.forEach(d => d.specialties.forEach(s => { counts[s] = (counts[s] || 0) + 1; }));
     return counts;
-  }, []);
+  }, [allDoctors]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -99,7 +104,11 @@ export const DoctorSearch: React.FC = () => {
       <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white pt-24 pb-12 px-6">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-3xl font-black mb-3">{isBn ? 'আপনার ডাক্তার খুঁজুন' : 'Find Your Doctor'}</h1>
-          <p className="text-blue-100 mb-8">{isBn ? `${MOCK_DOCTORS.length}+ বিশেষজ্ঞ ডাক্তার` : `${MOCK_DOCTORS.length}+ expert doctors`}</p>
+          <p className="text-blue-100 mb-8">
+            {loading ? (isBn ? 'লোড হচ্ছে...' : 'Loading...') : 
+              (isBn ? `${allDoctors.length}+ বিশেষজ্ঞ ডাক্তার` : `${allDoctors.length}+ expert doctors`)}
+            {isFromDatabase && <span className="ml-2 text-xs bg-green-500/20 px-2 py-0.5 rounded-full">✓ Live</span>}
+          </p>
           
           <div className="max-w-4xl mx-auto bg-white rounded-2xl p-2 shadow-2xl flex flex-col md:flex-row gap-2">
             <div className="flex-1 flex items-center px-4 bg-slate-50 rounded-xl">
