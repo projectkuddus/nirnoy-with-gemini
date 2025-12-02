@@ -304,7 +304,7 @@ const saveAdminSettings = (settings: AdminSettings) => {
 
 // ============ COMPONENT ============
 export const AdminDashboard: React.FC = () => {
-  const { getAllPendingDoctors, approveDoctor, rejectDoctor, getAllPatients, getAllDoctors } = useAuth();
+  const { getPendingDoctors, approveDoctor, rejectDoctor, getAllPatients, getAllDoctors } = useAuth();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isBn = language === 'bn';
@@ -362,7 +362,7 @@ export const AdminDashboard: React.FC = () => {
 
   const loadAllData = async () => {
     // Load pending doctors
-    const pending = await getAllPendingDoctors();
+    const pending = await getPendingDoctors();
     setPendingDoctors(pending);
     
     // Load all doctors from Supabase

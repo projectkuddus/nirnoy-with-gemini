@@ -325,11 +325,9 @@ const db = {
           bmdc_number: doctorData.bmdcNumber,
           nid_number: doctorData.nidNumber || null,
           specialties: doctorData.specializations || [],
-          qualifications: doctorData.qualifications || [],
-          institution: doctorData.institution || null,
           experience_years: doctorData.experienceYears || 0,
           consultation_fee: doctorData.consultationFee || 500,
-          status: 'pending'
+          is_verified: false  // Pending admin approval
         });
       
       if (doctorError) {
@@ -413,7 +411,8 @@ const db = {
 
   async getPendingDoctors(): Promise<DoctorProfile[]> {
     const all = await this.getAllDoctors();
-    return all.filter(d => d.status === 'pending');
+    // Filter by is_verified=false (pending approval)
+    return all.filter(d => !d.isVerified);
   },
 
   async updateDoctorStatus(profileId: string, status: 'approved' | 'rejected'): Promise<boolean> {
