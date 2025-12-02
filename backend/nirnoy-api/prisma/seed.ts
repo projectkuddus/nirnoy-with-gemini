@@ -169,14 +169,17 @@ const MEMBERSHIPS = [
 
 // Profile photo URLs (using UI Avatars and randomuser.me for variety)
 const getProfilePhoto = (gender: string, index: number): string => {
+  const firstName = gender === 'Male' 
+    ? MALE_FIRST_NAMES[index % MALE_FIRST_NAMES.length] 
+    : FEMALE_FIRST_NAMES[index % FEMALE_FIRST_NAMES.length];
+  
   // Mix of sources for variety
   if (index % 3 === 0) {
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${gender === 'Male' ? '3b82f6' : 'ec4899'}&color=fff&size=200`;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(firstName)}&background=${gender === 'Male' ? '3b82f6' : 'ec4899'}&color=fff&size=200`;
   } else if (index % 3 === 1) {
     return `https://i.pravatar.cc/300?img=${(index % 70) + 1}`;
   } else {
-    const name = gender === 'Male' ? MALE_FIRST_NAMES[index % MALE_FIRST_NAMES.length] : FEMALE_FIRST_NAMES[index % FEMALE_FIRST_NAMES.length];
-    return `https://ui-avatars.com/api/?name=${name}&background=0D9488&color=fff&size=300&bold=true`;
+    return `https://ui-avatars.com/api/?name=${firstName}&background=0D9488&color=fff&size=300&bold=true`;
   }
 };
 

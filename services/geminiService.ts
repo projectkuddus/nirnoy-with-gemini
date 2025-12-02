@@ -1,17 +1,58 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { api } from './api';
 
 // Initialize Gemini Client
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-// Usage tracking for finance war room
-const USAGE_KEYS = {
-  AI_CONVERSATIONS: 'nirnoy_ai_conversations',
-  AI_TOKENS: 'nirnoy_ai_tokens_used',
+// Get current user from auth context
+const getCurrentUser = () => {
+  try {
+    const sessionData = localStorage.getItem('nirnoy_session');
+    if (sessionData) {
+      const session = JSON.parse(sessionData);
+      return session.user;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 };
 
-const trackAIUsage = (estimatedTokens: number = 500) => {
+/**
+ * Track AI usage via backend API
+ * Falls back to localStorage if API is unavailable
+ */
+const trackAIUsage = async (
+  estimatedTokens: number = 500,
+  requestType: string = 'CHAT',
+  model: string = 'gemini-2.0-flash-exp'
+) => {
+  const user = getCurrentUser();
+
+  // If backend API is available and user is authenticated, track via API
+  if (user?.id) {
+    try {
+      await api.ai.trackTokenUsage({
+        userId: user.id,
+        userRole: user.role || 'PATIENT',
+        tokensUsed: estimatedTokens,
+        requestType,
+        model,
+        estimatedCostUsd: (estimatedTokens / 1000000) * 0.5, // Rough cost estimate
+      });
+      return;
+    } catch (error) {
+      console.warn('Failed to track AI usage via API, falling back to localStorage:', error);
+    }
+  }
+
+  // Fallback to localStorage (for development or when user not authenticated)
   try {
+    const USAGE_KEYS = {
+      AI_CONVERSATIONS: 'nirnoy_ai_conversations',
+      AI_TOKENS: 'nirnoy_ai_tokens_used',
+    };
     const currentConvs = parseInt(localStorage.getItem(USAGE_KEYS.AI_CONVERSATIONS) || '0');
     const currentTokens = parseInt(localStorage.getItem(USAGE_KEYS.AI_TOKENS) || '0');
     localStorage.setItem(USAGE_KEYS.AI_CONVERSATIONS, (currentConvs + 1).toString());
@@ -70,7 +111,8 @@ CONVERSATION MODE: Clinical consultation support. Provide evidence-based recomme
       }
     });
 
-    trackAIUsage(800); return response.text || "Unable to process query.";
+    await trackAIUsage(800, 'DOCTOR_CHAT', MEDICAL_MODEL);
+    return response.text || "Unable to process query.";
   } catch (error) {
     console.error("Error in doctor chat:", error);
     return "Connection error. Please try again.";
@@ -178,7 +220,7 @@ Remember: You help identify problems and guide to doctors. You do NOT diagnose o
       config: { systemInstruction }
     });
 
-    trackAIUsage(500); 
+    await trackAIUsage(500, 'HEALTH_ASSISTANT', FAST_MODEL);
     return response.text || "দুঃখিত, বুঝতে পারলাম না। আবার বলুন?";
   } catch (error) {
     console.error("Error in chat:", error);

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import PageHeader from '../components/PageHeader';
+import appointmentService from '../services/appointmentService';
 
 // ============ TYPES ============
 interface Appointment {
@@ -28,29 +29,10 @@ interface Appointment {
   doctorMessage?: string;
 }
 
-// Storage key for appointments
-const APPOINTMENTS_KEY = 'nirnoy_appointments_prod';
-
-// Get appointments from localStorage (will be replaced with Supabase)
-const getStoredAppointments = (userId: string): Appointment[] => {
-  try {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '{}');
-    return all[userId] || [];
-  } catch {
-    return [];
-  }
-};
-
-// Save appointments to localStorage
-const saveAppointments = (userId: string, appointments: Appointment[]) => {
-  try {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '{}');
-    all[userId] = appointments;
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
-  } catch (e) {
-    console.error('Failed to save appointments:', e);
-  }
-};
+/**
+ * NOTE: Using appointmentService which handles both Supabase and localStorage fallback
+ * No need for direct localStorage access
+ */
 
 // ============ MAIN COMPONENT ============
 export const MyAppointments: React.FC = () => {
@@ -60,16 +42,57 @@ export const MyAppointments: React.FC = () => {
   const isBn = language === 'bn';
 
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [showCancelModal, setShowCancelModal] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // Load appointments from storage
+  // Load appointments from appointmentService (Supabase or localStorage fallback)
   useEffect(() => {
-    if (user?.id) {
-      const userAppointments = getStoredAppointments(user.id);
-      setAppointments(userAppointments);
-    }
+    const loadAppointments = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // appointmentService.getPatientAppointments expects a string patientId
+        const data = await appointmentService.getPatientAppointments(user.id.toString());
+
+        // Map to component's expected format
+        const mappedAppointments = data.map(apt => ({
+          id: apt.id,
+          doctorId: apt.doctorId,
+          doctorName: apt.doctor?.name || '',
+          doctorNameBn: apt.doctor?.name || '', // TODO: Add Bengali name in backend
+          doctorImage: apt.doctor?.profileImage || '/default-doctor.png',
+          specialty: apt.doctor?.specialties?.[0] || '',
+          specialtyBn: apt.doctor?.specialties?.[0] || '', // TODO: Add Bengali specialty
+          chamberName: apt.chamber?.name || '',
+          chamberAddress: apt.chamber?.address || '',
+          date: apt.appointmentDate,
+          time: apt.appointmentTime,
+          serialNumber: apt.serialNumber,
+          status: apt.status === 'booked' ? 'upcoming' :
+                  apt.status === 'in_queue' ? 'in-queue' :
+                  apt.status === 'in_progress' ? 'in-progress' :
+                  apt.status === 'completed' ? 'completed' :
+                  apt.status === 'cancelled' ? 'cancelled' : 'upcoming',
+          visitType: apt.visitType === 'new' ? 'new' : apt.visitType === 'follow_up' ? 'follow-up' : 'report',
+          fee: apt.fee,
+          isPaid: apt.isPaid,
+        }));
+
+        setAppointments(mappedAppointments);
+      } catch (error) {
+        console.error('Failed to load appointments:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointments();
   }, [user?.id]);
 
   // Translations
@@ -103,16 +126,30 @@ export const MyAppointments: React.FC = () => {
   const upcomingAppointments = appointments.filter(a => ['upcoming', 'in-queue', 'in-progress'].includes(a.status));
   const pastAppointments = appointments.filter(a => ['completed', 'cancelled', 'no-show'].includes(a.status));
 
-  const handleCancel = (id: string) => {
-    const updatedAppointments = appointments.map(a => 
-      a.id === id ? { ...a, status: 'cancelled' as const } : a
-    );
-    setAppointments(updatedAppointments);
-    if (user?.id) {
-      saveAppointments(user.id, updatedAppointments);
+  const handleCancel = async (id: string) => {
+    try {
+      // Cancel via appointmentService
+      const result = await appointmentService.cancelAppointment(
+        id,
+        user?.id.toString() || 'patient',
+        cancelReason || 'Cancelled by patient'
+      );
+
+      if (result.success) {
+        // Update local state
+        const updatedAppointments = appointments.map(a =>
+          a.id === id ? { ...a, status: 'cancelled' as const } : a
+        );
+        setAppointments(updatedAppointments);
+        setShowCancelModal(null);
+        setCancelReason('');
+      } else {
+        alert(isBn ? 'বাতিল করতে ব্যর্থ' : 'Failed to cancel');
+      }
+    } catch (error) {
+      console.error('Cancel error:', error);
+      alert(isBn ? 'বাতিল করতে ব্যর্থ' : 'Failed to cancel');
     }
-    setShowCancelModal(null);
-    setCancelReason('');
   };
 
   const formatDate = (dateStr: string) => {
@@ -125,7 +162,7 @@ export const MyAppointments: React.FC = () => {
     return date.toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">

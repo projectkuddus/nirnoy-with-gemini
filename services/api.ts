@@ -1,9 +1,11 @@
 /**
  * Nirnoy Care API Service
  * Connects frontend to NestJS backend
+ * 
+ * Production-ready: Uses environment variables for API URL
  */
 
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 // Store JWT token
 let authToken: string | null = localStorage.getItem('nirnoy_token');
@@ -291,11 +293,131 @@ export const appointmentsAPI = {
   },
 };
 
+// ==================== AI SERVICES ====================
+
+export interface AiConversation {
+  id: number;
+  userId: number;
+  userRole: string;
+  conversationType: string;
+  messages: any[];
+  tokensUsed: number;
+  sessionId?: string;
+  context?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiTokenUsage {
+  id: number;
+  userId: number;
+  userRole: string;
+  tokensUsed: number;
+  requestType: string;
+  model: string;
+  estimatedCostUsd: number;
+  createdAt: string;
+}
+
+export interface AiUsageStats {
+  requestType: string;
+  totalTokens: number;
+  totalCost: number;
+  count: number;
+}
+
+export interface UserTokenUsageSummary {
+  totalTokens: number;
+  totalCost: number;
+  conversationCount: number;
+}
+
+export const aiAPI = {
+  /**
+   * Save AI conversation to database
+   */
+  createConversation: async (data: {
+    userId: number;
+    userRole: string;
+    conversationType: string;
+    messages: any[];
+    tokensUsed?: number;
+    sessionId?: string;
+    context?: string;
+  }): Promise<AiConversation> => {
+    return fetchAPI<AiConversation>('/ai/conversations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Track AI token usage
+   */
+  trackTokenUsage: async (data: {
+    userId: number;
+    userRole: string;
+    tokensUsed: number;
+    requestType: string;
+    model?: string;
+    estimatedCostUsd?: number;
+  }): Promise<AiTokenUsage> => {
+    return fetchAPI<AiTokenUsage>('/ai/token-usage', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /**
+   * Get user's conversation history
+   */
+  getUserConversations: async (userId: number, limit = 10): Promise<AiConversation[]> => {
+    return fetchAPI<AiConversation[]>(`/ai/conversations/${userId}?limit=${limit}`);
+  },
+
+  /**
+   * Get user's total token usage
+   */
+  getUserTokenUsage: async (userId: number): Promise<UserTokenUsageSummary> => {
+    return fetchAPI<UserTokenUsageSummary>(`/ai/token-usage/${userId}`);
+  },
+
+  /**
+   * Get usage statistics by date range
+   */
+  getUsageStats: async (
+    userId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<AiUsageStats[]> => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    const query = params.toString() ? `?${params}` : '';
+    return fetchAPI<AiUsageStats[]>(`/ai/usage-stats/${userId}${query}`);
+  },
+
+  /**
+   * Update existing conversation with new messages
+   */
+  updateConversation: async (
+    conversationId: number,
+    messages: any[],
+    tokensUsed: number
+  ): Promise<AiConversation> => {
+    return fetchAPI<AiConversation>(`/ai/conversations/${conversationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ messages, tokensUsed }),
+    });
+  },
+};
+
 // Export all APIs
 export const api = {
   auth: authAPI,
   doctors: doctorsAPI,
   appointments: appointmentsAPI,
+  ai: aiAPI,
 };
 
 export default api;

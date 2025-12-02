@@ -1,15 +1,60 @@
-import { Controller, Post, Body, UseGuards, Get, Request } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Request, Patch } from '@nestjs/common';
+import { IsString, Matches, IsOptional, IsIn, Length } from 'class-validator';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 class RequestOTPDto {
+  @IsString()
+  @Matches(/^01[3-9]\d{8}$/, { message: 'Phone must be a valid Bangladesh number (01XXXXXXXXX)' })
   phone: string;
-  role: 'PATIENT' | 'DOCTOR';
+
+  @IsOptional()
+  @IsIn(['PATIENT', 'DOCTOR'])
+  role?: 'PATIENT' | 'DOCTOR';
 }
 
 class VerifyOTPDto {
+  @IsString()
+  @Matches(/^01[3-9]\d{8}$/, { message: 'Phone must be a valid Bangladesh number (01XXXXXXXXX)' })
   phone: string;
+
+  @IsString()
+  @Length(6, 6, { message: 'OTP must be 6 digits' })
   otp: string;
+}
+
+class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  name_bn?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  date_of_birth?: string;
+
+  @IsOptional()
+  @IsIn(['male', 'female', 'other'])
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
+  blood_group?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
 }
 
 @Controller('auth')
@@ -18,25 +63,24 @@ export class AuthController {
 
   @Post('request-otp')
   async requestOTP(@Body() dto: RequestOTPDto) {
-    return this.authService.requestOTP(dto.phone, dto.role);
+    return this.authService.sendOtp(dto.phone, dto.role);
   }
 
   @Post('verify-otp')
   async verifyOTP(@Body() dto: VerifyOTPDto) {
-    return this.authService.verifyOTP(dto.phone, dto.otp);
+    return this.authService.verifyOtp(dto.phone, dto.otp);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMe(@Request() req) {
-    return {
-      id: req.user.id,
-      phone: req.user.phone,
-      role: req.user.role,
-      doctorId: req.user.doctor?.id,
-      patientId: req.user.patient?.id,
-      name: req.user.doctor?.name || req.user.patient?.name,
-    };
+    return this.authService.getMe(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  async updateProfile(@Request() req, @Body() dto: UpdateProfileDto) {
+    return this.authService.updateProfile(req.user.id, dto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -45,4 +89,3 @@ export class AuthController {
     return this.authService.refreshToken(req.user.id);
   }
 }
-

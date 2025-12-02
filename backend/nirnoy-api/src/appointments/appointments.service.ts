@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 export enum AppointmentStatus {
   REQUESTED = 'REQUESTED',
@@ -37,104 +38,130 @@ interface CreateAppointmentDto {
 
 @Injectable()
 export class AppointmentsService {
+  private readonly logger = new Logger(AppointmentsService.name);
+
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Create appointment with transaction lock to prevent double-booking
+   * Uses SELECT FOR UPDATE to lock the slot during booking
+   */
   async create(patientId: number, dto: CreateAppointmentDto) {
-    // Validate doctor exists and is approved
-    const doctor = await this.prisma.doctor.findUnique({
-      where: { id: dto.doctorId },
+    this.logger.log(`Creating appointment for patient ${patientId} with doctor ${dto.doctorId}`);
+
+    // Use transaction with serializable isolation to prevent race conditions
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Validate doctor exists and is approved
+      const doctor = await tx.doctor.findUnique({
+        where: { id: dto.doctorId },
+      });
+      if (!doctor) {
+        throw new NotFoundException('Doctor not found');
+      }
+      if (doctor.registrationStatus !== 'APPROVED') {
+        throw new BadRequestException('Doctor is not available for appointments');
+      }
+
+      // 2. Validate chamber exists and belongs to doctor
+      const chamber = await tx.doctorChamber.findFirst({
+        where: {
+          id: dto.chamberId,
+          doctorId: dto.doctorId,
+          isActive: true,
+        },
+      });
+      if (!chamber) {
+        throw new BadRequestException('Chamber not found or not available');
+      }
+
+      // 3. CRITICAL: Lock and check for slot conflicts using raw query with FOR UPDATE
+      // This prevents race conditions when two users book the same slot simultaneously
+      const appointmentDate = new Date(dto.date);
+      appointmentDate.setHours(0, 0, 0, 0);
+
+      const existingSlots = await tx.$queryRaw<any[]>`
+        SELECT id FROM "Appointment"
+        WHERE "doctorId" = ${dto.doctorId}
+          AND "chamberId" = ${dto.chamberId}
+          AND "date" = ${appointmentDate}::date
+          AND "startTime" = ${dto.startTime}
+          AND "status" IN ('REQUESTED', 'CONFIRMED')
+        FOR UPDATE NOWAIT
+      `.catch((error: any) => {
+        // NOWAIT will throw if row is already locked by another transaction
+        if (error.code === '55P03') { // Lock not available
+          throw new ConflictException('This slot is being booked by another user. Please try again.');
+        }
+        throw error;
+      });
+
+      if (existingSlots && existingSlots.length > 0) {
+        throw new ConflictException('এই সময়টি ইতিমধ্যে বুক হয়ে গেছে। অন্য সময় বেছে নিন।');
+      }
+
+      // 4. Get serial number for the day (within transaction)
+      const dayAppointments = await tx.appointment.count({
+        where: {
+          doctorId: dto.doctorId,
+          chamberId: dto.chamberId,
+          date: appointmentDate,
+          status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.CONFIRMED] },
+        },
+      });
+      const serialNumber = dayAppointments + 1;
+
+      // 5. Determine fee based on visit type
+      let fee = chamber.consultationFee || doctor.consultationFeeNew;
+      if (dto.visitType === VisitType.FOLLOW_UP) {
+        fee = chamber.followUpFee || doctor.consultationFeeFollowUp || Math.round(fee * 0.5);
+      } else if (dto.visitType === VisitType.REPORT_CHECK) {
+        fee = chamber.reportCheckFee || doctor.consultationFeeReport || Math.round(fee * 0.3);
+      }
+
+      // 6. Get patient info (within transaction)
+      const patient = await tx.patient.findUnique({
+        where: { id: patientId },
+      });
+
+      // 7. Create appointment (within transaction - atomic operation)
+      const appointment = await tx.appointment.create({
+        data: {
+          patientId,
+          doctorId: dto.doctorId,
+          chamberId: dto.chamberId,
+          clinicId: chamber.clinicId,
+          date: appointmentDate,
+          startTime: dto.startTime,
+          status: AppointmentStatus.REQUESTED,
+          visitType: dto.visitType || VisitType.NEW,
+          consultationType: dto.consultationType || ConsultationType.CHAMBER,
+          serialNumber,
+          patientName: dto.patientName || patient?.name,
+          patientPhone: dto.patientPhone,
+          patientGender: patient?.gender,
+          symptoms: dto.symptoms,
+          fee,
+        },
+        include: {
+          doctor: true,
+          chamber: true,
+          patient: true,
+        },
+      });
+
+      // 8. Update doctor stats (within transaction)
+      await tx.doctor.update({
+        where: { id: dto.doctorId },
+        data: { totalAppointments: { increment: 1 } },
+      });
+
+      this.logger.log(`Appointment created: #${appointment.id} for patient ${patientId}`);
+      return this.formatAppointment(appointment);
+    }, {
+      // Transaction options for preventing race conditions
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10000, // 10 second timeout
     });
-    if (!doctor) {
-      throw new NotFoundException('Doctor not found');
-    }
-    if (doctor.registrationStatus !== 'APPROVED') {
-      throw new BadRequestException('Doctor is not available for appointments');
-    }
-
-    // Validate chamber exists and belongs to doctor
-    const chamber = await this.prisma.doctorChamber.findFirst({
-      where: {
-        id: dto.chamberId,
-        doctorId: dto.doctorId,
-        isActive: true,
-      },
-    });
-    if (!chamber) {
-      throw new BadRequestException('Chamber not found or not available');
-    }
-
-    // Check for slot conflicts
-    const existingAppointment = await this.prisma.appointment.findFirst({
-      where: {
-        doctorId: dto.doctorId,
-        chamberId: dto.chamberId,
-        date: new Date(dto.date),
-        startTime: dto.startTime,
-        status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.CONFIRMED] },
-      },
-    });
-
-    if (existingAppointment) {
-      throw new BadRequestException('This time slot is already booked');
-    }
-
-    // Get serial number for the day
-    const dayAppointments = await this.prisma.appointment.count({
-      where: {
-        doctorId: dto.doctorId,
-        chamberId: dto.chamberId,
-        date: new Date(dto.date),
-        status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.CONFIRMED] },
-      },
-    });
-    const serialNumber = dayAppointments + 1;
-
-    // Determine fee based on visit type
-    let fee = chamber.consultationFee || doctor.consultationFeeNew;
-    if (dto.visitType === VisitType.FOLLOW_UP) {
-      fee = chamber.followUpFee || doctor.consultationFeeFollowUp || Math.round(fee * 0.5);
-    } else if (dto.visitType === VisitType.REPORT_CHECK) {
-      fee = chamber.reportCheckFee || doctor.consultationFeeReport || Math.round(fee * 0.3);
-    }
-
-    // Get patient info
-    const patient = await this.prisma.patient.findUnique({
-      where: { id: patientId },
-    });
-
-    // Create appointment
-    const appointment = await this.prisma.appointment.create({
-      data: {
-        patientId,
-        doctorId: dto.doctorId,
-        chamberId: dto.chamberId,
-        clinicId: chamber.clinicId,
-        date: new Date(dto.date),
-        startTime: dto.startTime,
-        status: AppointmentStatus.REQUESTED,
-        visitType: dto.visitType || VisitType.NEW,
-        consultationType: dto.consultationType || ConsultationType.CHAMBER,
-        serialNumber,
-        patientName: dto.patientName || patient?.name,
-        patientPhone: dto.patientPhone,
-        patientGender: patient?.gender,
-        symptoms: dto.symptoms,
-        fee,
-      },
-      include: {
-        doctor: true,
-        chamber: true,
-        patient: true,
-      },
-    });
-
-    // Update doctor stats
-    await this.prisma.doctor.update({
-      where: { id: dto.doctorId },
-      data: { totalAppointments: { increment: 1 } },
-    });
-
-    return this.formatAppointment(appointment);
   }
 
   async findByPatient(patientId: number, status?: string) {

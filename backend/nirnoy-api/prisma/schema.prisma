@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ==================== USER & AUTH ====================
@@ -21,6 +22,10 @@ model User {
   doctor    Doctor?
   patient   Patient?
   admin     Admin?
+
+  @@index([phone])
+  @@index([email])
+  @@index([role])
 }
 
 model Admin {
@@ -142,6 +147,12 @@ model Doctor {
   reviews             DoctorReview[]
   appointments        Appointment[]
   verifications       DoctorVerification[]
+
+  @@index([primarySpecialty])
+  @@index([registrationStatus])
+  @@index([averageRating])
+  @@index([consultationFeeNew])
+  @@index([slug])
 }
 
 // === QUALIFICATIONS (Degrees) ===
@@ -250,6 +261,12 @@ model DoctorChamber {
   doctor          Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
   clinic          Clinic?  @relation(fields: [clinicId], references: [id])
   appointments    Appointment[]
+
+  @@index([doctorId])
+  @@index([area])
+  @@index([city])
+  @@index([isActive])
+  @@index([doctorId, isActive])
 }
 
 // === ACHIEVEMENTS & AWARDS ===
@@ -533,6 +550,78 @@ model Appointment {
   chamber             DoctorChamber @relation(fields: [chamberId], references: [id])
   clinic              Clinic?  @relation(fields: [clinicId], references: [id])
   review              DoctorReview?
+
+  // CRITICAL: Prevent double-booking with unique constraint
+  @@unique([doctorId, chamberId, date, startTime], name: "unique_appointment_slot")
+
+  // Performance indexes
+  @@index([patientId, status])
+  @@index([doctorId, date])
+  @@index([chamberId, date, status])
+  @@index([date, status])
+  @@index([status])
+  @@index([bookedAt])
+}
+
+// ==================== OTP AUTHENTICATION ====================
+
+model Otp {
+  id         Int      @id @default(autoincrement())
+  phone      String
+  code       String
+  expiresAt  DateTime
+  verified   Boolean  @default(false)
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([phone, verified])
+  @@index([expiresAt])
+  @@index([phone, createdAt])
+}
+
+// ==================== AI CONVERSATIONS & USAGE ====================
+
+model AiConversation {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  userRole        String   // "PATIENT" | "DOCTOR"
+  conversationType String  // "HEALTH_ASSISTANT" | "DOCTOR_COPILOT" | "VOICE"
+
+  // Conversation data
+  messages        String   // JSON array of messages
+  tokensUsed      Int      @default(0)
+
+  // Metadata
+  sessionId       String?  // For grouping related conversations
+  context         String?  // JSON with additional context
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userRole])
+  @@index([sessionId])
+  @@index([createdAt])
+}
+
+model AiTokenUsage {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  userRole        String   // "PATIENT" | "DOCTOR"
+
+  // Usage tracking
+  tokensUsed      Int
+  requestType     String   // "CHAT" | "CLINICAL_PLAN" | "MEDICAL_NEWS" | "VOICE"
+  model           String   @default("gemini-2.0-flash-exp")
+
+  // Cost calculation (for billing)
+  estimatedCostUsd Float   @default(0)
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userRole, createdAt])
 }
 
 // ==================== SPECIALTIES MASTER ====================
