@@ -65,23 +65,28 @@ export function useDoctors(options: UseDoctorsOptions = {}): UseDoctorsResult {
           // Transform database doctors to match the Doctor type
           const transformedDoctors: Doctor[] = data.map((doc: any) => ({
             id: doc.id,
+            userId: doc.profile_id || doc.id,
             name: doc.profile?.name || 'Doctor',
             nameBn: doc.profile?.name_bn || doc.profile?.name || 'ডাক্তার',
             gender: doc.profile?.gender === 'male' ? 'Male' : 'Female',
             specialties: doc.specialties || [],
-            degrees: doc.degrees || [],
+            degrees: Array.isArray(doc.degrees) ? doc.degrees.join(', ') : (doc.degrees || ''),
             experience: doc.experience_years || 0,
             rating: doc.rating || 4.5,
             totalReviews: doc.total_reviews || 0,
             totalPatients: doc.total_patients || 0,
+            bmdcNumber: doc.bmdc_number || '',
             bio: doc.bio || '',
             bioBn: doc.bio_bn || '',
+            image: doc.profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.profile?.name || 'Doctor')}&background=3b82f6&color=fff&size=200`,
             profilePhoto: doc.profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.profile?.name || 'Doctor')}&background=3b82f6&color=fff&size=200`,
             languages: doc.languages || ['Bangla', 'English'],
-            isVerified: doc.is_verified,
-            isFeatured: doc.is_featured,
+            isVerified: doc.is_verified || false,
+            isActive: true,
+            isFeatured: doc.is_featured || false,
             chambers: (doc.chambers || []).map((c: any) => ({
               id: c.id,
+              doctorId: doc.id,
               name: c.name,
               address: c.address,
               area: c.area || 'Dhaka',
@@ -89,7 +94,6 @@ export function useDoctors(options: UseDoctorsOptions = {}): UseDoctorsResult {
               phone: c.phone,
               fee: c.fee || doc.consultation_fee || 500,
               followUpFee: c.follow_up_fee || Math.round((c.fee || 500) * 0.6),
-              isPrimary: c.is_primary,
               schedule: []
             }))
           }));
@@ -126,7 +130,7 @@ export function useDoctors(options: UseDoctorsOptions = {}): UseDoctorsResult {
       }
 
       if (options.featured) {
-        mockResults = mockResults.filter(d => d.isFeatured);
+        mockResults = mockResults.filter(d => d.isFeatured === true);
       }
 
       if (options.limit) {
@@ -187,26 +191,31 @@ export function useDoctor(doctorId: string | undefined) {
             .single();
 
           if (!dbError && data) {
-            const doc = data;
+            const doc = data as any;
             const transformedDoctor: Doctor = {
               id: doc.id,
+              userId: doc.profile_id || doc.id,
               name: doc.profile?.name || 'Doctor',
               nameBn: doc.profile?.name_bn || doc.profile?.name || 'ডাক্তার',
               gender: doc.profile?.gender === 'male' ? 'Male' : 'Female',
               specialties: doc.specialties || [],
-              degrees: doc.degrees || [],
+              degrees: Array.isArray(doc.degrees) ? doc.degrees.join(', ') : (doc.degrees || ''),
               experience: doc.experience_years || 0,
               rating: doc.rating || 4.5,
               totalReviews: doc.total_reviews || 0,
               totalPatients: doc.total_patients || 0,
+              bmdcNumber: doc.bmdc_number || '',
               bio: doc.bio || '',
               bioBn: doc.bio_bn || '',
+              image: doc.profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.profile?.name || 'Doctor')}&background=3b82f6&color=fff&size=200`,
               profilePhoto: doc.profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.profile?.name || 'Doctor')}&background=3b82f6&color=fff&size=200`,
               languages: doc.languages || ['Bangla', 'English'],
-              isVerified: doc.is_verified,
-              isFeatured: doc.is_featured,
+              isVerified: doc.is_verified || false,
+              isActive: true,
+              isFeatured: doc.is_featured || false,
               chambers: (doc.chambers || []).map((c: any) => ({
                 id: c.id,
+                doctorId: doc.id,
                 name: c.name,
                 address: c.address,
                 area: c.area || 'Dhaka',
@@ -214,12 +223,10 @@ export function useDoctor(doctorId: string | undefined) {
                 phone: c.phone,
                 fee: c.fee || doc.consultation_fee || 500,
                 followUpFee: c.follow_up_fee || Math.round((c.fee || 500) * 0.6),
-                isPrimary: c.is_primary,
                 schedule: (c.schedules || []).map((s: any) => ({
                   day: s.day_of_week,
                   startTime: s.start_time,
                   endTime: s.end_time,
-                  slotDuration: s.slot_duration,
                   maxPatients: s.max_patients
                 }))
               }))

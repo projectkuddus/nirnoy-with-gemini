@@ -235,45 +235,64 @@ export const MOCK_DOCTORS: Doctor[] = RAW_DOCTORS_MINIMAL.map((doc, index) => {
   
   // Assign at least one chamber. Use specific one if available, else generic.
   const specificChamber = RAW_CHAMBERS_MINIMAL.find(c => c.did === doc.id);
+  const fee = specificChamber?.fee || 1000;
   
   const chambers: Chamber[] = specificChamber ? [{
       id: specificChamber.id,
+      doctorId: doc.id,
       name: specificChamber.name,
       address: `${specificChamber.addr}, Dhaka`,
-      area: specificChamber.addr, // Use address segment as area for filtering
-      startTime: '16:00',
-      endTime: '20:00',
-      slotDuration: 20,
-      fee: specificChamber.fee
+      area: specificChamber.addr,
+      city: 'Dhaka',
+      fee: fee,
+      followUpFee: Math.round(fee * 0.6),
+      schedule: [{
+        day: 'Saturday',
+        startTime: '16:00',
+        endTime: '20:00',
+        maxPatients: 20
+      }]
   }] : [{
       id: `gc-${index}`,
+      doctorId: doc.id,
       name: 'Popular Diagnostic Centre',
       address: 'Dhanmondi, Dhaka',
       area: 'Dhanmondi',
-      startTime: '17:00',
-      endTime: '21:00',
-      slotDuration: 15,
-      fee: 1000
+      city: 'Dhaka',
+      fee: 1000,
+      followUpFee: 600,
+      schedule: [{
+        day: 'Saturday',
+        startTime: '17:00',
+        endTime: '21:00',
+        maxPatients: 15
+      }]
   }];
 
   // Generate a Bio based on data
   const bio = `${doc.name} is a highly qualified specialist in ${doc.specs[0]} holding ${doc.deg}. Dedicated to providing patient-centered care with a focus on evidence-based medicine. Currently practicing at ${chambers[0].name}.`;
+  const experience = Math.floor(Math.random() * 20) + 5; // 5-25 years
 
   return {
     id: doc.id,
+    userId: `user-${doc.id}`,
     name: doc.name,
     specialties: doc.specs,
     degrees: doc.deg,
-    chambers: chambers,
-    // Default avatars for demo doctors (like Facebook default profile)
+    experience: experience,
+    rating: parseFloat((Math.random() * (5 - 4) + 4).toFixed(1)), // 4.0 to 5.0
+    totalReviews: Math.floor(Math.random() * 200) + 10,
+    totalPatients: Math.floor(Math.random() * 5000) + 500,
+    bmdcNumber: `A-${10000 + index}`,
+    bio: bio,
     image: doc.sex === 'Female' 
       ? 'https://ui-avatars.com/api/?name=' + encodeURIComponent(doc.name) + '&background=ec4899&color=fff&size=200&bold=true'
       : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(doc.name) + '&background=3b82f6&color=fff&size=200&bold=true',
-    isDemo: true, // Mark as demo account
-    rating: parseFloat((Math.random() * (5 - 4) + 4).toFixed(1)), // 4.0 to 5.0
-    patientCount: Math.floor(Math.random() * 5000) + 500,
-    bio: bio,
-    nextAvailable: 'Today, 5:00 PM',
-    gender: doc.sex
+    gender: doc.sex === 'Female' ? 'Female' : 'Male',
+    isVerified: true,
+    isActive: true,
+    isDemo: true,
+    chambers: chambers,
+    nextAvailable: 'Today, 5:00 PM'
   };
 });

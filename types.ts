@@ -55,9 +55,12 @@ export interface Doctor {
   bio?: string;
   bioBn?: string;
   image?: string;
+  profilePhoto?: string; // Alias for image
   gender?: 'Male' | 'Female';
+  languages?: string[];
   isVerified: boolean;
   isActive: boolean;
+  isFeatured?: boolean;
   isDemo?: boolean; // Flag for demo/sample accounts
   chambers: Chamber[];
   nextAvailable?: string;

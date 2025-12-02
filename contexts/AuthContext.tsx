@@ -8,6 +8,15 @@ import { authService, PatientProfile, DoctorProfile, normalizePhone, isSupabaseC
 // Re-export types
 export type { PatientProfile, DoctorProfile };
 
+// Storage keys for localStorage fallback
+export const STORAGE_KEYS = {
+  USER: 'nirnoy_user',
+  ROLE: 'nirnoy_role',
+  DOCTORS: 'nirnoy_doctors',
+  PATIENTS: 'nirnoy_patients',
+  APPOINTMENTS: 'nirnoy_appointments'
+} as const;
+
 interface AuthContextType {
   user: PatientProfile | DoctorProfile | null;
   role: 'patient' | 'doctor' | 'admin' | null;
