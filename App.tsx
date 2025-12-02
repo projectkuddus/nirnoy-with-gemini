@@ -175,24 +175,13 @@ const AppRoutes: React.FC = () => {
         } 
       />
 
-      {/* Admin Routes */}
-      <Route 
-        path="/admin" 
-        element={
-          <ProtectedRoute allowedRoles={['ADMIN', 'admin']} redirectTo="/">
-            <AdminDashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/admin-dashboard" 
-        element={
-          <ProtectedRoute allowedRoles={['ADMIN', 'admin']} redirectTo="/">
-            <AdminDashboard />
-          </ProtectedRoute>
-        } 
-      />
 
+      {/* Admin Routes - AdminDashboard has its own password auth */}
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/*" element={<AdminDashboard />} />
+      <Route path="/admin-dashboard" element={<AdminDashboard />} />
+
+      {/* 404 */}
       {/* 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
