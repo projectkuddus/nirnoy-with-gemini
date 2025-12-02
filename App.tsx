@@ -13,7 +13,7 @@ const DoctorRegistration = lazy(() => import('./pages/DoctorRegistration').then(
 const DoctorDashboard = lazy(() => import('./pages/DoctorDashboard').then(m => ({ default: m.DoctorDashboard })));
 const DoctorSearch = lazy(() => import('./pages/DoctorSearch').then(m => ({ default: m.DoctorSearch })));
 const DoctorProfile = lazy(() => import('./pages/DoctorProfile').then(m => ({ default: m.DoctorProfile })));
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboardV2').then(m => ({ default: m.AdminDashboardV2 })));
 const MyAppointments = lazy(() => import('./pages/MyAppointments').then(m => ({ default: m.MyAppointments })));
 const FamilyHealth = lazy(() => import('./pages/FamilyHealth').then(m => ({ default: m.FamilyHealth })));
 const About = lazy(() => import('./pages/About').then(m => ({ default: m.About })));
