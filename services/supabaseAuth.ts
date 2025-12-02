@@ -420,10 +420,29 @@ const db = {
   async updateDoctorStatus(profileId: string, status: 'approved' | 'rejected'): Promise<boolean> {
     try {
       const isApproved = status === 'approved';
-      // Update is_verified on both tables
-      await supabase.from('doctors').update({ is_verified: isApproved }).eq('profile_id', profileId);
-      await supabase.from('profiles').update({ is_verified: isApproved }).eq('id', profileId);
-      console.log('[DB] Doctor status updated:', profileId, '-> is_verified:', isApproved);
+      // Update both is_verified AND status field on doctors table
+      const { error: doctorError } = await supabase
+        .from('doctors')
+        .update({ is_verified: isApproved, status: status })
+        .eq('profile_id', profileId);
+      
+      if (doctorError) {
+        console.error('[DB] Doctor update error:', doctorError);
+        return false;
+      }
+      
+      // Update is_verified on profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_verified: isApproved })
+        .eq('id', profileId);
+      
+      if (profileError) {
+        console.error('[DB] Profile update error:', profileError);
+        return false;
+      }
+      
+      console.log('[DB] Doctor status updated:', profileId, '-> status:', status, 'is_verified:', isApproved);
       return true;
     } catch (error) {
       console.error('[DB] Failed to update doctor status:', error);

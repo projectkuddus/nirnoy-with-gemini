@@ -487,8 +487,9 @@ export const AdminDashboard: React.FC = () => {
     return matchesSearch && matchesTier;
   });
 
-  // Filter doctors
-  const filteredDoctors = allDoctors.filter(d => 
+  // Filter doctors - only show approved doctors in the main list
+  const approvedDoctors = allDoctors.filter(d => d.status === 'approved');
+  const filteredDoctors = approvedDoctors.filter(d => 
     d.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     d.phone?.includes(searchQuery) ||
     d.bmdcNumber?.includes(searchQuery)
