@@ -779,7 +779,7 @@ export const authService = {
   getAllDoctors: () => db.getAllDoctors(),
   getPendingDoctors: () => db.getPendingDoctors(),
 
-  async updateDoctorStatus(id: string, phone: string, status: 'approved' | 'rejected'): Promise<boolean> {
+  async updateDoctorStatus(id: string, status: 'approved' | 'rejected'): Promise<boolean> {
     return await db.updateDoctorStatus(id, status);
   },
 

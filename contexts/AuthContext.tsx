@@ -35,8 +35,8 @@ interface AuthContextType {
   getAllPatients: () => Promise<PatientProfile[]>;
   getAllDoctors: () => Promise<DoctorProfile[]>;
   getPendingDoctors: () => Promise<DoctorProfile[]>;
-  approveDoctor: (id: string, phone: string) => Promise<boolean>;
-  rejectDoctor: (id: string, phone: string) => Promise<boolean>;
+  approveDoctor: (id: string) => Promise<boolean>;
+  rejectDoctor: (id: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -131,12 +131,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const getAllDoctors = () => authService.getAllDoctors();
   const getPendingDoctors = () => authService.getPendingDoctors();
   
-  const approveDoctor = async (id: string, phone: string) => {
-    return await authService.updateDoctorStatus(id, phone, 'approved');
+  const approveDoctor = async (id: string) => {
+    return await authService.updateDoctorStatus(id, 'approved');
   };
   
-  const rejectDoctor = async (id: string, phone: string) => {
-    return await authService.updateDoctorStatus(id, phone, 'rejected');
+  const rejectDoctor = async (id: string) => {
+    return await authService.updateDoctorStatus(id, 'rejected');
   };
 
   return (
