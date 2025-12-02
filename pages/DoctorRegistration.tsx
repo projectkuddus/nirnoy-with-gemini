@@ -4,6 +4,14 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth, DoctorProfile, normalizePhone as authNormalizePhone } from '../contexts/AuthContext';
 import PageHeader from '../components/PageHeader';
 
+// Storage keys for localStorage fallback
+const STORAGE_KEYS = {
+  USER: "nirnoy_user",
+  ROLE: "nirnoy_role",
+  DOCTORS: "nirnoy_doctors",
+  PATIENTS: "nirnoy_patients",
+};
+
 type Step = 'phone' | 'otp' | 'personal' | 'professional' | 'verification' | 'review';
 
 // Test OTP bypass
