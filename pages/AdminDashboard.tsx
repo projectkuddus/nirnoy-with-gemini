@@ -414,22 +414,28 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleApproveDoctor = async (doctorId: string) => {
-    const result = await approveDoctor(doctorId);
-    if (result.success) {
+    console.log('[Admin] Approving doctor:', doctorId);
+    const success = await approveDoctor(doctorId);
+    if (success) {
       setPendingDoctors(prev => prev.filter(d => d.id !== doctorId));
       loadAllData();
       alert(isBn ? '✅ ডাক্তার অনুমোদিত হয়েছে!' : '✅ Doctor approved!');
+    } else {
+      alert(isBn ? '❌ অনুমোদন ব্যর্থ হয়েছে' : '❌ Approval failed');
     }
   };
 
   const handleRejectDoctor = async (doctorId: string) => {
     const reason = prompt(isBn ? 'প্রত্যাখ্যানের কারণ লিখুন:' : 'Enter rejection reason:');
     if (reason) {
-      const result = await rejectDoctor(doctorId, reason);
-      if (result.success) {
+      console.log('[Admin] Rejecting doctor:', doctorId);
+      const success = await rejectDoctor(doctorId);
+      if (success) {
         setPendingDoctors(prev => prev.filter(d => d.id !== doctorId));
         loadAllData();
         alert(isBn ? '❌ ডাক্তার প্রত্যাখ্যাত হয়েছে' : '❌ Doctor rejected');
+      } else {
+        alert(isBn ? '❌ প্রত্যাখ্যান ব্যর্থ হয়েছে' : '❌ Rejection failed');
       }
     }
   };
