@@ -716,21 +716,25 @@ export const DoctorRegistration: React.FC = () => {
                     </div>
                     
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (authPhone.length >= 10) {
-                          // Normalize phone for comparison
-                          const normalizePhone = (p: string) => p.replace(/^\+880/, '').replace(/^0/, '');
-                          const normalizedInput = normalizePhone(authPhone);
-                          console.log('[DoctorReg] Checking phone:', authPhone, 'Normalized:', normalizedInput);
-                          // Check if doctor already exists
-                          const doctors: DoctorProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.DOCTORS) || '[]');
-                          const existingDoc = doctors.find(d => normalizePhone(d.phone) === normalizedInput);
-                          console.log('[DoctorReg] Found doctors:', doctors.length, 'Existing:', existingDoc?.name || 'none');
+                          console.log('[DoctorReg] Checking phone:', authPhone);
                           
-                          if (existingDoc) {
-                            setIsExistingDoctor(true);
-                            setExistingDoctorData(existingDoc);
-                          } else {
+                          // Check Supabase for existing doctor
+                          try {
+                            const result = await checkPhone(authPhone);
+                            console.log('[DoctorReg] checkPhone result:', result);
+                            
+                            if (result.exists && result.type === 'doctor') {
+                              setIsExistingDoctor(true);
+                              // We'll fetch full doctor data on login
+                              setExistingDoctorData({ phone: authPhone, name: 'Doctor', isApproved: result.isApproved } as DoctorProfile);
+                            } else {
+                              setIsExistingDoctor(false);
+                              setExistingDoctorData(null);
+                            }
+                          } catch (err) {
+                            console.error('[DoctorReg] checkPhone error:', err);
                             setIsExistingDoctor(false);
                             setExistingDoctorData(null);
                           }
@@ -805,10 +809,14 @@ export const DoctorRegistration: React.FC = () => {
                       onClick={async () => {
                         if (otp === generatedOtp || otp === TEST_BYPASS_CODE) {
                           if (isExistingDoctor && existingDoctorData) {
-                            // Login existing doctor
-                            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(existingDoctorData));
-                            localStorage.setItem(STORAGE_KEYS.ROLE, 'DOCTOR');
-                            navigate('/doctor-dashboard');
+                            // Login existing doctor via Supabase
+                            console.log('[DoctorReg] Logging in existing doctor:', authPhone);
+                            const result = await loginDoctor(authPhone);
+                            if (result.success) {
+                              navigate('/doctor-dashboard');
+                            } else {
+                              alert(result.error || (isBn ? 'লগইন ব্যর্থ' : 'Login failed'));
+                            }
                           } else {
                             // New doctor - proceed to registration
                             updateData('phone', authPhone);

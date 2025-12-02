@@ -550,10 +550,10 @@ export const authService = {
     if (profile.role === 'doctor') {
       const { data: doctor } = await supabase
         .from('doctors')
-        .select('status')
+        .select('is_verified')
         .eq('profile_id', profile.id)
         .single();
-      return { exists: true, type: 'doctor', isApproved: doctor?.status === 'approved' };
+      return { exists: true, type: 'doctor', isApproved: doctor?.is_verified === true };
     }
     
     return { exists: true, type: 'patient' };
@@ -633,7 +633,7 @@ export const authService = {
       .eq('profile_id', profile.id)
       .single();
     
-    if (doctorData?.status !== 'approved') {
+    if (!doctorData?.is_verified) {
       return { success: false, error: 'Account pending approval' };
     }
     
