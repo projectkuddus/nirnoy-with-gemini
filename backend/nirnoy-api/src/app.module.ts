@@ -13,6 +13,8 @@ import { AdminModule } from './admin/admin.module';
 import { QueueModule } from './queue/queue.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AiModule } from './ai/ai.module';
+import { JobsModule } from './jobs/jobs.module';
+import { VoiceModule } from './voice/voice.module';
 
 @Module({
   imports: [
@@ -58,6 +60,8 @@ import { AiModule } from './ai/ai.module';
     QueueModule,
     NotificationsModule,
     AiModule,
+    JobsModule,  // BullMQ background jobs (SMS, notifications)
+    VoiceModule, // Voice relay for Gemini Live API
   ],
   controllers: [AppController],
   providers: [
