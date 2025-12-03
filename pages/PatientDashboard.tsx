@@ -286,8 +286,8 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         .from('appointments')
         .select('*')
         .or(`patient_id.eq.${patientUser.id},booked_by_id.eq.${patientUser.id}`)
-        .order('appointment_date', { ascending: true })
-        .order('appointment_time', { ascending: true });
+        .order('scheduled_date', { ascending: true })
+        .order('scheduled_time', { ascending: true });
 
       if (error) {
         console.error('[PatientDashboard] Error fetching appointments:', error);
@@ -325,12 +325,12 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             doctorSpecialty: doctorData?.specialties?.[0] || 'General',
             chamberName: apt.chamber_name || 'Chamber',
             chamberAddress: apt.chamber_address || '',
-            date: apt.appointment_date,
-            time: apt.appointment_time,
+            date: apt.scheduled_date,
+            time: apt.scheduled_time,
             serialNumber: apt.serial_number || 1,
-            visitType: apt.visit_type || 'new',
+            visitType: apt.appointment_type || 'new',
             status: apt.status || 'confirmed',
-            fee: apt.fee || 500,
+            fee: apt.fee_paid || 500,
             symptoms: apt.symptoms,
             isFamilyBooking: apt.is_family_booking || false,
             familyMemberName: apt.patient_name,

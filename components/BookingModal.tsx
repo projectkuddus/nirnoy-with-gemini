@@ -109,16 +109,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
         // Get all appointments for this doctor on this date
         const { data, error } = await supabase
           .from('appointments')
-          .select('appointment_time, id')
+          .select('scheduled_time, id')
           .or(`doctor_id.eq.${doctorId},doctor_id.eq.${doctor.id}`)
-          .eq('appointment_date', selectedDate)
+          .eq('scheduled_date', selectedDate)
           .neq('status', 'cancelled');
         
         if (!error && data) {
           // Count bookings per time slot
           const bookingsMap = new Map<string, number>();
           data.forEach(apt => {
-            const time = apt.appointment_time?.substring(0, 5); // "HH:MM"
+            const time = apt.scheduled_time?.substring(0, 5); // "HH:MM"
             if (time) {
               bookingsMap.set(time, (bookingsMap.get(time) || 0) + 1);
             }
@@ -311,25 +311,25 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
         
         console.log('[BookingModal] Saving appointment with doctor_id:', doctorId);
         
-        // Create appointment in Supabase
+        // Create appointment in Supabase - using correct column names
         const appointmentData = {
           doctor_id: doctorId,
           patient_id: user!.id,
           patient_name: effectivePatientName,
           patient_phone: effectivePatientPhone,
-          appointment_date: selectedDate,
-          appointment_time: selectedSlot?.time,
+          scheduled_date: selectedDate,
+          scheduled_time: selectedSlot?.time,
           serial_number: assignedSerial,
-          visit_type: visitType.toLowerCase(),
+          appointment_type: visitType.toLowerCase(),
           symptoms: symptoms || null,
-          fee: fee,
+          fee_paid: fee,
           status: 'confirmed',
           chamber_name: chamber.name,
           chamber_address: chamber.address || 'Dhaka, Bangladesh',
           is_guest_booking: false,
           is_family_booking: bookingFor === 'family',
           family_relation: bookingFor === 'family' ? familyRelation : null,
-          booked_by_id: user!.id, // Track who made the booking
+          booked_by_id: user!.id,
           created_at: new Date().toISOString()
         };
         

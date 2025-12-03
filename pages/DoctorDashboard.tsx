@@ -302,8 +302,8 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
           .from('appointments')
           .select('*')
           .or(`doctor_id.eq.${profileId}${doctorsTableId ? `,doctor_id.eq.${doctorsTableId}` : ''}`)
-          .order('appointment_date', { ascending: true })
-          .order('appointment_time', { ascending: true });
+          .order('scheduled_date', { ascending: true })
+          .order('scheduled_time', { ascending: true });
 
         if (error) {
           console.error('[DoctorDashboard] Error fetching appointments:', error);
@@ -318,20 +318,20 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
           const transformedAppointments: Appointment[] = data.map((apt, index) => ({
             id: apt.id,
             patientId: apt.patient_id || `guest-${apt.id}`,
-            patientName: apt.patient_name,
-            patientNameBn: apt.patient_name,
-            patientImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(apt.patient_name)}&background=${apt.patient_id ? '3b82f6' : 'ec4899'}&color=fff&size=200`,
-            patientPhone: apt.patient_phone,
+            patientName: apt.patient_name || 'Unknown',
+            patientNameBn: apt.patient_name || 'অজানা',
+            patientImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(apt.patient_name || 'U')}&background=${apt.patient_id ? '3b82f6' : 'ec4899'}&color=fff&size=200`,
+            patientPhone: apt.patient_phone || '',
             patientAge: 0,
             patientGender: 'Male' as const,
-            date: apt.appointment_date,
-            time: apt.appointment_time,
+            date: apt.scheduled_date,
+            time: apt.scheduled_time,
             serial: apt.serial_number || index + 1,
-            type: apt.visit_type === 'follow_up' ? 'Follow-up' : apt.visit_type === 'report' ? 'Report' : 'New',
+            type: apt.appointment_type === 'follow_up' ? 'Follow-up' : apt.appointment_type === 'report' ? 'Report' : 'New',
             status: apt.status === 'confirmed' ? 'Waiting' : apt.status === 'completed' ? 'Completed' : apt.status === 'cancelled' ? 'Cancelled' : 'Waiting',
             chiefComplaint: apt.symptoms,
-            fee: apt.fee || 500,
-            paymentStatus: 'Paid' as const,
+            fee: apt.fee_paid || 500,
+            paymentStatus: apt.payment_status === 'paid' ? 'Paid' : apt.payment_status === 'pending' ? 'Pending' : 'Paid' as const,
           }));
 
           console.log('[DoctorDashboard] Loaded', transformedAppointments.length, 'appointments');
