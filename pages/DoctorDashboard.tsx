@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { chatWithDoctorAssistant, getMedicalNews, searchMedicalGuidelines } from '../services/geminiService';
@@ -275,100 +275,116 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const [schedule, setSchedule] = useState<Schedule[]>(DEFAULT_SCHEDULE);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
 
-  // Fetch real appointments from Supabase
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      if (!user?.id || !isSupabaseConfigured()) {
-        console.log('[DoctorDashboard] ❌ Cannot fetch - no user or Supabase not configured');
+  // Fetch real appointments from Supabase - optimized with useCallback
+  const fetchAppointments = useCallback(async () => {
+    if (!user?.id || !isSupabaseConfigured()) {
+      console.log('[DoctorDashboard] ❌ Cannot fetch - no user or Supabase not configured');
+      setAppointmentsLoading(false);
+      return;
+    }
+
+    try {
+      const profileId = user.id;
+      
+      // Optimized query - only fetch today and future appointments by default
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Simple query - just use profile_id as doctor_id
+      // This should match what BookingModal saves
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('doctor_id', profileId)
+        .gte('scheduled_date', today) // Only today and future
+        .order('scheduled_date', { ascending: true })
+        .order('scheduled_time', { ascending: true })
+        .limit(100); // Limit to prevent huge queries
+
+      if (error) {
+        console.error('[DoctorDashboard] ❌ Query error:', error);
         setAppointmentsLoading(false);
         return;
       }
 
-      try {
-        const profileId = user.id;
-        
-        console.log('[DoctorDashboard] ========================================');
-        console.log('[DoctorDashboard] FETCHING APPOINTMENTS');
-        console.log('[DoctorDashboard] Doctor profile_id:', profileId);
-        
-        // Simple query - just use profile_id as doctor_id
-        // This should match what BookingModal saves
-        const { data, error } = await supabase
-          .from('appointments')
-          .select('*')
-          .eq('doctor_id', profileId)
-          .order('scheduled_date', { ascending: true })
-          .order('scheduled_time', { ascending: true });
+      console.log('[DoctorDashboard] Query returned:', data?.length || 0, 'appointments');
 
-        if (error) {
-          console.error('[DoctorDashboard] ❌ Query error:', error);
-          setAppointmentsLoading(false);
-          return;
-        }
+      if (data && data.length > 0) {
+        const transformedAppointments: Appointment[] = data.map((apt, index) => ({
+          id: apt.id,
+          patientId: apt.patient_id || `guest-${apt.id}`,
+          patientName: apt.patient_name || 'Unknown',
+          patientNameBn: apt.patient_name || 'অজানা',
+          patientImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(apt.patient_name || 'U')}&background=${apt.patient_id ? '3b82f6' : 'ec4899'}&color=fff&size=200`,
+          patientPhone: apt.patient_phone || '',
+          patientAge: 0,
+          patientGender: 'Male' as const,
+          date: apt.scheduled_date,
+          time: apt.scheduled_time,
+          serial: apt.serial_number || index + 1,
+          type: apt.appointment_type === 'follow_up' ? 'Follow-up' : apt.appointment_type === 'report' ? 'Report' : 'New',
+          status: apt.status === 'confirmed' ? 'Waiting' : apt.status === 'completed' ? 'Completed' : apt.status === 'cancelled' ? 'Cancelled' : 'Waiting',
+          chiefComplaint: apt.symptoms,
+          fee: apt.fee_paid || 500,
+          paymentStatus: apt.payment_status === 'paid' ? 'Paid' : apt.payment_status === 'pending' ? 'Pending' : apt.payment_status === 'waived' ? 'Waived' : 'Pending' as const,
+        }));
 
-        console.log('[DoctorDashboard] Query returned:', data?.length || 0, 'appointments');
-        
-        // Also log what's in the appointments table for debugging
-        const { data: allAppts } = await supabase
-          .from('appointments')
-          .select('id, doctor_id, patient_name, scheduled_date')
-          .order('created_at', { ascending: false })
-          .limit(5);
-        
-        console.log('[DoctorDashboard] Recent appointments in DB:', allAppts);
-        console.log('[DoctorDashboard] ========================================');
-
-        if (data && data.length > 0) {
-          const transformedAppointments: Appointment[] = data.map((apt, index) => ({
-            id: apt.id,
-            patientId: apt.patient_id || `guest-${apt.id}`,
-            patientName: apt.patient_name || 'Unknown',
-            patientNameBn: apt.patient_name || 'অজানা',
-            patientImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(apt.patient_name || 'U')}&background=${apt.patient_id ? '3b82f6' : 'ec4899'}&color=fff&size=200`,
-            patientPhone: apt.patient_phone || '',
-            patientAge: 0,
-            patientGender: 'Male' as const,
-            date: apt.scheduled_date,
-            time: apt.scheduled_time,
-            serial: apt.serial_number || index + 1,
-            type: apt.appointment_type === 'follow_up' ? 'Follow-up' : apt.appointment_type === 'report' ? 'Report' : 'New',
-            status: apt.status === 'confirmed' ? 'Waiting' : apt.status === 'completed' ? 'Completed' : apt.status === 'cancelled' ? 'Cancelled' : 'Waiting',
-            chiefComplaint: apt.symptoms,
-            fee: apt.fee_paid || 500,
-            paymentStatus: apt.payment_status === 'paid' ? 'Paid' : apt.payment_status === 'pending' ? 'Pending' : apt.payment_status === 'waived' ? 'Waived' : 'Pending' as const,
-          }));
-
-          console.log('[DoctorDashboard] ✅ Loaded', transformedAppointments.length, 'appointments for today/upcoming');
-          setAppointments(transformedAppointments);
-        } else {
-          console.log('[DoctorDashboard] ℹ️ No appointments found for this doctor');
-          setAppointments([]);
-        }
-      } catch (e) {
-        console.error('[DoctorDashboard] ❌ Fetch exception:', e);
+        console.log('[DoctorDashboard] ✅ Loaded', transformedAppointments.length, 'appointments');
+        setAppointments(transformedAppointments);
+      } else {
+        console.log('[DoctorDashboard] ℹ️ No appointments found for this doctor');
+        setAppointments([]);
       }
-
+    } catch (e) {
+      console.error('[DoctorDashboard] ❌ Fetch exception:', e);
+    } finally {
       setAppointmentsLoading(false);
-    };
+    }
+  }, [user?.id]);
 
+  // Debounce function for real-time updates
+  const debouncedFetch = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    return () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        fetchAppointments();
+      }, 500); // 500ms debounce
+    };
+  }, [fetchAppointments]);
+
+  // Fetch appointments on mount and when user changes
+  useEffect(() => {
     fetchAppointments();
 
-    // Real-time subscription
+    // Real-time subscription with debouncing
+    if (!user?.id || !isSupabaseConfigured()) return;
+
     const subscription = supabase
-      .channel('doctor-appointments-' + user?.id)
+      .channel('doctor-appointments-' + user.id)
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'appointments' },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'appointments',
+          filter: `doctor_id=eq.${user.id}` // Only listen to this doctor's appointments
+        },
         (payload) => {
           console.log('[DoctorDashboard] 🔄 Real-time update:', payload.eventType);
-          fetchAppointments();
+          debouncedFetch();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[DoctorDashboard] ✅ Real-time subscription active');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[DoctorDashboard] ❌ Real-time subscription error');
+        }
+      });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [user?.id]);
+  }, [user?.id, fetchAppointments, debouncedFetch]);
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [patientHistory, setPatientHistory] = useState<CompleteMedicalHistory | null>(null);
@@ -376,6 +392,9 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const [isEditingCompleted, setIsEditingCompleted] = useState(false);
   const [existingConsultationId, setExistingConsultationId] = useState<string | null>(null);
   const [existingPrescriptions, setExistingPrescriptions] = useState<PrescriptionItem[]>([]);
+  const [consultationError, setConsultationError] = useState<string | null>(null);
+  const [consultationSuccess, setConsultationSuccess] = useState(false);
+  const [isSavingConsultation, setIsSavingConsultation] = useState(false);
 
   
   // Consultation state
@@ -749,7 +768,18 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   };
 
   const completeConsultation = async () => {
-    if (selectedAppointment && selectedPatient) {
+    if (!selectedAppointment || !selectedPatient) {
+      setConsultationError('রোগী বা অ্যাপয়েন্টমেন্ট নির্বাচন করা হয়নি।');
+      return;
+    }
+
+    // Clear previous errors/success
+    setConsultationError(null);
+    setConsultationSuccess(false);
+    setIsSavingConsultation(true);
+
+    try {
+      // Update local state first for immediate feedback
       updateAppointmentStatus(selectedAppointment.id, 'Completed');
       
       // If payment status not set, default to Pending (doctor can change it)
@@ -760,133 +790,158 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       
       // Save consultation data to Supabase
       if (isSupabaseConfigured()) {
-        try {
-          // 1. Update appointment status and payment
-          await supabase
+        // 1. Update appointment status and payment
+        const { error: appointmentUpdateError } = await supabase
+          .from('appointments')
+          .update({ 
+            status: 'completed',
+            payment_status: finalPaymentStatus.toLowerCase(), // 'paid', 'pending', 'waived'
+          })
+          .eq('id', selectedAppointment.id);
+        
+        if (appointmentUpdateError) {
+          throw new Error(`অ্যাপয়েন্টমেন্ট আপডেট ব্যর্থ: ${appointmentUpdateError.message}`);
+        }
+        
+        // 2. Get actual patient_id from appointment (check both patient_id and booked_by_id)
+        let actualPatientId: string | null = null;
+        if (!selectedAppointment.patientId.startsWith('guest-')) {
+          actualPatientId = selectedAppointment.patientId;
+        } else {
+          // For guest bookings, check if there's a booked_by_id in the appointment
+          const { data: appointmentData, error: appointmentFetchError } = await supabase
             .from('appointments')
-            .update({ 
-              status: 'completed',
-              payment_status: finalPaymentStatus.toLowerCase(), // 'paid', 'pending', 'waived'
+            .select('patient_id, booked_by_id')
+            .eq('id', selectedAppointment.id)
+            .single();
+          
+          if (appointmentFetchError) {
+            throw new Error(`রোগীর তথ্য লোড করতে ব্যর্থ: ${appointmentFetchError.message}`);
+          }
+          
+          actualPatientId = appointmentData?.patient_id || appointmentData?.booked_by_id || null;
+          console.log('[Consultation] Resolved patient_id from appointment:', actualPatientId);
+        }
+        
+        // 3. Create or update consultation record
+        const consultationDate = selectedAppointment.date || new Date().toISOString().split('T')[0];
+        const consultationTime = selectedAppointment.time || new Date().toTimeString().split(' ')[0].substring(0, 5);
+        
+        let consultationData;
+        
+        if (isEditingCompleted && existingConsultationId) {
+          // Update existing consultation
+          const { data, error: consultationError } = await supabase
+            .from('consultations')
+            .update({
+              subjective: soapNote.subjective,
+              objective: soapNote.objective,
+              assessment: soapNote.assessment,
+              plan: soapNote.plan,
+              diagnosis: diagnosis,
+              diagnosis_bn: diagnosis,
+              advice: advice.filter(a => a.trim()),
+              updated_at: new Date().toISOString(),
             })
-            .eq('id', selectedAppointment.id);
+            .eq('id', existingConsultationId)
+            .select()
+            .single();
           
-          // 2. Get actual patient_id from appointment (check both patient_id and booked_by_id)
-          let actualPatientId: string | null = null;
-          if (!selectedAppointment.patientId.startsWith('guest-')) {
-            actualPatientId = selectedAppointment.patientId;
-          } else {
-            // For guest bookings, check if there's a booked_by_id in the appointment
-            const { data: appointmentData } = await supabase
-              .from('appointments')
-              .select('patient_id, booked_by_id')
-              .eq('id', selectedAppointment.id)
-              .single();
-            
-            actualPatientId = appointmentData?.patient_id || appointmentData?.booked_by_id || null;
-            console.log('[Consultation] Resolved patient_id from appointment:', actualPatientId);
+          if (consultationError) {
+            throw new Error(`কনসাল্টেশন আপডেট ব্যর্থ: ${consultationError.message}`);
           }
           
-          // 3. Create or update consultation record
-          const consultationDate = selectedAppointment.date || new Date().toISOString().split('T')[0];
-          const consultationTime = selectedAppointment.time || new Date().toTimeString().split(' ')[0].substring(0, 5);
-          
-          let consultationData;
-          
-          if (isEditingCompleted && existingConsultationId) {
-            // Update existing consultation
-            const { data, error: consultationError } = await supabase
-              .from('consultations')
-              .update({
-                subjective: soapNote.subjective,
-                objective: soapNote.objective,
-                assessment: soapNote.assessment,
-                plan: soapNote.plan,
-                diagnosis: diagnosis,
-                diagnosis_bn: diagnosis,
-                advice: advice.filter(a => a.trim()),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', existingConsultationId)
-              .select()
-              .single();
-            
-            if (consultationError) {
-              console.error('[Consultation] ❌ Error updating consultation:', consultationError);
-            } else {
-              consultationData = data;
-              console.log('[Consultation] ✅ Consultation updated:', consultationData?.id);
-            }
-          } else {
-            // Create new consultation
-            const { data, error: consultationError } = await supabase
-              .from('consultations')
-              .insert({
-                appointment_id: selectedAppointment.id,
-                doctor_id: user?.id,
-                patient_id: actualPatientId, // Use resolved patient_id
-                subjective: soapNote.subjective,
-                objective: soapNote.objective,
-                assessment: soapNote.assessment,
-                plan: soapNote.plan,
-                diagnosis: diagnosis,
-                diagnosis_bn: diagnosis,
-                advice: advice.filter(a => a.trim()),
-                consultation_date: consultationDate,
-                consultation_time: consultationTime,
-              })
-              .select()
-              .single();
-            
-            if (consultationError) {
-              console.error('[Consultation] ❌ Error creating consultation:', consultationError);
-            } else {
-              consultationData = data;
-              console.log('[Consultation] ✅ Consultation record created:', consultationData?.id);
-            }
-          }
-          
-          // 4. Create new prescription records (existing ones are preserved)
-          if (prescription.length > 0 && consultationData) {
-            const prescriptionRecords = prescription.map(med => ({
-              consultation_id: consultationData.id,
+          consultationData = data;
+          console.log('[Consultation] ✅ Consultation updated:', consultationData?.id);
+        } else {
+          // Create new consultation
+          const { data, error: consultationError } = await supabase
+            .from('consultations')
+            .insert({
               appointment_id: selectedAppointment.id,
               doctor_id: user?.id,
               patient_id: actualPatientId, // Use resolved patient_id
-              medicine_name: med.medicine,
-              medicine_name_bn: med.medicine,
-              dosage: med.dosage,
-              duration: med.duration,
-              instruction: med.instruction,
-              prescription_date: consultationDate,
-              follow_up_date: followUpDays > 0 
-                ? new Date(Date.now() + followUpDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-                : null,
-            }));
-            
-            const { error: prescriptionError } = await supabase
-              .from('prescriptions')
-              .insert(prescriptionRecords);
-            
-            if (prescriptionError) {
-              console.error('[Consultation] ❌ Error creating prescriptions:', prescriptionError);
-            } else {
-              console.log('[Consultation] ✅ New prescriptions saved:', prescriptionRecords.length);
-            }
+              subjective: soapNote.subjective,
+              objective: soapNote.objective,
+              assessment: soapNote.assessment,
+              plan: soapNote.plan,
+              diagnosis: diagnosis,
+              diagnosis_bn: diagnosis,
+              advice: advice.filter(a => a.trim()),
+              consultation_date: consultationDate,
+              consultation_time: consultationTime,
+            })
+            .select()
+            .single();
+          
+          if (consultationError) {
+            throw new Error(`কনসাল্টেশন সংরক্ষণ ব্যর্থ: ${consultationError.message}`);
           }
           
-          console.log('[Consultation] ✅ All data saved to database');
-        } catch (e) {
-          console.error('[Consultation] ❌ Error saving:', e);
+          consultationData = data;
+          console.log('[Consultation] ✅ Consultation record created:', consultationData?.id);
         }
+        
+        // 4. Create new prescription records (existing ones are preserved)
+        if (prescription.length > 0 && consultationData) {
+          const prescriptionRecords = prescription.map(med => ({
+            consultation_id: consultationData.id,
+            appointment_id: selectedAppointment.id,
+            doctor_id: user?.id,
+            patient_id: actualPatientId, // Use resolved patient_id
+            medicine_name: med.medicine,
+            medicine_name_bn: med.medicine,
+            dosage: med.dosage,
+            duration: med.duration,
+            instruction: med.instruction,
+            prescription_date: consultationDate,
+            follow_up_date: followUpDays > 0 
+              ? new Date(Date.now() + followUpDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+              : null,
+          }));
+          
+          const { error: prescriptionError } = await supabase
+            .from('prescriptions')
+            .insert(prescriptionRecords);
+          
+          if (prescriptionError) {
+            throw new Error(`প্রেসক্রিপশন সংরক্ষণ ব্যর্থ: ${prescriptionError.message}`);
+          }
+          
+          console.log('[Consultation] ✅ New prescriptions saved:', prescriptionRecords.length);
+        }
+        
+        console.log('[Consultation] ✅ All data saved to database');
+        
+        // Show success message
+        setConsultationSuccess(true);
+        
+        // Generate prescription PDF
+        generatePrescription();
+        
+        // Clear form and navigate after a short delay
+        setTimeout(() => {
+          setIsEditingCompleted(false);
+          setExistingConsultationId(null);
+          setExistingPrescriptions([]);
+          setSelectedPatient(null);
+          setSelectedAppointment(null);
+          setConsultationSuccess(false);
+          setActiveTab('queue');
+        }, 2000);
+      } else {
+        throw new Error('ডাটাবেস সংযোগ নেই। ইন্টারনেট সংযোগ পরীক্ষা করুন।');
       }
+    } catch (e: any) {
+      console.error('[Consultation] ❌ Error saving:', e);
+      setConsultationError(e.message || 'একটি ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।');
       
-      generatePrescription();
-      setIsEditingCompleted(false);
-      setExistingConsultationId(null);
-      setExistingPrescriptions([]);
-      setSelectedPatient(null);
-      setSelectedAppointment(null);
-      setActiveTab('queue');
+      // Revert appointment status on error
+      if (selectedAppointment) {
+        updateAppointmentStatus(selectedAppointment.id, 'In-Progress');
+      }
+    } finally {
+      setIsSavingConsultation(false);
     }
   };
 
@@ -1754,6 +1809,42 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
             </div>
           </div>
 
+          {/* Error/Success Messages */}
+          {consultationError && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 animate-pulse">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-sm">
+                  <i className="fas fa-exclamation"></i>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-800">{consultationError}</p>
+                </div>
+                <button
+                  onClick={() => setConsultationError(null)}
+                  className="flex-shrink-0 text-red-400 hover:text-red-600 transition"
+                  aria-label="বন্ধ করুন"
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {consultationSuccess && (
+            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 animate-pulse">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
+                  <i className="fas fa-check"></i>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-green-800">
+                    ✅ কনসাল্টেশন সফলভাবে সংরক্ষণ করা হয়েছে! কিউতে ফিরে যাচ্ছে...
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Payment Status & Action Buttons */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4">
             <div className="flex items-center justify-between mb-4">
@@ -1804,11 +1895,28 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               </div>
             </div>
             <div className="flex gap-4">
-              <button onClick={generatePrescription} className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2">
+              <button 
+                onClick={generatePrescription} 
+                disabled={isSavingConsultation}
+                className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <span>🖨️</span> প্রেসক্রিপশন প্রিন্ট
               </button>
-              <button onClick={completeConsultation} className="flex-1 px-6 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 flex items-center justify-center gap-2">
-                <span>✓</span> কনসাল্টেশন সম্পন্ন
+              <button 
+                onClick={completeConsultation} 
+                disabled={isSavingConsultation}
+                className="flex-1 px-6 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingConsultation ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin"></i>
+                    <span>সংরক্ষণ করা হচ্ছে...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✓</span> কনসাল্টেশন সম্পন্ন
+                  </>
+                )}
               </button>
             </div>
           </div>

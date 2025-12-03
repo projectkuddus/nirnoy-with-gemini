@@ -4,6 +4,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService, PatientProfile, DoctorProfile, normalizePhone, isSupabaseConfigured } from '../services/supabaseAuth';
+import { setSentryUser, clearSentryUser } from '../lib/sentry';
+import { logger } from '../lib/logger';
 
 // Re-export types
 export type { PatientProfile, DoctorProfile };
@@ -56,8 +58,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('[AuthContext] Found user:', currentUser.role, currentUser.user?.name);
       setUser(currentUser.user);
       setRole(currentUser.role as any);
+      
+      // Set Sentry user and logger
+      if (currentUser.user) {
+        logger.setUserId(currentUser.user.id);
+        setSentryUser({ 
+          id: currentUser.user.id, 
+          name: currentUser.user.name, 
+          role: currentUser.role || undefined 
+        });
+      }
     } else {
       console.log('[AuthContext] No user found');
+      clearSentryUser();
     }
     
     setIsLoading(false);
@@ -77,20 +90,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const loginPatient = async (phone: string) => {
     console.log('[AuthContext] loginPatient:', phone);
+    logger.setUserId(''); // Clear until we get user
     const result = await authService.loginPatient(phone);
     if (result.success && result.user) {
       setUser(result.user);
       setRole('patient');
+      logger.setUserId(result.user.id);
+      setSentryUser({ id: result.user.id, name: result.user.name, role: 'patient' });
     }
     return result;
   };
   
   const loginDoctor = async (phone: string) => {
     console.log('[AuthContext] loginDoctor:', phone);
+    logger.setUserId(''); // Clear until we get user
     const result = await authService.loginDoctor(phone);
     if (result.success && result.user) {
       setUser(result.user);
       setRole('doctor');
+      logger.setUserId(result.user.id);
+      setSentryUser({ id: result.user.id, name: result.user.name, role: 'doctor' });
     }
     return result;
   };
@@ -116,6 +135,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     authService.logout();
     setUser(null);
     setRole(null);
+    logger.setUserId('');
+    clearSentryUser();
   };
   
   const updateProfile = async (updates: any) => {

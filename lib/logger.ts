@@ -83,16 +83,24 @@ class Logger {
   }
 
   private async sendToErrorTracking(entry: LogEntry): Promise<void> {
-    // TODO: Integrate with Sentry, LogRocket, or similar
-    // Example:
-    // if (window.Sentry) {
-    //   window.Sentry.captureException(entry.error || new Error(entry.message), {
-    //     extra: entry.context,
-    //     user: { id: entry.userId },
-    //   });
-    // }
+    // Try Sentry first (if configured)
+    if (typeof window !== 'undefined' && (window as any).Sentry) {
+      try {
+        (window as any).Sentry.captureException(entry.error || new Error(entry.message), {
+          extra: entry.context,
+          user: entry.userId ? { id: entry.userId } : undefined,
+          tags: {
+            level: entry.level,
+            sessionId: entry.sessionId,
+          },
+        });
+        return; // Sentry handled it, no need to send to Supabase
+      } catch (e) {
+        console.warn('[Logger] Sentry error:', e);
+      }
+    }
 
-    // For now, send to Supabase analytics table (if exists)
+    // Fallback: Send to Supabase analytics table (if exists)
     try {
       const { supabase } = await import('./supabase');
       await supabase.from('error_logs').insert({
@@ -105,7 +113,8 @@ class Logger {
         created_at: entry.timestamp,
       });
     } catch (e) {
-      // Ignore if table doesn't exist
+      // Ignore if table doesn't exist or Supabase not configured
+      console.warn('[Logger] Could not send to error_logs:', e);
     }
   }
 

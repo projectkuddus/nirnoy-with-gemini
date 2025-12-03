@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
+    "@sentry/react": "^10.28.0",
     "@supabase/realtime-js": "^2.86.0",
     "@supabase/supabase-js": "^2.86.0",
     "react": "^19.2.0",

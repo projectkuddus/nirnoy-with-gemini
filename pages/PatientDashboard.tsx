@@ -99,10 +99,13 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   // Appointments state
   const [appointments, setAppointments] = useState<AppointmentData[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState<string | null>(null);
   
   // Medical History state
   const [medicalHistory, setMedicalHistory] = useState<CompleteMedicalHistory | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [retryHistoryCount, setRetryHistoryCount] = useState(0);
   const [selectedAppointmentDetails, setSelectedAppointmentDetails] = useState<any>(null);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   
@@ -284,10 +287,16 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     if (activeTab === 'feedback') loadMyFeedbacks();
   }, [activeTab, loadMyFeedbacks]);
 
-  // Load user's appointments
+  // Load user's appointments with improved error handling
   const loadMyAppointments = useCallback(async () => {
-    if (!patientUser || !isSupabaseConfigured()) return;
+    if (!patientUser || !isSupabaseConfigured()) {
+      setAppointmentsError('ডাটাবেস সংযোগ নেই। ইন্টারনেট সংযোগ পরীক্ষা করুন।');
+      return;
+    }
+    
+    setAppointmentsError(null);
     setLoadingAppointments(true);
+    
     try {
       // Query appointments for this patient (either as patient_id or booked_by_id)
       const { data, error } = await supabase
@@ -299,28 +308,43 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
       if (error) {
         console.error('[PatientDashboard] Error fetching appointments:', error);
+        setAppointmentsError('অ্যাপয়েন্টমেন্ট লোড করতে ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।');
         setLoadingAppointments(false);
         return;
       }
 
       if (data && data.length > 0) {
         // Get doctor info for each appointment
-        const doctorIds = [...new Set(data.map(apt => apt.doctor_id))];
+        const doctorIds = [...new Set(data.map(apt => apt.doctor_id).filter(Boolean))];
         
-        // Fetch doctor profiles
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name')
-          .in('id', doctorIds);
+        let profileMap = new Map();
+        let doctorMap = new Map();
         
-        // Fetch doctor specialties
-        const { data: doctors } = await supabase
-          .from('doctors')
-          .select('profile_id, specialties')
-          .in('profile_id', doctorIds);
-        
-        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-        const doctorMap = new Map(doctors?.map(d => [d.profile_id, d]) || []);
+        if (doctorIds.length > 0) {
+          // Fetch doctor profiles
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, name')
+            .in('id', doctorIds);
+          
+          if (profileError) {
+            console.warn('[PatientDashboard] Error fetching doctor profiles:', profileError);
+          } else {
+            profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+          }
+          
+          // Fetch doctor specialties
+          const { data: doctors, error: doctorError } = await supabase
+            .from('doctors')
+            .select('profile_id, specialties')
+            .in('profile_id', doctorIds);
+          
+          if (doctorError) {
+            console.warn('[PatientDashboard] Error fetching doctor specialties:', doctorError);
+          } else {
+            doctorMap = new Map(doctors?.map(d => [d.profile_id, d]) || []);
+          }
+        }
         
         const transformedAppointments: AppointmentData[] = data.map(apt => {
           const profile = profileMap.get(apt.doctor_id);
@@ -348,28 +372,67 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
         console.log('[PatientDashboard] Loaded', transformedAppointments.length, 'appointments');
         setAppointments(transformedAppointments);
+        setAppointmentsError(null);
       } else {
         setAppointments([]);
+        setAppointmentsError(null);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('[PatientDashboard] Appointment load error:', e);
+      setAppointmentsError(e?.message || 'অ্যাপয়েন্টমেন্ট লোড করতে ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।');
+    } finally {
+      setLoadingAppointments(false);
     }
-    setLoadingAppointments(false);
   }, [patientUser]);
 
-  // Load medical history
-  const loadMedicalHistory = useCallback(async () => {
-    if (!patientUser || !isSupabaseConfigured()) return;
+  // Load medical history with improved error handling
+  const loadMedicalHistory = useCallback(async (retry = false) => {
+    if (!patientUser || !isSupabaseConfigured()) {
+      setHistoryError('ডাটাবেস সংযোগ নেই। ইন্টারনেট সংযোগ পরীক্ষা করুন।');
+      return;
+    }
+    
+    // Clear previous errors on new load (unless retry)
+    if (!retry) {
+      setHistoryError(null);
+      setRetryHistoryCount(0);
+    }
+    
     setLoadingHistory(true);
     try {
       const history = await getPatientMedicalHistory(patientUser.id);
+      
+      if (!history) {
+        throw new Error('চিকিৎসা ইতিহাস লোড করতে ব্যর্থ হয়েছে।');
+      }
+      
       setMedicalHistory(history);
+      setHistoryError(null);
+      setRetryHistoryCount(0);
       console.log('[PatientDashboard] Loaded medical history:', history?.consultations.length || 0, 'consultations');
-    } catch (e) {
+    } catch (e: any) {
       console.error('[PatientDashboard] Medical history load error:', e);
+      
+      let errorMessage = 'চিকিৎসা ইতিহাস লোড করতে ব্যর্থ হয়েছে।';
+      if (e?.message) {
+        errorMessage = e.message;
+      } else if (e?.code === 'PGRST301' || e?.message?.includes('network')) {
+        errorMessage = 'নেটওয়ার্ক ত্রুটি। ইন্টারনেট সংযোগ পরীক্ষা করুন।';
+      }
+      
+      setHistoryError(errorMessage);
+      
+      // Auto-retry for network errors (max 2 retries)
+      if (retryHistoryCount < 2 && (e?.message?.includes('network') || e?.code === 'PGRST301')) {
+        setTimeout(() => {
+          setRetryHistoryCount(prev => prev + 1);
+          loadMedicalHistory(true);
+        }, 2000);
+      }
+    } finally {
+      setLoadingHistory(false);
     }
-    setLoadingHistory(false);
-  }, [patientUser]);
+  }, [patientUser, retryHistoryCount]);
 
   // Load history when tab is active
   useEffect(() => {
@@ -655,15 +718,60 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               <div className="bg-white rounded-xl p-6 border">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-bold text-gray-800">📅 আমার অ্যাপয়েন্টমেন্ট</h2>
-                  <button onClick={loadMyAppointments} className="text-blue-600 text-sm hover:underline">
-                    {loadingAppointments ? '...' : '🔄 রিফ্রেশ'}
+                  <button 
+                    onClick={() => loadMyAppointments()} 
+                    disabled={loadingAppointments}
+                    className="text-blue-600 text-sm hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {loadingAppointments ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        <span>লোড হচ্ছে...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-sync-alt"></i>
+                        <span>রিফ্রেশ</span>
+                      </>
+                    )}
                   </button>
                 </div>
                 
+                {/* Error Message */}
+                {appointmentsError && (
+                  <div className="mb-4 bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-sm">
+                        <i className="fas fa-exclamation"></i>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-800">{appointmentsError}</p>
+                        <button
+                          onClick={() => {
+                            setAppointmentsError(null);
+                            loadMyAppointments();
+                          }}
+                          className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                        >
+                          আবার চেষ্টা করুন
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setAppointmentsError(null)}
+                        className="flex-shrink-0 text-red-400 hover:text-red-600 transition"
+                        aria-label="বন্ধ করুন"
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 {loadingAppointments ? (
-                  <div className="text-center py-8">
-                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <p className="text-gray-500 mt-2 text-sm">লোড হচ্ছে...</p>
+                  <div className="text-center py-12">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600 font-medium">অ্যাপয়েন্টমেন্ট লোড হচ্ছে...</p>
+                    <p className="text-gray-500 text-sm mt-2">অনুগ্রহ করে অপেক্ষা করুন</p>
                   </div>
                 ) : appointments.length === 0 ? (
                   <div className="text-center py-12">
@@ -804,21 +912,79 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
               <div className="bg-white rounded-xl p-6 border">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-bold text-gray-800">📋 চিকিৎসা ইতিহাস</h2>
-                  <button onClick={loadMedicalHistory} className="text-blue-600 text-sm hover:underline">
-                    {loadingHistory ? '...' : '🔄 রিফ্রেশ'}
+                  <button 
+                    onClick={() => loadMedicalHistory(false)} 
+                    disabled={loadingHistory}
+                    className="text-blue-600 text-sm hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {loadingHistory ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        <span>লোড হচ্ছে...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-sync-alt"></i>
+                        <span>রিফ্রেশ</span>
+                      </>
+                    )}
                   </button>
                 </div>
                 
+                {/* Error Message */}
+                {historyError && (
+                  <div className="mb-4 bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-sm">
+                        <i className="fas fa-exclamation"></i>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-800">{historyError}</p>
+                        {retryHistoryCount > 0 && (
+                          <p className="text-xs text-red-600 mt-1">
+                            পুনরায় চেষ্টা করা হচ্ছে... ({retryHistoryCount}/2)
+                          </p>
+                        )}
+                        {retryHistoryCount === 0 && (
+                          <button
+                            onClick={() => loadMedicalHistory(false)}
+                            className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                          >
+                            আবার চেষ্টা করুন
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setHistoryError(null);
+                          setRetryHistoryCount(0);
+                        }}
+                        className="flex-shrink-0 text-red-400 hover:text-red-600 transition"
+                        aria-label="বন্ধ করুন"
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 {loadingHistory ? (
-                  <div className="text-center py-8">
-                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <p className="text-gray-500 mt-2 text-sm">লোড হচ্ছে...</p>
+                  <div className="text-center py-12">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600 font-medium">চিকিৎসা ইতিহাস লোড হচ্ছে...</p>
+                    <p className="text-gray-500 text-sm mt-2">অনুগ্রহ করে অপেক্ষা করুন</p>
                   </div>
                 ) : !medicalHistory || (medicalHistory.consultations.length === 0 && medicalHistory.prescriptions.length === 0 && medicalHistory.testReports.length === 0) ? (
                   <div className="text-center py-12">
                     <div className="text-5xl mb-4">📋</div>
                     <h3 className="text-lg font-medium text-gray-700">কোনো চিকিৎসা ইতিহাস নেই</h3>
                     <p className="text-gray-500 mt-2">আপনার পরামর্শ সম্পন্ন হলে এখানে দেখা যাবে।</p>
+                    <button
+                      onClick={() => navigate('/doctors')}
+                      className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+                    >
+                      ডাক্তার খুঁজুন
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-6">

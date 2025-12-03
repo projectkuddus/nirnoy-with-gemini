@@ -52,6 +52,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const [symptoms, setSymptoms] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   // Slot availability tracking
   const [slotBookings, setSlotBookings] = useState<Map<string, number>>(new Map());
@@ -318,14 +320,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const effectivePatientName = bookingFor === 'self' ? patientName : familyMemberName;
   const effectivePatientPhone = bookingFor === 'self' ? patientPhone : familyMemberPhone;
 
-  // Handle booking - save to Supabase
+  // Handle booking - save to Supabase with improved error handling
   const handleBooking = async () => {
     if (!resolvedDoctorId) {
-      console.error('[BookingModal] No resolved doctor_id!');
-      alert('ডাক্তার তথ্য লোড হয়নি। পুনরায় চেষ্টা করুন।');
+      setError(isBn ? 'ডাক্তার তথ্য লোড হয়নি। পুনরায় চেষ্টা করুন।' : 'Doctor information not loaded. Please try again.');
       return;
     }
     
+    // Clear previous errors
+    setError(null);
     setIsSubmitting(true);
     
     try {
@@ -361,30 +364,76 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
         console.log('[BookingModal] Full data:', appointmentData);
         console.log('[BookingModal] ========================================');
         
-        const { data, error } = await supabase
+        const { data, error: insertError } = await supabase
           .from('appointments')
           .insert(appointmentData)
           .select('id')
           .single();
         
-        if (error) {
-          console.error('[BookingModal] ERROR saving appointment:', error);
-          alert('বুকিং সংরক্ষণ ব্যর্থ: ' + error.message);
+        if (insertError) {
+          console.error('[BookingModal] ERROR saving appointment:', insertError);
+          
+          // Handle specific error cases
+          let errorMessage = isBn 
+            ? 'বুকিং সংরক্ষণ ব্যর্থ হয়েছে।' 
+            : 'Failed to save booking.';
+          
+          // Check for specific error types
+          if (insertError.code === '23505') {
+            // Unique constraint violation (double booking)
+            errorMessage = isBn 
+              ? 'এই সময়টি ইতিমধ্যে বুক হয়ে গেছে। অন্য সময় বেছে নিন।' 
+              : 'This time slot is already booked. Please select another time.';
+          } else if (insertError.code === '23503') {
+            // Foreign key violation
+            errorMessage = isBn 
+              ? 'ডাক্তার বা রোগীর তথ্য সঠিক নয়। পুনরায় চেষ্টা করুন।' 
+              : 'Doctor or patient information is invalid. Please try again.';
+          } else if (insertError.message) {
+            errorMessage = isBn 
+              ? `ত্রুটি: ${insertError.message}` 
+              : `Error: ${insertError.message}`;
+          }
+          
+          setError(errorMessage);
           setIsSubmitting(false);
+          
+          // Auto-retry for network errors (max 2 retries)
+          if (retryCount < 2 && (insertError.message.includes('network') || insertError.message.includes('timeout'))) {
+            setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+              handleBooking();
+            }, 2000);
+          }
+          
           return;
         }
         
         console.log('[BookingModal] ✅ Appointment saved successfully! ID:', data.id);
         setBookingId(data.id);
+        setBookingComplete(true);
+      } else {
+        setError(isBn 
+          ? 'ডাটাবেস সংযোগ নেই। ইন্টারনেট সংযোগ পরীক্ষা করুন।' 
+          : 'Database connection unavailable. Please check your internet connection.');
+      }
+    } catch (error: any) {
+      console.error('[BookingModal] Booking exception:', error);
+      
+      let errorMessage = isBn 
+        ? 'একটি অপ্রত্যাশিত ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।' 
+        : 'An unexpected error occurred. Please try again.';
+      
+      if (error?.message) {
+        errorMessage = isBn 
+          ? `ত্রুটি: ${error.message}` 
+          : `Error: ${error.message}`;
       }
       
-      setBookingComplete(true);
-    } catch (error) {
-      console.error('[BookingModal] Booking exception:', error);
-      alert('একটি ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।');
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
   };
 
   // Can proceed to next step?
@@ -812,19 +861,76 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           )}
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mx-4 mb-4 p-4 bg-red-50 border-2 border-red-200 rounded-xl animate-pulse">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-sm">
+                <i className="fas fa-exclamation"></i>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-800">{error}</p>
+                {retryCount > 0 && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {isBn ? `পুনরায় চেষ্টা করা হচ্ছে... (${retryCount}/2)` : `Retrying... (${retryCount}/2)`}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setRetryCount(0);
+                }}
+                className="flex-shrink-0 text-red-400 hover:text-red-600 transition"
+                aria-label={isBn ? 'বন্ধ করুন' : 'Close'}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex-shrink-0 p-4 border-t border-slate-100 bg-white flex gap-3 rounded-b-2xl">
           {step > 1 && (
-            <button onClick={() => setStep((step - 1) as 1 | 2)} className="px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition">
+            <button 
+              onClick={() => {
+                setStep((step - 1) as 1 | 2);
+                setError(null);
+                setRetryCount(0);
+              }} 
+              disabled={isSubmitting}
+              className="px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50"
+            >
               <i className="fas fa-arrow-left mr-2"></i>{t.back}
             </button>
           )}
           <button
-            onClick={() => { if (step < 3) setStep((step + 1) as 2 | 3); else handleBooking(); }}
+            onClick={() => { 
+              if (step < 3) {
+                setStep((step + 1) as 2 | 3);
+                setError(null);
+              } else {
+                handleBooking();
+              }
+            }}
             disabled={!canProceed() || isSubmitting}
-            className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {isSubmitting ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t.confirming}</> : step === 3 ? <><i className="fas fa-check mr-2"></i>{t.confirm}</> : <>{t.next}<i className="fas fa-arrow-right ml-2"></i></>}
+            {isSubmitting ? (
+              <>
+                <i className="fas fa-spinner fa-spin mr-2"></i>
+                {isBn ? 'সংরক্ষণ করা হচ্ছে...' : 'Saving...'}
+              </>
+            ) : step === 3 ? (
+              <>
+                <i className="fas fa-check mr-2"></i>{t.confirm}
+              </>
+            ) : (
+              <>
+                {t.next}<i className="fas fa-arrow-right ml-2"></i>
+              </>
+            )}
           </button>
         </div>
       </div>
