@@ -58,8 +58,55 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [assignedSerial, setAssignedSerial] = useState<number>(1);
   
+  // Resolved doctor profile_id (the canonical ID we use for everything)
+  const [resolvedDoctorId, setResolvedDoctorId] = useState<string | null>(null);
+  
   // Max patients per slot (configurable per doctor, default 1)
-  const maxPatientsPerSlot = 1; // Each 15-min slot = 1 patient
+  const maxPatientsPerSlot = 1;
+  
+  // Resolve the correct doctor_id (profile_id) on mount
+  useEffect(() => {
+    const resolveDoctorId = async () => {
+      // Try to get profile_id from doctor object
+      let doctorProfileId = (doctor as any).userId || (doctor as any).profileId;
+      
+      // If not found, look it up from doctors table
+      if (!doctorProfileId && isSupabaseConfigured()) {
+        console.log('[BookingModal] Looking up profile_id for doctor.id:', doctor.id);
+        const { data: doctorRecord } = await supabase
+          .from('doctors')
+          .select('profile_id')
+          .eq('id', doctor.id)
+          .single();
+        
+        if (doctorRecord?.profile_id) {
+          doctorProfileId = doctorRecord.profile_id;
+          console.log('[BookingModal] Found profile_id:', doctorProfileId);
+        } else {
+          // Maybe the doctor.id IS the profile_id
+          const { data: profileCheck } = await supabase
+            .from('profiles')
+            .select('id, role')
+            .eq('id', doctor.id)
+            .single();
+          
+          if (profileCheck?.role === 'doctor') {
+            doctorProfileId = doctor.id;
+            console.log('[BookingModal] doctor.id IS the profile_id:', doctorProfileId);
+          }
+        }
+      }
+      
+      if (!doctorProfileId) {
+        doctorProfileId = doctor.id; // Fallback
+      }
+      
+      console.log('[BookingModal] RESOLVED doctor_id (profile_id):', doctorProfileId);
+      setResolvedDoctorId(doctorProfileId);
+    };
+    
+    resolveDoctorId();
+  }, [doctor]);
   
   // Auto-fill patient info from logged-in user for "self" bookings
   useEffect(() => {
@@ -83,7 +130,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   // Fetch slot bookings for the selected date
   useEffect(() => {
     const fetchSlotBookings = async () => {
-      if (!selectedDate || !isSupabaseConfigured()) {
+      if (!selectedDate || !resolvedDoctorId || !isSupabaseConfigured()) {
         setSlotBookings(new Map());
         return;
       }
@@ -91,26 +138,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
       setLoadingSlots(true);
       
       try {
-        // Get the doctor's profile_id
-        let doctorId = (doctor as any).userId || (doctor as any).profileId;
-        
-        if (!doctorId) {
-          const { data: doctorRecord } = await supabase
-            .from('doctors')
-            .select('profile_id')
-            .eq('id', doctor.id)
-            .single();
-          
-          doctorId = doctorRecord?.profile_id || doctor.id;
-        }
-        
-        console.log('[BookingModal] Fetching slots for doctor:', doctorId, 'date:', selectedDate);
+        console.log('[BookingModal] Fetching slots for doctor:', resolvedDoctorId, 'date:', selectedDate);
         
         // Get all appointments for this doctor on this date
         const { data, error } = await supabase
           .from('appointments')
           .select('scheduled_time, id')
-          .or(`doctor_id.eq.${doctorId},doctor_id.eq.${doctor.id}`)
+          .eq('doctor_id', resolvedDoctorId)
           .eq('scheduled_date', selectedDate)
           .neq('status', 'cancelled');
         
@@ -118,7 +152,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           // Count bookings per time slot
           const bookingsMap = new Map<string, number>();
           data.forEach(apt => {
-            const time = apt.scheduled_time?.substring(0, 5); // "HH:MM"
+            const time = apt.scheduled_time?.substring(0, 5);
             if (time) {
               bookingsMap.set(time, (bookingsMap.get(time) || 0) + 1);
             }
@@ -126,8 +160,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           
           console.log('[BookingModal] Slot bookings:', Object.fromEntries(bookingsMap));
           setSlotBookings(bookingsMap);
-          
-          // Calculate next serial number (total bookings for the day + 1)
           setAssignedSerial(data.length + 1);
         }
       } catch (e) {
@@ -138,7 +170,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     };
     
     fetchSlotBookings();
-  }, [selectedDate, doctor]);
+  }, [selectedDate, resolvedDoctorId]);
   
   // Clear slot when date changes
   useEffect(() => {
@@ -214,22 +246,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const slots = useMemo((): SlotData[] => {
     const result: SlotData[] = [];
     
-    // Check if selected date is today
     const today = new Date().toISOString().split('T')[0];
     const isToday = selectedDate === today;
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     
-    // Helper to check if slot is in the past (with 30 min buffer)
     const isSlotPast = (hour: number, minute: number): boolean => {
       if (!isToday) return false;
       const slotMinutes = hour * 60 + minute;
-      const currentMinutes = currentHour * 60 + currentMinute + 30; // 30 min buffer
+      const currentMinutes = currentHour * 60 + currentMinute + 30;
       return slotMinutes < currentMinutes;
     };
     
-    // Generate slots and check availability
     const generateSlot = (hour: number, minute: number, period: string): SlotData => {
       const isPast = isSlotPast(hour, minute);
       const timeKey = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
@@ -279,7 +308,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const fee = visitType === 'FOLLOW_UP' ? Math.round(baseFee * 0.5) : visitType === 'REPORT' ? Math.round(baseFee * 0.3) : baseFee;
   const discount = baseFee - fee;
 
-  // Validate phone - more lenient for BD numbers
+  // Validate phone
   const isValidPhone = (phone: string) => {
     const digits = phone.replace(/\D/g, '');
     return digits.length >= 10 && digits.length <= 11;
@@ -291,29 +320,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
 
   // Handle booking - save to Supabase
   const handleBooking = async () => {
+    if (!resolvedDoctorId) {
+      console.error('[BookingModal] No resolved doctor_id!');
+      alert('ডাক্তার তথ্য লোড হয়নি। পুনরায় চেষ্টা করুন।');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
       if (isSupabaseConfigured()) {
-        // Get the profile_id
-        let doctorId = (doctor as any).userId || (doctor as any).profileId;
-        
-        if (!doctorId) {
-          console.log('[BookingModal] Looking up profile_id for doctor.id:', doctor.id);
-          const { data: doctorRecord } = await supabase
-            .from('doctors')
-            .select('profile_id')
-            .eq('id', doctor.id)
-            .single();
-          
-          doctorId = doctorRecord?.profile_id || doctor.id;
-        }
-        
-        console.log('[BookingModal] Saving appointment with doctor_id:', doctorId);
-        
-        // Create appointment in Supabase - using correct column names
+        // Create appointment with the CORRECT doctor_id (profile_id)
         const appointmentData = {
-          doctor_id: doctorId,
+          doctor_id: resolvedDoctorId, // THIS IS THE KEY - always use profile_id
           patient_id: user!.id,
           patient_name: effectivePatientName,
           patient_phone: effectivePatientPhone,
@@ -333,7 +352,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           created_at: new Date().toISOString()
         };
         
-        console.log('[BookingModal] Saving appointment:', appointmentData);
+        console.log('[BookingModal] ========================================');
+        console.log('[BookingModal] SAVING APPOINTMENT:');
+        console.log('[BookingModal] doctor_id (profile_id):', resolvedDoctorId);
+        console.log('[BookingModal] patient_id:', user!.id);
+        console.log('[BookingModal] date:', selectedDate);
+        console.log('[BookingModal] time:', selectedSlot?.time);
+        console.log('[BookingModal] Full data:', appointmentData);
+        console.log('[BookingModal] ========================================');
         
         const { data, error } = await supabase
           .from('appointments')
@@ -342,17 +368,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           .single();
         
         if (error) {
-          console.error('[BookingModal] Error saving appointment:', error);
-        } else {
-          console.log('[BookingModal] Appointment saved:', data.id);
-          setBookingId(data.id);
+          console.error('[BookingModal] ERROR saving appointment:', error);
+          alert('বুকিং সংরক্ষণ ব্যর্থ: ' + error.message);
+          setIsSubmitting(false);
+          return;
         }
+        
+        console.log('[BookingModal] ✅ Appointment saved successfully! ID:', data.id);
+        setBookingId(data.id);
       }
       
       setBookingComplete(true);
     } catch (error) {
-      console.error('[BookingModal] Booking error:', error);
-      setBookingComplete(true);
+      console.error('[BookingModal] Booking exception:', error);
+      alert('একটি ত্রুটি হয়েছে। পুনরায় চেষ্টা করুন।');
     }
     
     setIsSubmitting(false);
@@ -376,7 +405,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     }
   };
 
-  // Login Required Screen - if not a registered patient
+  // Login Required Screen
   if (!isPatient) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -396,11 +425,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           <div className="p-6">
             <div className="bg-blue-50 rounded-xl p-4 mb-4">
               <p className="text-sm text-blue-800 text-center">
-                {isBn ? '✅ রেজিস্ট্রেশন বিনামূল্যে\n✅ ফোন নম্বর দিয়ে সহজে রেজিস্টার করুন' : '✅ Registration is FREE\n✅ Quick signup with phone number'}
+                {isBn ? '✅ রেজিস্ট্রেশন বিনামূল্যে • ফোন নম্বর দিয়ে সহজে' : '✅ Registration is FREE • Quick signup'}
               </p>
             </div>
 
-            {/* Doctor Info */}
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
               <img src={doctor.image} alt={doctor.name} className="w-12 h-12 rounded-lg object-cover" />
               <div>
@@ -408,22 +436,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                 <p className="text-sm text-slate-500">{chamber.name}</p>
               </div>
               <div className="ml-auto text-right">
-                <p className="text-sm text-slate-500">{isBn ? 'ফি' : 'Fee'}</p>
+                <p className="text-sm text-slate-500">ফি</p>
                 <p className="font-bold text-blue-600">৳{chamber.fee}</p>
               </div>
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition"
-              >
+              <button onClick={onClose} className="flex-1 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition">
                 {isBn ? 'বাতিল' : 'Cancel'}
               </button>
-              <button
-                onClick={() => { onClose(); navigate('/patient-auth'); }}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition"
-              >
+              <button onClick={() => { onClose(); navigate('/patient-auth'); }} className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition">
                 {isBn ? 'লগইন / রেজিস্টার' : 'Login / Register'}
               </button>
             </div>
@@ -438,7 +460,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-scale-in">
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-8 text-center text-white">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-8 text-center text-white">
             <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="fas fa-check text-4xl"></i>
             </div>
@@ -447,7 +469,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           </div>
           
           <div className="p-6">
-            {/* Doctor Info */}
             <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
               <img src={doctor.image} alt={doctor.name} className="w-12 h-12 rounded-lg object-cover" />
               <div>
@@ -456,17 +477,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               </div>
             </div>
 
-            {/* Patient Info */}
             {bookingFor === 'family' && (
               <div className="bg-purple-50 rounded-xl p-3 mb-4 border border-purple-200">
                 <p className="text-sm text-purple-800">
                   <i className="fas fa-users mr-2"></i>
-                  {isBn ? 'পরিবারের সদস্যের জন্য বুক করা হয়েছে:' : 'Booked for family member:'} <strong>{familyMemberName}</strong> ({familyRelation})
+                  পরিবারের সদস্য: <strong>{familyMemberName}</strong> ({familyRelation})
                 </p>
               </div>
             )}
 
-            {/* Booking Details */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-blue-50 rounded-xl p-4 text-center">
                 <p className="text-xs text-blue-600 uppercase font-bold mb-1">{t.serialNo}</p>
@@ -474,17 +493,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               </div>
               <div className="bg-slate-50 rounded-xl p-4 text-center">
                 <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t.estTime}</p>
-                <p className="text-xl font-bold text-slate-700">{selectedSlot?.display || '10:00 AM'}</p>
+                <p className="text-xl font-bold text-slate-700">{selectedSlot?.display}</p>
               </div>
             </div>
 
             <div className="space-y-2 text-sm mb-6">
               <div className="flex justify-between">
-                <span className="text-slate-500">{isBn ? 'তারিখ' : 'Date'}</span>
+                <span className="text-slate-500">তারিখ</span>
                 <span className="font-bold text-slate-700">{selectedDate}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">{isBn ? 'ভিজিটের ধরন' : 'Visit Type'}</span>
+                <span className="text-slate-500">ভিজিটের ধরন</span>
                 <span className="font-bold text-slate-700">
                   {visitType === 'NEW' ? t.newConsult : visitType === 'FOLLOW_UP' ? t.followUp : t.report}
                 </span>
@@ -500,10 +519,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               <p className="text-sm text-green-700">{t.smsSent} <span className="font-bold">{effectivePatientPhone}</span></p>
             </div>
 
-            <button
-              onClick={onClose}
-              className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-slate-900 transition"
-            >
+            <button onClick={onClose} className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold hover:bg-slate-900 transition">
               {t.done}
             </button>
           </div>
@@ -516,16 +532,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-slide-up sm:animate-scale-in">
         
-        {/* Header - Fixed */}
+        {/* Header */}
         <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold">{t.title}</h2>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition" title="Close" aria-label="Close modal">
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition" title="Close">
               <i className="fas fa-times"></i>
             </button>
           </div>
           
-          {/* Doctor Mini Card */}
           <div className="flex items-center gap-3">
             <img src={doctor.image} alt={doctor.name} className="w-10 h-10 rounded-lg object-cover border-2 border-white/30" />
             <div className="flex-1 min-w-0">
@@ -539,7 +554,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           </div>
         </div>
 
-        {/* Progress Steps - Fixed */}
+        {/* Progress Steps */}
         <div className="flex-shrink-0 flex items-center justify-center gap-2 py-3 bg-slate-50 border-b border-slate-100">
           {[1, 2, 3].map((s) => (
             <React.Fragment key={s}>
@@ -553,7 +568,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           ))}
         </div>
 
-        {/* Content - Scrollable */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 min-h-0">
           
           {/* Step 1: Visit Type */}
@@ -562,21 +577,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               <p className="text-sm font-bold text-slate-500 uppercase">{t.step1}</p>
               
               {[
-                { type: 'NEW' as VisitType, icon: 'fa-user-plus', title: t.newConsult, desc: t.newDesc, color: 'blue' },
-                { type: 'FOLLOW_UP' as VisitType, icon: 'fa-redo', title: t.followUp, desc: t.followUpDesc, color: 'blue', badge: '50% ছাড়' },
-                { type: 'REPORT' as VisitType, icon: 'fa-file-medical', title: t.report, desc: t.reportDesc, color: 'purple', badge: '70% ছাড়' },
+                { type: 'NEW' as VisitType, icon: 'fa-user-plus', title: t.newConsult, desc: t.newDesc, badge: null },
+                { type: 'FOLLOW_UP' as VisitType, icon: 'fa-redo', title: t.followUp, desc: t.followUpDesc, badge: '50% ছাড়' },
+                { type: 'REPORT' as VisitType, icon: 'fa-file-medical', title: t.report, desc: t.reportDesc, badge: '70% ছাড়' },
               ].map((item) => (
-                      <button 
+                <button 
                   key={item.type}
                   onClick={() => setVisitType(item.type)}
                   className={`w-full p-4 rounded-xl border-2 text-left transition flex items-center gap-4 ${
-                    visitType === item.type 
-                      ? `border-${item.color}-500 bg-${item.color}-50` 
-                      : 'border-slate-200 hover:border-slate-300'
+                    visitType === item.type ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    visitType === item.type ? `bg-${item.color}-500 text-white` : 'bg-slate-100 text-slate-400'
+                    visitType === item.type ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-400'
                   }`}>
                     <i className={`fas ${item.icon} text-lg`}></i>
                   </div>
@@ -584,9 +597,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-slate-800">{item.title}</p>
                       {item.badge && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                          {item.badge}
-                        </span>
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">{item.badge}</span>
                       )}
                     </div>
                     <p className="text-sm text-slate-500">{item.desc}</p>
@@ -596,16 +607,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                   }`}>
                     {visitType === item.type && <i className="fas fa-check text-white text-xs"></i>}
                   </div>
-                      </button>
+                </button>
               ))}
 
-              {/* Fee Summary */}
               {visitType !== 'NEW' && (
                 <div className="bg-green-50 rounded-xl p-3 flex items-center justify-between">
-                  <span className="text-sm text-green-700">
-                    <i className="fas fa-tag mr-2"></i>
-                    {t.discount}: ৳{discount}
-                  </span>
+                  <span className="text-sm text-green-700"><i className="fas fa-tag mr-2"></i>{t.discount}: ৳{discount}</span>
                   <span className="font-bold text-green-700">{t.total}: ৳{fee}</span>
                 </div>
               )}
@@ -615,7 +622,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           {/* Step 2: Date & Time */}
           {step === 2 && (
             <div className="space-y-4">
-              {/* Date Selection */}
               <div>
                 <p className="text-sm font-bold text-slate-500 uppercase mb-3">{t.selectDate}</p>
                 <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
@@ -624,21 +630,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                       key={d.value}
                       onClick={() => setSelectedDate(d.value)}
                       className={`flex-shrink-0 w-16 py-3 rounded-xl text-center transition ${
-                        selectedDate === d.value
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        selectedDate === d.value ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                     >
-                      <p className="text-xs font-medium opacity-80">
-                        {d.isToday ? t.today : d.isTomorrow ? t.tomorrow : d.day}
-                      </p>
+                      <p className="text-xs font-medium opacity-80">{d.isToday ? t.today : d.isTomorrow ? t.tomorrow : d.day}</p>
                       <p className="text-xl font-bold">{d.date}</p>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Time Selection */}
               {selectedDate && (
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -646,114 +647,49 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                     {loadingSlots && <span className="text-xs text-blue-500"><i className="fas fa-spinner fa-spin mr-1"></i>Loading...</span>}
                   </div>
                   
-                  {/* Legend */}
                   <div className="flex items-center gap-4 mb-3 text-xs">
-                    <span className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-green-500 rounded"></div>
-                      <span className="text-slate-600">{t.available}</span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-red-500 rounded"></div>
-                      <span className="text-slate-600">{t.slotFull}</span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-slate-300 rounded"></div>
-                      <span className="text-slate-600">{isBn ? 'পাস' : 'Past'}</span>
-                    </span>
+                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded"></div><span className="text-slate-600">{t.available}</span></span>
+                    <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500 rounded"></div><span className="text-slate-600">{t.slotFull}</span></span>
                   </div>
                   
-                  {/* Morning Slots */}
-                  {slots.filter(s => s.period === 'morning' && !s.isPast).length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
-                        <i className="fas fa-sun text-amber-400"></i> {t.morning}
-                      </p>
-                      <div className="grid grid-cols-4 gap-2">
-                        {slots.filter(s => s.period === 'morning' && !s.isPast).slice(0, 8).map((slot) => (
-                          <button
-                            key={slot.time}
-                            onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
-                            disabled={!slot.available}
-                            className={`py-2 px-1 rounded-lg text-xs font-medium transition relative ${
-                              selectedSlot?.time === slot.time
-                                ? 'bg-blue-500 text-white ring-2 ring-blue-300'
-                                : slot.available
-                                  ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
-                                  : 'bg-red-100 text-red-700 cursor-not-allowed border border-red-300'
-                            }`}
-                          >
-                            {slot.display.replace(' AM', '').replace(' PM', '')}
-                            {!slot.available && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">✕</span>}
-                          </button>
-                        ))}
+                  {['morning', 'afternoon', 'evening'].map(period => {
+                    const periodSlots = slots.filter(s => s.period === period && !s.isPast);
+                    if (periodSlots.length === 0) return null;
+                    
+                    return (
+                      <div key={period} className="mb-4">
+                        <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
+                          <i className={`fas ${period === 'morning' ? 'fa-sun text-amber-400' : period === 'afternoon' ? 'fa-cloud-sun text-orange-400' : 'fa-moon text-indigo-400'}`}></i>
+                          {period === 'morning' ? t.morning : period === 'afternoon' ? t.afternoon : t.evening}
+                        </p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {periodSlots.slice(0, 8).map((slot) => (
+                            <button
+                              key={slot.time}
+                              onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
+                              disabled={!slot.available}
+                              className={`py-2 px-1 rounded-lg text-xs font-medium transition relative ${
+                                selectedSlot?.time === slot.time
+                                  ? 'bg-blue-500 text-white ring-2 ring-blue-300'
+                                  : slot.available
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+                                    : 'bg-red-100 text-red-700 cursor-not-allowed border border-red-300'
+                              }`}
+                            >
+                              {slot.display.replace(' AM', '').replace(' PM', '')}
+                              {!slot.available && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">✕</span>}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                
-                  {/* Afternoon Slots */}
-                  {slots.filter(s => s.period === 'afternoon' && !s.isPast).length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
-                        <i className="fas fa-cloud-sun text-orange-400"></i> {t.afternoon}
-                      </p>
-                      <div className="grid grid-cols-4 gap-2">
-                        {slots.filter(s => s.period === 'afternoon' && !s.isPast).slice(0, 8).map((slot) => (
-                          <button 
-                            key={slot.time}
-                            onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
-                            disabled={!slot.available}
-                            className={`py-2 px-1 rounded-lg text-xs font-medium transition relative ${
-                              selectedSlot?.time === slot.time
-                                ? 'bg-blue-500 text-white ring-2 ring-blue-300'
-                                : slot.available
-                                  ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
-                                  : 'bg-red-100 text-red-700 cursor-not-allowed border border-red-300'
-                            }`}
-                          >
-                            {slot.display.replace(' AM', '').replace(' PM', '')}
-                            {!slot.available && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">✕</span>}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })}
 
-                  {/* Evening Slots */}
-                  {slots.filter(s => s.period === 'evening' && !s.isPast).length > 0 && (
-                    <div>
-                      <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
-                        <i className="fas fa-moon text-indigo-400"></i> {t.evening}
-                      </p>
-                      <div className="grid grid-cols-4 gap-2">
-                        {slots.filter(s => s.period === 'evening' && !s.isPast).slice(0, 8).map((slot) => (
-                          <button
-                            key={slot.time}
-                            onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
-                            disabled={!slot.available}
-                            className={`py-2 px-1 rounded-lg text-xs font-medium transition relative ${
-                              selectedSlot?.time === slot.time
-                                ? 'bg-blue-500 text-white ring-2 ring-blue-300'
-                                : slot.available
-                                  ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
-                                  : 'bg-red-100 text-red-700 cursor-not-allowed border border-red-300'
-                            }`}
-                          >
-                            {slot.display.replace(' AM', '').replace(' PM', '')}
-                            {!slot.available && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">✕</span>}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Your Serial Number */}
                   {selectedDate && (
                     <div className="mt-4 bg-green-50 rounded-xl p-3 border border-green-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                            #{assignedSerial}
-                          </div>
+                          <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">#{assignedSerial}</div>
                           <div>
                             <p className="text-sm font-bold text-green-800">{isBn ? 'আপনার সিরিয়াল' : 'Your Serial'}</p>
                             <p className="text-xs text-green-600">{assignedSerial - 1} {isBn ? 'জন আগে বুক করেছেন' : 'booked before you'}</p>
@@ -764,13 +700,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                     </div>
                   )}
 
-                  {/* Selected Time */}
                   {selectedSlot && (
                     <div className="mt-3 bg-blue-50 rounded-xl p-3 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
-                          <i className="fas fa-clock"></i>
-                        </div>
+                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white"><i className="fas fa-clock"></i></div>
                         <div>
                           <p className="text-sm font-bold text-blue-800">{isBn ? 'নির্বাচিত সময়' : 'Selected Time'}</p>
                           <p className="text-xs text-blue-600">{selectedSlot.display}</p>
@@ -795,25 +728,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setBookingFor('self')}
-                    className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
-                      bookingFor === 'self'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition ${bookingFor === 'self' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600'}`}
                   >
-                    <i className="fas fa-user mr-2"></i>
-                    {t.bookingForSelf}
+                    <i className="fas fa-user mr-2"></i>{t.bookingForSelf}
                   </button>
                   <button
                     onClick={() => setBookingFor('family')}
-                    className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
-                      bookingFor === 'family'
-                        ? 'border-purple-500 bg-purple-50 text-purple-700'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition ${bookingFor === 'family' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600'}`}
                   >
-                    <i className="fas fa-users mr-2"></i>
-                    {t.bookingForFamily}
+                    <i className="fas fa-users mr-2"></i>{t.bookingForFamily}
                   </button>
                 </div>
               </div>
@@ -821,22 +744,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               {/* Self Booking - Auto-filled */}
               {bookingFor === 'self' && (
                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                  <p className="text-sm font-medium text-blue-800 mb-3">
-                    <i className="fas fa-user-check mr-2"></i>
-                    {isBn ? 'আপনার প্রোফাইল থেকে তথ্য' : 'Info from your profile'}
-                  </p>
+                  <p className="text-sm font-medium text-blue-800 mb-3"><i className="fas fa-user-check mr-2"></i>{isBn ? 'আপনার প্রোফাইল থেকে তথ্য' : 'From your profile'}</p>
                   <div className="grid gap-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">{t.patientName}</label>
-                      <div className="w-full p-3 bg-white border border-blue-200 rounded-xl text-slate-700 font-medium">
-                        {patientName || '-'}
-                      </div>
+                      <div className="w-full p-3 bg-white border border-blue-200 rounded-xl text-slate-700 font-medium">{patientName || '-'}</div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">{t.phone}</label>
-                      <div className="w-full p-3 bg-white border border-blue-200 rounded-xl text-slate-700 font-medium">
-                        +880{patientPhone || '-'}
-                      </div>
+                      <div className="w-full p-3 bg-white border border-blue-200 rounded-xl text-slate-700 font-medium">+880{patientPhone}</div>
                     </div>
                   </div>
                 </div>
@@ -845,49 +761,27 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               {/* Family Member Booking */}
               {bookingFor === 'family' && (
                 <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                  <p className="text-sm font-medium text-purple-800 mb-3">
-                    <i className="fas fa-users mr-2"></i>
-                    {isBn ? 'পরিবারের সদস্যের তথ্য দিন' : 'Enter family member details'}
-                  </p>
+                  <p className="text-sm font-medium text-purple-800 mb-3"><i className="fas fa-users mr-2"></i>{isBn ? 'পরিবারের সদস্যের তথ্য' : 'Family member details'}</p>
                   <div className="grid gap-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">{t.familyName} *</label>
-                      <input 
-                        type="text" 
-                        value={familyMemberName}
-                        onChange={(e) => setFamilyMemberName(e.target.value)}
-                        className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 outline-none transition"
-                        placeholder={isBn ? 'পরিবারের সদস্যের নাম' : 'Family member name'}
-                      />
+                      <input type="text" value={familyMemberName} onChange={(e) => setFamilyMemberName(e.target.value)} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 outline-none" placeholder={isBn ? 'নাম' : 'Name'} />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">{t.phone} *</label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">+880</span>
-                        <input 
-                          type="tel" 
-                          value={familyMemberPhone}
-                          onChange={(e) => setFamilyMemberPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                          className={`w-full p-3 pl-14 border-2 rounded-xl outline-none transition ${
-                            familyMemberPhone && !isValidPhone(familyMemberPhone) ? 'border-red-300' : 'border-slate-200 focus:border-purple-500'
-                          }`}
-                          placeholder="01712345678"
-                        />
+                        <input type="tel" value={familyMemberPhone} onChange={(e) => setFamilyMemberPhone(e.target.value.replace(/\D/g, '').slice(0, 11))} className="w-full p-3 pl-14 border-2 border-slate-200 rounded-xl focus:border-purple-500 outline-none" placeholder="01712345678" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">{t.familyRelation} *</label>
-                      <select
-                        value={familyRelation}
-                        onChange={(e) => setFamilyRelation(e.target.value)}
-                        className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 outline-none transition"
-                      >
-                        <option value="">{isBn ? 'সম্পর্ক নির্বাচন করুন' : 'Select relation'}</option>
+                      <select value={familyRelation} onChange={(e) => setFamilyRelation(e.target.value)} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 outline-none">
+                        <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
                         <option value="spouse">{isBn ? 'স্বামী/স্ত্রী' : 'Spouse'}</option>
                         <option value="child">{isBn ? 'সন্তান' : 'Child'}</option>
                         <option value="parent">{isBn ? 'মা/বাবা' : 'Parent'}</option>
                         <option value="sibling">{isBn ? 'ভাই/বোন' : 'Sibling'}</option>
-                        <option value="grandparent">{isBn ? 'দাদা/দাদি/নানা/নানি' : 'Grandparent'}</option>
                         <option value="other">{isBn ? 'অন্যান্য' : 'Other'}</option>
                       </select>
                     </div>
@@ -895,97 +789,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                 </div>
               )}
 
-              {/* Patient Intake Form */}
+              {/* Symptoms */}
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                <p className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                  <i className="fas fa-clipboard-list text-blue-500"></i>
-                  {isBn ? 'সমস্যার বিবরণ (ঐচ্ছিক)' : 'Health Information (Optional)'}
-                </p>
-                
-                {/* Chief Complaint */}
-                <div className="mb-3">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    {isBn ? 'প্রধান সমস্যা' : 'Chief Complaint'}
-                  </label>
-                  <textarea 
-                    value={symptoms}
-                    onChange={(e) => setSymptoms(e.target.value)}
-                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none transition resize-none text-sm bg-white"
-                    rows={2}
-                    placeholder={isBn ? 'আপনার প্রধান সমস্যা সংক্ষেপে লিখুন...' : 'Briefly describe your main problem...'}
-                  />
-                </div>
-
-                {/* Quick Symptom Tags */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-2">
-                    {isBn ? 'সাধারণ লক্ষণ (প্রযোজ্য হলে ক্লিক করুন)' : 'Common Symptoms (click if applicable)'}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { en: 'Fever', bn: 'জ্বর' },
-                      { en: 'Headache', bn: 'মাথা ব্যথা' },
-                      { en: 'Cough', bn: 'কাশি' },
-                      { en: 'Chest Pain', bn: 'বুকে ব্যথা' },
-                      { en: 'Breathing Issue', bn: 'শ্বাসকষ্ট' },
-                      { en: 'Weakness', bn: 'দুর্বলতা' },
-                    ].map((symptom, i) => {
-                      const text = isBn ? symptom.bn : symptom.en;
-                      const isSelected = symptoms.toLowerCase().includes(text.toLowerCase());
-                      return (
-                        <button 
-                          key={i}
-                          type="button"
-                          onClick={() => {
-                            if (isSelected) {
-                              setSymptoms(symptoms.replace(new RegExp(text + ',?\\s*', 'gi'), ''));
-                            } else {
-                              setSymptoms(symptoms ? `${symptoms}, ${text}` : text);
-                            }
-                          }}
-                          className={`px-3 py-1 text-xs rounded-full border transition ${
-                            isSelected 
-                              ? 'bg-blue-500 text-white border-blue-500' 
-                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
-                          }`}
-                        >
-                          {text}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <p className="text-sm font-bold text-slate-700 mb-3"><i className="fas fa-clipboard-list text-blue-500 mr-2"></i>{isBn ? 'সমস্যার বিবরণ (ঐচ্ছিক)' : 'Symptoms (Optional)'}</p>
+                <textarea value={symptoms} onChange={(e) => setSymptoms(e.target.value)} className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none resize-none text-sm bg-white" rows={2} placeholder={t.symptomsPlaceholder} />
               </div>
 
-              {/* Booking Summary */}
+              {/* Summary */}
               <div className="bg-slate-50 rounded-xl p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">{isBn ? 'ডাক্তার' : 'Doctor'}</span>
-                  <span className="font-medium text-slate-700">{doctor.name}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">{t.chamber}</span>
-                  <span className="font-medium text-slate-700">{chamber.name}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">{isBn ? 'রোগী' : 'Patient'}</span>
-                  <span className="font-medium text-slate-700">
-                    {effectivePatientName}
-                    {bookingFor === 'family' && <span className="text-purple-600 text-xs ml-1">({familyRelation})</span>}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">{isBn ? 'তারিখ' : 'Date'}</span>
-                  <span className="font-medium text-slate-700">{selectedDate}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">{isBn ? 'সময়' : 'Time'}</span>
-                  <span className="font-medium text-slate-700">{selectedSlot?.display}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">{t.serial}</span>
-                  <span className="font-bold text-blue-600">#{assignedSerial}</span>
-                </div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">ডাক্তার</span><span className="font-medium text-slate-700">{doctor.name}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">{t.chamber}</span><span className="font-medium text-slate-700">{chamber.name}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">রোগী</span><span className="font-medium text-slate-700">{effectivePatientName}{bookingFor === 'family' && <span className="text-purple-600 text-xs ml-1">({familyRelation})</span>}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">তারিখ</span><span className="font-medium text-slate-700">{selectedDate}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">সময়</span><span className="font-medium text-slate-700">{selectedSlot?.display}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">{t.serial}</span><span className="font-bold text-blue-600">#{assignedSerial}</span></div>
                 <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
                   <span className="font-bold text-slate-700">{t.total}</span>
                   <span className="font-bold text-blue-600 text-lg">৳{fee}</span>
@@ -995,31 +812,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           )}
         </div>
 
-        {/* Footer - Fixed at bottom */}
+        {/* Footer */}
         <div className="flex-shrink-0 p-4 border-t border-slate-100 bg-white flex gap-3 rounded-b-2xl">
           {step > 1 && (
-            <button
-              onClick={() => setStep((step - 1) as 1 | 2)}
-              className="px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition"
-            >
+            <button onClick={() => setStep((step - 1) as 1 | 2)} className="px-6 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition">
               <i className="fas fa-arrow-left mr-2"></i>{t.back}
             </button>
           )}
           <button
-            onClick={() => {
-              if (step < 3) setStep((step + 1) as 2 | 3);
-              else handleBooking();
-            }}
+            onClick={() => { if (step < 3) setStep((step + 1) as 2 | 3); else handleBooking(); }}
             disabled={!canProceed() || isSubmitting}
             className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? (
-              <><i className="fas fa-spinner fa-spin mr-2"></i>{t.confirming}</>
-            ) : step === 3 ? (
-              <><i className="fas fa-check mr-2"></i>{t.confirm}</>
-            ) : (
-              <>{t.next}<i className="fas fa-arrow-right ml-2"></i></>
-            )}
+            {isSubmitting ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t.confirming}</> : step === 3 ? <><i className="fas fa-check mr-2"></i>{t.confirm}</> : <>{t.next}<i className="fas fa-arrow-right ml-2"></i></>}
           </button>
         </div>
       </div>

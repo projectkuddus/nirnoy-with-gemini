@@ -278,43 +278,46 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   useEffect(() => {
     const fetchAppointments = async () => {
       if (!user?.id || !isSupabaseConfigured()) {
+        console.log('[DoctorDashboard] ❌ Cannot fetch - no user or Supabase not configured');
         setAppointmentsLoading(false);
         return;
       }
 
       try {
-        // First, get the doctors table ID for this profile
-        const { data: doctorRecord } = await supabase
-          .from('doctors')
-          .select('id')
-          .eq('profile_id', user.id)
-          .single();
-
-        const doctorsTableId = doctorRecord?.id;
         const profileId = user.id;
         
-        console.log('[DoctorDashboard] Looking for appointments with:');
-        console.log('  - profile_id (user.id):', profileId);
-        console.log('  - doctors.id:', doctorsTableId);
+        console.log('[DoctorDashboard] ========================================');
+        console.log('[DoctorDashboard] FETCHING APPOINTMENTS');
+        console.log('[DoctorDashboard] Doctor profile_id:', profileId);
         
-        // Query appointments using BOTH possible IDs (profile_id OR doctors.id)
+        // Simple query - just use profile_id as doctor_id
+        // This should match what BookingModal saves
         const { data, error } = await supabase
           .from('appointments')
           .select('*')
-          .or(`doctor_id.eq.${profileId}${doctorsTableId ? `,doctor_id.eq.${doctorsTableId}` : ''}`)
+          .eq('doctor_id', profileId)
           .order('scheduled_date', { ascending: true })
           .order('scheduled_time', { ascending: true });
 
         if (error) {
-          console.error('[DoctorDashboard] Error fetching appointments:', error);
+          console.error('[DoctorDashboard] ❌ Query error:', error);
           setAppointmentsLoading(false);
           return;
         }
 
-        console.log('[DoctorDashboard] Raw appointments data:', data);
+        console.log('[DoctorDashboard] Query returned:', data?.length || 0, 'appointments');
+        
+        // Also log what's in the appointments table for debugging
+        const { data: allAppts } = await supabase
+          .from('appointments')
+          .select('id, doctor_id, patient_name, scheduled_date')
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        console.log('[DoctorDashboard] Recent appointments in DB:', allAppts);
+        console.log('[DoctorDashboard] ========================================');
 
         if (data && data.length > 0) {
-          // Transform Supabase data to match Appointment interface
           const transformedAppointments: Appointment[] = data.map((apt, index) => ({
             id: apt.id,
             patientId: apt.patient_id || `guest-${apt.id}`,
@@ -334,14 +337,14 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
             paymentStatus: apt.payment_status === 'paid' ? 'Paid' : apt.payment_status === 'pending' ? 'Pending' : 'Paid' as const,
           }));
 
-          console.log('[DoctorDashboard] Loaded', transformedAppointments.length, 'appointments');
+          console.log('[DoctorDashboard] ✅ Loaded', transformedAppointments.length, 'appointments for today/upcoming');
           setAppointments(transformedAppointments);
         } else {
-          console.log('[DoctorDashboard] No appointments found');
+          console.log('[DoctorDashboard] ℹ️ No appointments found for this doctor');
           setAppointments([]);
         }
       } catch (e) {
-        console.error('[DoctorDashboard] Fetch error:', e);
+        console.error('[DoctorDashboard] ❌ Fetch exception:', e);
       }
 
       setAppointmentsLoading(false);
@@ -349,14 +352,14 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
 
     fetchAppointments();
 
-    // Set up real-time subscription for new appointments
+    // Real-time subscription
     const subscription = supabase
-      .channel('appointments-changes')
+      .channel('doctor-appointments-' + user?.id)
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'appointments' },
         (payload) => {
-          console.log('[DoctorDashboard] Real-time update:', payload);
-          fetchAppointments(); // Refresh appointments on any change
+          console.log('[DoctorDashboard] 🔄 Real-time update:', payload.eventType);
+          fetchAppointments();
         }
       )
       .subscribe();
