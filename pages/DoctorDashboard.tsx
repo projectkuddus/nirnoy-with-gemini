@@ -334,7 +334,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
             status: apt.status === 'confirmed' ? 'Waiting' : apt.status === 'completed' ? 'Completed' : apt.status === 'cancelled' ? 'Cancelled' : 'Waiting',
             chiefComplaint: apt.symptoms,
             fee: apt.fee_paid || 500,
-            paymentStatus: apt.payment_status === 'paid' ? 'Paid' : apt.payment_status === 'pending' ? 'Pending' : 'Paid' as const,
+            paymentStatus: apt.payment_status === 'paid' ? 'Paid' : apt.payment_status === 'pending' ? 'Pending' : apt.payment_status === 'waived' ? 'Waived' : 'Pending' as const,
           }));
 
           console.log('[DoctorDashboard] ✅ Loaded', transformedAppointments.length, 'appointments for today/upcoming');
