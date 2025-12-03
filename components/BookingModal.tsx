@@ -28,6 +28,37 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const [symptoms, setSymptoms] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
+  const [existingBookingsCount, setExistingBookingsCount] = useState(0);
+  const [assignedSerial, setAssignedSerial] = useState<number>(1);
+  
+  // Fetch existing bookings count for the selected date
+  useEffect(() => {
+    const fetchBookingsCount = async () => {
+      if (!selectedDate || !isSupabaseConfigured()) {
+        setExistingBookingsCount(0);
+        return;
+      }
+      
+      try {
+        const doctorId = (doctor as any).profileId || doctor.id;
+        const { count, error } = await supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .eq('doctor_id', doctorId)
+          .eq('appointment_date', selectedDate);
+        
+        if (!error && count !== null) {
+          setExistingBookingsCount(count);
+          setAssignedSerial(count + 1); // Next serial number
+          console.log('[BookingModal] Existing bookings for', selectedDate, ':', count, '-> Next serial:', count + 1);
+        }
+      } catch (e) {
+        console.error('[BookingModal] Error fetching bookings count:', e);
+      }
+    };
+    
+    fetchBookingsCount();
+  }, [selectedDate, doctor]);
   
   // Clear slot when date changes
   useEffect(() => {
@@ -94,30 +125,35 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     });
   }, [isBn]);
 
-  // Generate time slots - stable based on date
+  // Generate time slots - filtering past times for today
   const slots = useMemo(() => {
-    const result: { time: string; display: string; serial: number; available: boolean; period: string }[] = [];
-    let serial = 1;
+    const result: { time: string; display: string; available: boolean; period: string; isPast: boolean }[] = [];
     
-    // Use date as seed for consistent availability
-    const dateSeed = selectedDate ? parseInt(selectedDate.replace(/-/g, '')) : 20241126;
-    const pseudoRandom = (index: number) => {
-      const x = Math.sin(dateSeed + index) * 10000;
-      return x - Math.floor(x);
+    // Check if selected date is today
+    const today = new Date().toISOString().split('T')[0];
+    const isToday = selectedDate === today;
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Helper to check if slot is in the past (with 30 min buffer)
+    const isSlotPast = (hour: number, minute: number): boolean => {
+      if (!isToday) return false;
+      const slotMinutes = hour * 60 + minute;
+      const currentMinutes = currentHour * 60 + currentMinute + 30; // 30 min buffer
+      return slotMinutes < currentMinutes;
     };
-    
-    let slotIndex = 0;
     
     // Morning: 9 AM - 12 PM
     for (let h = 9; h < 12; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const available = pseudoRandom(slotIndex++) > 0.2; // 80% available
+        const isPast = isSlotPast(h, m);
         result.push({
           time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
           display: `${h}:${m.toString().padStart(2, '0')} AM`,
-          serial: available ? serial++ : 0,
-          available,
+          available: !isPast,
           period: 'morning',
+          isPast,
         });
       }
     }
@@ -125,13 +161,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     // Afternoon: 3 PM - 6 PM
     for (let h = 15; h < 18; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const available = pseudoRandom(slotIndex++) > 0.2;
+        const isPast = isSlotPast(h, m);
         result.push({
           time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
           display: `${h - 12}:${m.toString().padStart(2, '0')} PM`,
-          serial: available ? serial++ : 0,
-          available,
+          available: !isPast,
           period: 'afternoon',
+          isPast,
         });
       }
     }
@@ -139,13 +175,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     // Evening: 6 PM - 9 PM
     for (let h = 18; h < 21; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const available = pseudoRandom(slotIndex++) > 0.2;
+        const isPast = isSlotPast(h, m);
         result.push({
           time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
           display: `${h - 12}:${m.toString().padStart(2, '0')} PM`,
-          serial: available ? serial++ : 0,
-          available,
+          available: !isPast,
           period: 'evening',
+          isPast,
         });
       }
     }
@@ -435,16 +471,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                 <div>
                   <p className="text-sm font-bold text-slate-500 uppercase mb-3">{t.selectTime}</p>
                   
-                  {/* Morning */}
+                  {/* Morning - only show if there are available slots */}
+                  {slots.filter(s => s.period === 'morning' && !s.isPast).length > 0 && (
                   <div className="mb-4">
                     <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
                       <i className="fas fa-sun text-amber-400"></i> {t.morning}
                     </p>
                     <div className="grid grid-cols-4 gap-2">
-                      {slots.filter(s => s.period === 'morning').slice(0, 8).map((slot) => (
+                      {slots.filter(s => s.period === 'morning' && !s.isPast).slice(0, 8).map((slot) => (
                          <button
                           key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: slot.serial, display: slot.display })}
+                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
@@ -455,22 +492,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                           }`}
                         >
                           {slot.display.replace(' AM', '').replace(' PM', '')}
-                          {slot.available && <span className="text-[10px] opacity-60 block">#{slot.serial}</span>}
                          </button>
                       ))}
                    </div>
                 </div>
+                  )}
                 
-                  {/* Afternoon */}
+                  {/* Afternoon - only show if there are available slots */}
+                  {slots.filter(s => s.period === 'afternoon' && !s.isPast).length > 0 && (
                   <div className="mb-4">
                     <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
                       <i className="fas fa-cloud-sun text-orange-400"></i> {t.afternoon}
                     </p>
                     <div className="grid grid-cols-4 gap-2">
-                      {slots.filter(s => s.period === 'afternoon').slice(0, 8).map((slot) => (
+                      {slots.filter(s => s.period === 'afternoon' && !s.isPast).slice(0, 8).map((slot) => (
                    <button 
                           key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: slot.serial, display: slot.display })}
+                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
@@ -481,22 +519,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                           }`}
                         >
                           {slot.display.replace(' AM', '').replace(' PM', '')}
-                          {slot.available && <span className="text-[10px] opacity-60 block">#{slot.serial}</span>}
                    </button>
                       ))}
                     </div>
                   </div>
+                  )}
 
-                  {/* Evening */}
+                  {/* Evening - only show if there are available slots */}
+                  {slots.filter(s => s.period === 'evening' && !s.isPast).length > 0 && (
                   <div>
                     <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
                       <i className="fas fa-moon text-indigo-400"></i> {t.evening}
                     </p>
                     <div className="grid grid-cols-4 gap-2">
-                      {slots.filter(s => s.period === 'evening').slice(0, 8).map((slot) => (
+                      {slots.filter(s => s.period === 'evening' && !s.isPast).slice(0, 8).map((slot) => (
                         <button
                           key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: slot.serial, display: slot.display })}
+                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
                           disabled={!slot.available}
                           className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
                             selectedSlot?.time === slot.time
@@ -507,21 +546,39 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                           }`}
                         >
                           {slot.display.replace(' AM', '').replace(' PM', '')}
-                          {slot.available && <span className="text-[10px] opacity-60 block">#{slot.serial}</span>}
                         </button>
                       ))}
                     </div>
                  </div>
+                  )}
 
-                  {/* Selected Summary */}
-                  {selectedSlot && (
-                    <div className="mt-4 bg-blue-50 rounded-xl p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
-                          #{selectedSlot.serial}
+                  {/* Your Serial Number */}
+                  {selectedDate && (
+                    <div className="mt-4 bg-green-50 rounded-xl p-3 border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                            #{assignedSerial}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-green-800">{isBn ? 'আপনার সিরিয়াল' : 'Your Serial'}</p>
+                            <p className="text-xs text-green-600">{existingBookingsCount} {isBn ? 'জন আগে বুক করেছেন' : 'booked before you'}</p>
+                          </div>
                         </div>
-                 <div>
-                          <p className="text-sm font-bold text-blue-800">{t.serial} #{selectedSlot.serial}</p>
+                        <i className="fas fa-check-circle text-green-500 text-xl"></i>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Selected Time */}
+                  {selectedSlot && (
+                    <div className="mt-3 bg-blue-50 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
+                          <i className="fas fa-clock"></i>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-blue-800">{isBn ? 'নির্বাচিত সময়' : 'Selected Time'}</p>
                           <p className="text-xs text-blue-600">{selectedSlot.display}</p>
                         </div>
                       </div>
