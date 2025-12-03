@@ -591,14 +591,21 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     if (selectedAppointment) {
       updateAppointmentStatus(selectedAppointment.id, 'Completed');
       
+      // If payment status not set, default to Pending (doctor can change it)
+      const finalPaymentStatus = selectedAppointment.paymentStatus || 'Pending';
+      if (!selectedAppointment.paymentStatus) {
+        updateAppointmentPaymentStatus(selectedAppointment.id, 'Pending');
+      }
+      
       // Save consultation data to Supabase
       if (isSupabaseConfigured()) {
         try {
-          // Update appointment status and notes
+          // Update appointment status, payment status, and notes
           await supabase
             .from('appointments')
             .update({ 
               status: 'completed',
+              payment_status: finalPaymentStatus.toLowerCase(), // 'paid', 'pending', 'waived'
               notes: JSON.stringify({
                 soapNote,
                 diagnosis,
@@ -609,7 +616,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
             })
             .eq('id', selectedAppointment.id);
           
-          console.log('[Consultation] ✅ Saved to database');
+          console.log('[Consultation] ✅ Saved to database with payment status:', finalPaymentStatus);
         } catch (e) {
           console.error('[Consultation] ❌ Error saving:', e);
         }
@@ -620,6 +627,48 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       setSelectedAppointment(null);
       setActiveTab('queue');
     }
+  };
+
+  // Set payment status directly
+  const setPaymentStatus = async (appointmentId: string, status: Appointment['paymentStatus']) => {
+    // Update local state
+    updateAppointmentPaymentStatus(appointmentId, status);
+    
+    // Update in Supabase
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('appointments')
+          .update({ 
+            payment_status: status.toLowerCase() // 'paid', 'pending', 'waived'
+          })
+          .eq('id', appointmentId);
+        
+        console.log('[Payment] ✅ Updated to', status);
+      } catch (e) {
+        console.error('[Payment] ❌ Error updating:', e);
+      }
+    }
+  };
+
+  // Toggle payment status (for queue view - cycles through options)
+  const togglePaymentStatus = async (appointmentId: string, currentStatus: Appointment['paymentStatus']) => {
+    let newStatus: Appointment['paymentStatus'];
+    
+    // Cycle: Pending -> Paid -> Waived -> Pending
+    if (currentStatus === 'Pending') {
+      newStatus = 'Paid';
+    } else if (currentStatus === 'Paid') {
+      newStatus = 'Waived';
+    } else {
+      newStatus = 'Pending';
+    }
+    
+    await setPaymentStatus(appointmentId, newStatus);
+  };
+
+  const updateAppointmentPaymentStatus = (id: string, status: Appointment['paymentStatus']) => {
+    setAppointments(prev => prev.map(a => a.id === id ? { ...a, paymentStatus: status } : a));
   };
 
   const toggleScheduleDay = (day: string) => {
@@ -954,6 +1003,21 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 {apt.status === 'In-Progress' && (
                   <button onClick={() => startConsultation(apt)} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600">
                     কনসাল্ট
+                  </button>
+                )}
+                {apt.status === 'Completed' && (
+                  <button 
+                    onClick={() => togglePaymentStatus(apt.id, apt.paymentStatus)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                      apt.paymentStatus === 'Paid' 
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                        : apt.paymentStatus === 'Pending'
+                        ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                    title="পেমেন্ট স্ট্যাটাস পরিবর্তন করুন"
+                  >
+                    {apt.paymentStatus === 'Paid' ? '✓ পেইড' : apt.paymentStatus === 'Pending' ? '⏳ বকেয়া' : '⊘ মওকুফ'}
                   </button>
                 )}
               </div>
@@ -1378,14 +1442,63 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-4">
-            <button onClick={generatePrescription} className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2">
-              <span>🖨️</span> প্রেসক্রিপশন প্রিন্ট
-            </button>
-            <button onClick={completeConsultation} className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
-              <span>✓</span> কনসাল্টেশন সম্পন্ন
-            </button>
+          {/* Payment Status & Action Buttons */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between mb-4">
+              <label className="text-sm font-medium text-slate-600">পেমেন্ট স্ট্যাটাস:</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (selectedAppointment) {
+                      setPaymentStatus(selectedAppointment.id, 'Pending');
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    selectedAppointment?.paymentStatus === 'Pending'
+                      ? 'bg-yellow-500 text-white'
+                      : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                  }`}
+                >
+                  ⏳ বকেয়া
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedAppointment) {
+                      setPaymentStatus(selectedAppointment.id, 'Paid');
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    selectedAppointment?.paymentStatus === 'Paid'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  }`}
+                >
+                  ✓ পেইড (ক্যাশ/বিকাশ)
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedAppointment) {
+                      setPaymentStatus(selectedAppointment.id, 'Waived');
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    selectedAppointment?.paymentStatus === 'Waived'
+                      ? 'bg-slate-500 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  ⊘ মওকুফ
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <button onClick={generatePrescription} className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2">
+                <span>🖨️</span> প্রেসক্রিপশন প্রিন্ট
+              </button>
+              <button onClick={completeConsultation} className="flex-1 px-6 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 flex items-center justify-center gap-2">
+                <span>✓</span> কনসাল্টেশন সম্পন্ন
+              </button>
+            </div>
           </div>
         </div>
 
