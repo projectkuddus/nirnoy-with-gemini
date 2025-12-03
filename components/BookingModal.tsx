@@ -40,7 +40,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
       }
       
       try {
-        const doctorId = (doctor as any).profileId || doctor.id;
+        // Get the profile_id - check multiple possible fields
+        const doctorId = (doctor as any).userId || (doctor as any).profileId || doctor.id;
+        console.log('[BookingModal] Using doctor_id for count:', doctorId);
+        
         const { count, error } = await supabase
           .from('appointments')
           .select('*', { count: 'exact', head: true })
@@ -207,8 +210,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     
     try {
       if (isSupabaseConfigured()) {
-        // Get doctor ID from the doctor object (could be doctors.id or profile_id)
-        const doctorId = (doctor as any).profileId || doctor.id;
+        // Get the profile_id - check multiple possible fields (userId from useDoctors, profileId from DoctorProfile)
+        const doctorId = (doctor as any).userId || (doctor as any).profileId || doctor.id;
+        console.log('[BookingModal] Saving appointment with doctor_id:', doctorId);
         
         // Create appointment in Supabase
         const appointmentData = {

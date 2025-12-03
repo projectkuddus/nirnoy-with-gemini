@@ -283,7 +283,8 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       }
 
       try {
-        console.log('[DoctorDashboard] Fetching appointments for doctor:', user.id);
+        console.log('[DoctorDashboard] Fetching appointments for doctor_id:', user.id);
+        console.log('[DoctorDashboard] User object:', user);
         
         const { data, error } = await supabase
           .from('appointments')

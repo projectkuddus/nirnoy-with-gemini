@@ -77,7 +77,8 @@ export const DoctorProfile: React.FC = () => {
           const specialties = doctorData.specialties || [];
           setDoctor({
             id: doctorData.id,
-            profileId: profile.id,
+            userId: profile.id,  // profile_id - this is what DoctorDashboard uses
+            profileId: profile.id,  // alias for compatibility
             name: profile.name,
             image: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=3b82f6&color=fff&size=200`,
             specialties: specialties,
