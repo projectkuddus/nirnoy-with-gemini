@@ -429,15 +429,20 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
   };
 
-  const callNextPatient = () => {
+  const callNextPatient = async () => {
     if (currentPatient) {
       updateAppointmentStatus(currentPatient.id, 'Completed');
+      // Update in Supabase
+      if (isSupabaseConfigured()) {
+        await supabase
+          .from('appointments')
+          .update({ status: 'completed' })
+          .eq('id', currentPatient.id);
+      }
     }
     if (nextInQueue) {
-      updateAppointmentStatus(nextInQueue.id, 'In-Progress');
-      const patient = PATIENTS.find(p => p.id === nextInQueue.patientId);
-      if (patient) setSelectedPatient(patient);
-      setSelectedAppointment(nextInQueue);
+      // Use startConsultation to properly load patient data
+      startConsultation(nextInQueue);
     }
   };
 
@@ -445,16 +450,82 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     updateAppointmentStatus(id, 'No-Show');
   };
 
-  const startConsultation = (apt: Appointment) => {
+  const startConsultation = async (apt: Appointment) => {
     // If there's a current patient, complete them first
     if (currentPatient && currentPatient.id !== apt.id) {
       updateAppointmentStatus(currentPatient.id, 'Completed');
     }
     updateAppointmentStatus(apt.id, 'In-Progress');
-    const patient = PATIENTS.find(p => p.id === apt.patientId);
-    if (patient) setSelectedPatient(patient);
+    
+    // Update status in Supabase
+    if (isSupabaseConfigured()) {
+      await supabase
+        .from('appointments')
+        .update({ status: 'in_progress' })
+        .eq('id', apt.id);
+    }
+    
+    // Create patient record from appointment data (no mock lookup)
+    const patientFromAppointment: PatientRecord = {
+      id: apt.patientId,
+      name: apt.patientName,
+      nameBn: apt.patientNameBn || apt.patientName,
+      age: apt.patientAge || 0,
+      gender: apt.patientGender || 'Male',
+      phone: apt.patientPhone,
+      bloodGroup: 'Unknown',
+      profileImage: apt.patientImage,
+      lastVisit: apt.date,
+      totalVisits: 1,
+      diagnosis: '',
+      diagnosisBn: '',
+      riskLevel: 'Low',
+      conditions: [],
+      medications: [],
+      allergies: [],
+      familyHistory: [],
+      vitals: [],
+      consultations: []
+    };
+    
+    // Try to fetch additional patient data from Supabase if patient_id exists
+    if (apt.patientId && !apt.patientId.startsWith('guest-') && isSupabaseConfigured()) {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', apt.patientId)
+          .single();
+        
+        if (profileData) {
+          patientFromAppointment.name = profileData.name || apt.patientName;
+          patientFromAppointment.nameBn = profileData.name_bn || profileData.name || apt.patientName;
+          patientFromAppointment.phone = profileData.phone || apt.patientPhone;
+          patientFromAppointment.profileImage = profileData.avatar_url || apt.patientImage;
+          patientFromAppointment.gender = profileData.gender === 'female' ? 'Female' : 'Male';
+          if (profileData.date_of_birth) {
+            const birthDate = new Date(profileData.date_of_birth);
+            const age = Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+            patientFromAppointment.age = age;
+          }
+        }
+        
+        // Fetch past appointments count
+        const { count } = await supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .eq('patient_id', apt.patientId);
+        
+        patientFromAppointment.totalVisits = count || 1;
+      } catch (e) {
+        console.log('[Consultation] Could not fetch additional patient data:', e);
+      }
+    }
+    
+    setSelectedPatient(patientFromAppointment);
     setSelectedAppointment(apt);
     setActiveTab('consult');
+    
     // Reset consultation form
     setSoapNote({ subjective: apt.chiefComplaint || '', objective: '', assessment: '', plan: '' });
     setPrescription([]);
@@ -479,10 +550,16 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   };
 
   const generatePrescription = () => {
-    if (!selectedPatient || !selectedAppointment) return;
+    if (!selectedAppointment) return;
     
     const followUpDate = new Date();
     followUpDate.setDate(followUpDate.getDate() + followUpDays);
+
+    // Use selectedPatient if available, otherwise use appointment data
+    const patientName = selectedPatient?.nameBn || selectedPatient?.name || selectedAppointment.patientNameBn || selectedAppointment.patientName;
+    const patientAge = selectedPatient?.age || selectedAppointment.patientAge || 0;
+    const patientGender = (selectedPatient?.gender || selectedAppointment.patientGender || 'Male') === 'Male' ? 'পুরুষ' : 'মহিলা';
+    const patientPhone = selectedPatient?.phone || selectedAppointment.patientPhone || '';
 
     const data: PrescriptionData = {
       doctorName: doctorProfile.name,
@@ -493,10 +570,10 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       chamberName: doctorProfile.hospitalBn,
       chamberAddress: doctorProfile.chamberAddress,
       chamberPhone: doctorProfile.chamberPhone,
-      patientName: selectedPatient.nameBn,
-      patientAge: selectedPatient.age,
-      patientGender: selectedPatient.gender === 'Male' ? 'পুরুষ' : 'মহিলা',
-      patientPhone: selectedPatient.phone,
+      patientName: patientName,
+      patientAge: patientAge,
+      patientGender: patientGender,
+      patientPhone: patientPhone,
       date: new Date().toLocaleDateString('bn-BD'),
       serialNumber: selectedAppointment.serial,
       diagnosis: diagnosis,
@@ -510,9 +587,34 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     openPrescriptionWindow(data);
   };
 
-  const completeConsultation = () => {
+  const completeConsultation = async () => {
     if (selectedAppointment) {
       updateAppointmentStatus(selectedAppointment.id, 'Completed');
+      
+      // Save consultation data to Supabase
+      if (isSupabaseConfigured()) {
+        try {
+          // Update appointment status and notes
+          await supabase
+            .from('appointments')
+            .update({ 
+              status: 'completed',
+              notes: JSON.stringify({
+                soapNote,
+                diagnosis,
+                advice,
+                prescription,
+                completedAt: new Date().toISOString()
+              })
+            })
+            .eq('id', selectedAppointment.id);
+          
+          console.log('[Consultation] ✅ Saved to database');
+        } catch (e) {
+          console.error('[Consultation] ❌ Error saving:', e);
+        }
+      }
+      
       generatePrescription();
       setSelectedPatient(null);
       setSelectedAppointment(null);
@@ -1099,7 +1201,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
   // ============ RENDER CONSULTATION ============
   const renderConsultation = () => {
-    if (!selectedPatient || !selectedAppointment) {
+    if (!selectedAppointment) {
       return (
         <div className="flex flex-col items-center justify-center h-96 text-slate-400">
           <div className="text-6xl mb-4">👨‍⚕️</div>
@@ -1111,6 +1213,16 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       );
     }
 
+    // Safe getters for patient data (handle missing data gracefully)
+    const patientName = selectedPatient?.nameBn || selectedPatient?.name || selectedAppointment.patientNameBn || selectedAppointment.patientName || 'রোগী';
+    const patientAge = selectedPatient?.age || selectedAppointment.patientAge || 0;
+    const patientGender = selectedPatient?.gender || selectedAppointment.patientGender || 'Male';
+    const patientBloodGroup = selectedPatient?.bloodGroup || 'Unknown';
+    const patientConditions = selectedPatient?.conditions || [];
+    const patientAllergies = selectedPatient?.allergies || [];
+    const patientPhone = selectedPatient?.phone || selectedAppointment.patientPhone || '';
+    const patientImage = selectedAppointment.patientImage || selectedPatient?.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(patientName)}&background=3b82f6&color=fff&size=200`;
+
     return (
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left: Patient Info & SOAP */}
@@ -1118,24 +1230,31 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           {/* Patient Header */}
           <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white">
             <div className="flex items-center gap-4">
-              <img src={selectedAppointment.patientImage} alt="" className="w-20 h-20 rounded-xl border-4 border-white/30" />
+              <img src={patientImage} alt="" className="w-20 h-20 rounded-xl border-4 border-white/30" />
               <div className="flex-1">
-                <h2 className="text-2xl font-bold">{selectedPatient.nameBn}</h2>
-                <p className="opacity-90">{selectedPatient.age} বছর • {selectedPatient.gender === 'Male' ? 'পুরুষ' : 'মহিলা'} • {selectedPatient.bloodGroup}</p>
-                <div className="flex gap-2 mt-2">
-                  {selectedPatient.conditions.map(c => (
-                    <span key={c} className="px-2 py-0.5 bg-white/20 rounded text-xs">{c}</span>
-                  ))}
-                </div>
+                <h2 className="text-2xl font-bold">{patientName}</h2>
+                <p className="opacity-90">
+                  {patientAge > 0 ? `${patientAge} বছর • ` : ''}
+                  {patientGender === 'Male' ? 'পুরুষ' : 'মহিলা'}
+                  {patientBloodGroup !== 'Unknown' ? ` • ${patientBloodGroup}` : ''}
+                </p>
+                <p className="opacity-80 text-sm">{patientPhone}</p>
+                {patientConditions.length > 0 && (
+                  <div className="flex gap-2 mt-2">
+                    {patientConditions.map(c => (
+                      <span key={c} className="px-2 py-0.5 bg-white/20 rounded text-xs">{c}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <div className="text-sm opacity-80">সিরিয়াল</div>
                 <div className="text-3xl font-bold">#{selectedAppointment.serial}</div>
               </div>
             </div>
-            {selectedPatient.allergies.length > 0 && (
+            {patientAllergies.length > 0 && (
               <div className="mt-4 p-3 bg-red-500/30 rounded-lg">
-                <span className="font-bold">⚠️ এলার্জি:</span> {selectedPatient.allergies.join(', ')}
+                <span className="font-bold">⚠️ এলার্জি:</span> {patientAllergies.join(', ')}
               </div>
             )}
           </div>
@@ -1385,29 +1504,42 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
             <div className="p-4 space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">মোট ভিজিট:</span>
-                <span className="font-medium">{selectedPatient.totalVisits} বার</span>
+                <span className="font-medium">{selectedPatient?.totalVisits || 1} বার</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">শেষ ভিজিট:</span>
-                <span className="font-medium">{new Date(selectedPatient.lastVisit).toLocaleDateString('bn-BD')}</span>
+                <span className="text-slate-500">আজকের ভিজিট:</span>
+                <span className="font-medium">{new Date(selectedAppointment.date).toLocaleDateString('bn-BD')}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">ঝুঁকির মাত্রা:</span>
-                <span className={`font-medium ${selectedPatient.riskLevel === 'High' ? 'text-red-600' : selectedPatient.riskLevel === 'Medium' ? 'text-yellow-600' : 'text-green-600'}`}>
-                  {selectedPatient.riskLevel === 'High' ? 'উচ্চ' : selectedPatient.riskLevel === 'Medium' ? 'মাঝারি' : 'কম'}
+                <span className="text-slate-500">সমস্যা:</span>
+                <span className="font-medium text-blue-600">{selectedAppointment.chiefComplaint || 'উল্লেখ নেই'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">ভিজিটের ধরন:</span>
+                <span className="font-medium">
+                  {selectedAppointment.type === 'New' ? 'নতুন রোগী' : 
+                   selectedAppointment.type === 'Follow-up' ? 'ফলো-আপ' : 
+                   selectedAppointment.type === 'Report' ? 'রিপোর্ট দেখানো' : 
+                   selectedAppointment.type}
                 </span>
               </div>
-              
-              <div className="pt-3 border-t">
-                <div className="text-sm font-medium text-slate-600 mb-2">বর্তমান ওষুধ:</div>
-                <div className="space-y-1">
-                  {selectedPatient.medications.map((med, i) => (
-                    <div key={i} className="text-sm px-2 py-1 bg-blue-50 text-blue-700 rounded">{med}</div>
-                  ))}
-                </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">ফি:</span>
+                <span className="font-medium text-green-600">৳{selectedAppointment.fee}</span>
               </div>
+              
+              {selectedPatient?.medications && selectedPatient.medications.length > 0 && (
+                <div className="pt-3 border-t">
+                  <div className="text-sm font-medium text-slate-600 mb-2">বর্তমান ওষুধ:</div>
+                  <div className="space-y-1">
+                    {selectedPatient.medications.map((med, i) => (
+                      <div key={i} className="text-sm px-2 py-1 bg-blue-50 text-blue-700 rounded">{med}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              {selectedPatient.familyHistory.length > 0 && (
+              {selectedPatient?.familyHistory && selectedPatient.familyHistory.length > 0 && (
                 <div className="pt-3 border-t">
                   <div className="text-sm font-medium text-slate-600 mb-2">পারিবারিক ইতিহাস:</div>
                   <div className="space-y-1">
@@ -1415,6 +1547,12 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                       <div key={i} className="text-sm text-slate-600">{h.condition} ({h.relation})</div>
                     ))}
                   </div>
+                </div>
+              )}
+              
+              {!selectedPatient?.medications?.length && !selectedPatient?.familyHistory?.length && (
+                <div className="pt-3 border-t">
+                  <p className="text-sm text-slate-400 text-center py-2">এই রোগীর পূর্ববর্তী তথ্য নেই</p>
                 </div>
               )}
             </div>
