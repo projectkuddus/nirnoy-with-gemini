@@ -1675,9 +1675,6 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               )}
 
               {/* Diagnosis */}
-            
-            <div className="p-4">
-              {/* Diagnosis */}
               <div className="mb-4">
                 <label className="text-sm font-medium text-slate-600">রোগ নির্ণয় (Diagnosis)</label>
                 <input type="text" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="যেমন: উচ্চ রক্তচাপ / Hypertension" className="w-full px-4 py-2 border rounded-lg mt-1" />
