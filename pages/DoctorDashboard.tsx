@@ -5,6 +5,7 @@ import { chatWithDoctorAssistant, getMedicalNews, searchMedicalGuidelines } from
 import { ChatMessage, PrescriptionItem } from '../types';
 import { useAuth, DoctorProfile } from "../contexts/AuthContext";
 import { openPrescriptionWindow, PrescriptionData } from '../utils/prescriptionPDF';
+import { supabase, isSupabaseConfigured } from '../services/supabaseAuth';
 
 // ============ TYPES ============
 interface PatientRecord {
@@ -268,9 +269,86 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   
   // State
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [appointments, setAppointments] = useState<Appointment[]>([]); // Empty - real appointments will come from backend
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
   const [schedule, setSchedule] = useState<Schedule[]>(DEFAULT_SCHEDULE);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+
+  // Fetch real appointments from Supabase
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      if (!user?.id || !isSupabaseConfigured()) {
+        setAppointmentsLoading(false);
+        return;
+      }
+
+      try {
+        console.log('[DoctorDashboard] Fetching appointments for doctor:', user.id);
+        
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('*')
+          .eq('doctor_id', user.id)
+          .order('appointment_date', { ascending: true })
+          .order('appointment_time', { ascending: true });
+
+        if (error) {
+          console.error('[DoctorDashboard] Error fetching appointments:', error);
+          setAppointmentsLoading(false);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          // Transform Supabase data to match Appointment interface
+          const transformedAppointments: Appointment[] = data.map((apt, index) => ({
+            id: apt.id,
+            patientId: apt.patient_id || `guest-${apt.id}`,
+            patientName: apt.patient_name,
+            patientNameBn: apt.patient_name,
+            patientImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(apt.patient_name)}&background=${apt.patient_id ? '3b82f6' : 'ec4899'}&color=fff&size=200`,
+            patientPhone: apt.patient_phone,
+            patientAge: 0, // Not stored in appointments
+            patientGender: 'Male' as const,
+            date: apt.appointment_date,
+            time: apt.appointment_time,
+            serial: apt.serial_number || index + 1,
+            type: apt.visit_type === 'follow_up' ? 'Follow-up' : apt.visit_type === 'report' ? 'Report' : 'New',
+            status: apt.status === 'confirmed' ? 'Waiting' : apt.status === 'completed' ? 'Completed' : apt.status === 'cancelled' ? 'Cancelled' : 'Waiting',
+            chiefComplaint: apt.symptoms,
+            fee: apt.fee || 500,
+            paymentStatus: 'Paid' as const,
+          }));
+
+          console.log('[DoctorDashboard] Loaded', transformedAppointments.length, 'appointments');
+          setAppointments(transformedAppointments);
+        } else {
+          console.log('[DoctorDashboard] No appointments found');
+        }
+      } catch (e) {
+        console.error('[DoctorDashboard] Fetch error:', e);
+      }
+
+      setAppointmentsLoading(false);
+    };
+
+    fetchAppointments();
+
+    // Set up real-time subscription for new appointments
+    const subscription = supabase
+      .channel('appointments-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'appointments', filter: `doctor_id=eq.${user?.id}` },
+        (payload) => {
+          console.log('[DoctorDashboard] Real-time update:', payload);
+          fetchAppointments(); // Refresh appointments on any change
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user?.id]);
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
