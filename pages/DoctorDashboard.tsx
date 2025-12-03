@@ -1436,13 +1436,14 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       { day: 'শুক্র', patients: 0, revenue: 0 },
     ];
 
+    // Calculate real stats from appointments
     const monthlyStats = {
-      totalPatients: 156,
-      totalRevenue: 145000,
-      avgPerDay: 22,
-      noShowRate: 8,
-      newPatients: 45,
-      followUps: 111,
+      totalPatients: appointments.length,
+      totalRevenue: appointments.reduce((sum, a) => sum + a.fee, 0),
+      avgPerDay: appointments.length > 0 ? Math.round(appointments.length / 30) : 0,
+      noShowRate: appointments.length > 0 ? Math.round((appointments.filter(a => a.status === 'No-Show').length / appointments.length) * 100) : 0,
+      newPatients: appointments.filter(a => a.type === 'New').length,
+      followUps: appointments.filter(a => a.type === 'Follow-up').length,
     };
 
     const diagnosisData = [
@@ -2063,9 +2064,18 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h3 className="font-bold text-slate-800 mb-4">এই মাসের সারাংশ</h3>
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-green-50 rounded-xl"><div className="text-2xl font-bold text-green-600">৳১,৪৫,০০০</div><div className="text-sm text-green-700">মোট আয়</div></div>
-                  <div className="p-4 bg-blue-50 rounded-xl"><div className="text-2xl font-bold text-blue-600">১৫৬</div><div className="text-sm text-blue-700">মোট রোগী</div></div>
-                  <div className="p-4 bg-purple-50 rounded-xl"><div className="text-2xl font-bold text-purple-600">৳৯৩০</div><div className="text-sm text-purple-700">গড় ফি</div></div>
+                  <div className="p-4 bg-green-50 rounded-xl">
+                    <div className="text-2xl font-bold text-green-600">৳{appointments.reduce((sum, a) => sum + a.fee, 0).toLocaleString()}</div>
+                    <div className="text-sm text-green-700">মোট আয়</div>
+                  </div>
+                  <div className="p-4 bg-blue-50 rounded-xl">
+                    <div className="text-2xl font-bold text-blue-600">{appointments.length}</div>
+                    <div className="text-sm text-blue-700">মোট রোগী</div>
+                  </div>
+                  <div className="p-4 bg-purple-50 rounded-xl">
+                    <div className="text-2xl font-bold text-purple-600">৳{appointments.length > 0 ? Math.round(appointments.reduce((sum, a) => sum + a.fee, 0) / appointments.length) : 0}</div>
+                    <div className="text-sm text-purple-700">গড় ফি</div>
+                  </div>
                 </div>
               </div>
             </>
