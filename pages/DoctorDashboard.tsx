@@ -373,6 +373,9 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [patientHistory, setPatientHistory] = useState<CompleteMedicalHistory | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isEditingCompleted, setIsEditingCompleted] = useState(false);
+  const [existingConsultationId, setExistingConsultationId] = useState<string | null>(null);
+  const [existingPrescriptions, setExistingPrescriptions] = useState<PrescriptionItem[]>([]);
 
   
   // Consultation state
@@ -453,6 +456,137 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     updateAppointmentStatus(id, 'No-Show');
   };
 
+  // Load and view/edit a completed consultation
+  const viewEditCompletedConsultation = async (apt: Appointment) => {
+    if (!apt.patientId || apt.patientId.startsWith('guest-')) {
+      alert('গেস্ট বুকিং সম্পাদনা করা যাবে না');
+      return;
+    }
+
+    setIsEditingCompleted(true);
+    setLoadingHistory(true);
+
+    try {
+      // Load existing consultation data
+      const { data: consultationData, error: consultationError } = await supabase
+        .from('consultations')
+        .select('*')
+        .eq('appointment_id', apt.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (consultationError && consultationError.code !== 'PGRST116') {
+        console.error('[Consultation] Error loading consultation:', consultationError);
+      }
+
+      // Load existing prescriptions
+      const { data: prescriptionData, error: prescriptionError } = await supabase
+        .from('prescriptions')
+        .select('*')
+        .eq('appointment_id', apt.id)
+        .order('created_at', { ascending: true });
+
+      if (prescriptionError) {
+        console.error('[Consultation] Error loading prescriptions:', prescriptionError);
+      }
+
+      // Create patient record
+      const patientFromAppointment: PatientRecord = {
+        id: apt.patientId,
+        name: apt.patientName,
+        nameBn: apt.patientNameBn || apt.patientName,
+        age: apt.patientAge || 0,
+        gender: apt.patientGender || 'Male',
+        phone: apt.patientPhone,
+        bloodGroup: 'Unknown',
+        profileImage: apt.patientImage,
+        lastVisit: apt.date,
+        totalVisits: 1,
+        diagnosis: consultationData?.diagnosis || '',
+        diagnosisBn: consultationData?.diagnosis_bn || '',
+        riskLevel: 'Low',
+        conditions: [],
+        medications: [],
+        allergies: [],
+        familyHistory: [],
+        vitals: consultationData?.vitals ? [consultationData.vitals] : [],
+        consultations: []
+      };
+
+      // Try to fetch additional patient data
+      if (isSupabaseConfigured()) {
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', apt.patientId)
+            .single();
+          
+          if (profileData) {
+            patientFromAppointment.name = profileData.name || apt.patientName;
+            patientFromAppointment.nameBn = profileData.name_bn || profileData.name || apt.patientName;
+            patientFromAppointment.phone = profileData.phone || apt.patientPhone;
+            patientFromAppointment.profileImage = profileData.avatar_url || apt.patientImage;
+            patientFromAppointment.gender = profileData.gender === 'female' ? 'Female' : 'Male';
+            if (profileData.date_of_birth) {
+              const birthDate = new Date(profileData.date_of_birth);
+              const age = Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+              patientFromAppointment.age = age;
+            }
+          }
+        } catch (e) {
+          console.log('[Consultation] Could not fetch additional patient data:', e);
+        }
+      }
+
+      setSelectedPatient(patientFromAppointment);
+      setSelectedAppointment(apt);
+      setActiveTab('consult');
+
+      // Load existing consultation data into form
+      if (consultationData) {
+        setExistingConsultationId(consultationData.id);
+        setSoapNote({
+          subjective: consultationData.subjective || apt.chiefComplaint || '',
+          objective: consultationData.objective || '',
+          assessment: consultationData.assessment || '',
+          plan: consultationData.plan || ''
+        });
+        setDiagnosis(consultationData.diagnosis || '');
+        setAdvice(consultationData.advice || []);
+      } else {
+        setExistingConsultationId(null);
+        setSoapNote({ subjective: apt.chiefComplaint || '', objective: '', assessment: '', plan: '' });
+        setDiagnosis('');
+        setAdvice([]);
+      }
+
+      // Load existing prescriptions (keep them separate)
+      if (prescriptionData && prescriptionData.length > 0) {
+        const existingPresc: PrescriptionItem[] = prescriptionData.map(p => ({
+          medicine: p.medicine_name,
+          dosage: p.dosage,
+          duration: p.duration,
+          instruction: p.instruction || ''
+        }));
+        setExistingPrescriptions(existingPresc);
+        setPrescription([]); // New prescriptions will be added here
+      } else {
+        setExistingPrescriptions([]);
+        setPrescription([]);
+      }
+
+      // Load patient history
+      const history = await getPatientHistoryForDoctor(apt.patientId, user?.id);
+      setPatientHistory(history);
+    } catch (e) {
+      console.error('[Consultation] Error loading completed consultation:', e);
+    }
+
+    setLoadingHistory(false);
+  };
+
   const startConsultation = async (apt: Appointment) => {
     // If there's a current patient, complete them first
     if (currentPatient && currentPatient.id !== apt.id) {
@@ -525,6 +659,10 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       }
     }
     
+    setIsEditingCompleted(false);
+    setExistingConsultationId(null);
+    setExistingPrescriptions([]);
+    
     setSelectedPatient(patientFromAppointment);
     setSelectedAppointment(apt);
     setActiveTab('consult');
@@ -579,6 +717,11 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     const patientGender = (selectedPatient?.gender || selectedAppointment.patientGender || 'Male') === 'Male' ? 'পুরুষ' : 'মহিলা';
     const patientPhone = selectedPatient?.phone || selectedAppointment.patientPhone || '';
 
+    // Combine existing and new prescriptions for printing
+    const allPrescriptions = isEditingCompleted 
+      ? [...existingPrescriptions, ...prescription]
+      : prescription;
+
     const data: PrescriptionData = {
       doctorName: doctorProfile.name,
       doctorNameBn: doctorProfile.nameBn,
@@ -597,7 +740,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       diagnosis: diagnosis,
       diagnosisBn: diagnosis,
       clinicalNotes: soapNote.assessment,
-      medicines: prescription,
+      medicines: allPrescriptions, // Include both old and new
       advice: advice.filter(a => a.trim()),
       followUpDate: followUpDate.toLocaleDateString('bn-BD'),
     };
@@ -627,61 +770,91 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
             })
             .eq('id', selectedAppointment.id);
           
-          // 2. Create consultation record
+          // 2. Create or update consultation record
           const consultationDate = selectedAppointment.date || new Date().toISOString().split('T')[0];
           const consultationTime = selectedAppointment.time || new Date().toTimeString().split(' ')[0].substring(0, 5);
           
-          const { data: consultationData, error: consultationError } = await supabase
-            .from('consultations')
-            .insert({
-              appointment_id: selectedAppointment.id,
-              doctor_id: user?.id,
-              patient_id: selectedAppointment.patientId.startsWith('guest-') ? null : selectedAppointment.patientId,
-              subjective: soapNote.subjective,
-              objective: soapNote.objective,
-              assessment: soapNote.assessment,
-              plan: soapNote.plan,
-              diagnosis: diagnosis,
-              diagnosis_bn: diagnosis, // Can be enhanced later
-              advice: advice.filter(a => a.trim()),
-              consultation_date: consultationDate,
-              consultation_time: consultationTime,
-            })
-            .select()
-            .single();
+          let consultationData;
           
-          if (consultationError) {
-            console.error('[Consultation] ❌ Error creating consultation:', consultationError);
-          } else {
-            console.log('[Consultation] ✅ Consultation record created:', consultationData?.id);
+          if (isEditingCompleted && existingConsultationId) {
+            // Update existing consultation
+            const { data, error: consultationError } = await supabase
+              .from('consultations')
+              .update({
+                subjective: soapNote.subjective,
+                objective: soapNote.objective,
+                assessment: soapNote.assessment,
+                plan: soapNote.plan,
+                diagnosis: diagnosis,
+                diagnosis_bn: diagnosis,
+                advice: advice.filter(a => a.trim()),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingConsultationId)
+              .select()
+              .single();
             
-            // 3. Create prescription records
-            if (prescription.length > 0 && consultationData) {
-              const prescriptionRecords = prescription.map(med => ({
-                consultation_id: consultationData.id,
+            if (consultationError) {
+              console.error('[Consultation] ❌ Error updating consultation:', consultationError);
+            } else {
+              consultationData = data;
+              console.log('[Consultation] ✅ Consultation updated:', consultationData?.id);
+            }
+          } else {
+            // Create new consultation
+            const { data, error: consultationError } = await supabase
+              .from('consultations')
+              .insert({
                 appointment_id: selectedAppointment.id,
                 doctor_id: user?.id,
                 patient_id: selectedAppointment.patientId.startsWith('guest-') ? null : selectedAppointment.patientId,
-                medicine_name: med.medicine,
-                medicine_name_bn: med.medicine, // Can be enhanced later
-                dosage: med.dosage,
-                duration: med.duration,
-                instruction: med.instruction,
-                prescription_date: consultationDate,
-                follow_up_date: followUpDays > 0 
-                  ? new Date(Date.now() + followUpDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-                  : null,
-              }));
-              
-              const { error: prescriptionError } = await supabase
-                .from('prescriptions')
-                .insert(prescriptionRecords);
-              
-              if (prescriptionError) {
-                console.error('[Consultation] ❌ Error creating prescriptions:', prescriptionError);
-              } else {
-                console.log('[Consultation] ✅ Prescriptions saved:', prescriptionRecords.length);
-              }
+                subjective: soapNote.subjective,
+                objective: soapNote.objective,
+                assessment: soapNote.assessment,
+                plan: soapNote.plan,
+                diagnosis: diagnosis,
+                diagnosis_bn: diagnosis,
+                advice: advice.filter(a => a.trim()),
+                consultation_date: consultationDate,
+                consultation_time: consultationTime,
+              })
+              .select()
+              .single();
+            
+            if (consultationError) {
+              console.error('[Consultation] ❌ Error creating consultation:', consultationError);
+            } else {
+              consultationData = data;
+              console.log('[Consultation] ✅ Consultation record created:', consultationData?.id);
+            }
+          }
+          
+          // 3. Create new prescription records (existing ones are preserved)
+          if (prescription.length > 0 && consultationData) {
+            const prescriptionRecords = prescription.map(med => ({
+              consultation_id: consultationData.id,
+              appointment_id: selectedAppointment.id,
+              doctor_id: user?.id,
+              patient_id: selectedAppointment.patientId.startsWith('guest-') ? null : selectedAppointment.patientId,
+              medicine_name: med.medicine,
+              medicine_name_bn: med.medicine,
+              dosage: med.dosage,
+              duration: med.duration,
+              instruction: med.instruction,
+              prescription_date: consultationDate,
+              follow_up_date: followUpDays > 0 
+                ? new Date(Date.now() + followUpDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                : null,
+            }));
+            
+            const { error: prescriptionError } = await supabase
+              .from('prescriptions')
+              .insert(prescriptionRecords);
+            
+            if (prescriptionError) {
+              console.error('[Consultation] ❌ Error creating prescriptions:', prescriptionError);
+            } else {
+              console.log('[Consultation] ✅ New prescriptions saved:', prescriptionRecords.length);
             }
           }
           
@@ -692,6 +865,9 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       }
       
       generatePrescription();
+      setIsEditingCompleted(false);
+      setExistingConsultationId(null);
+      setExistingPrescriptions([]);
       setSelectedPatient(null);
       setSelectedAppointment(null);
       setActiveTab('queue');
@@ -1075,19 +1251,28 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                   </button>
                 )}
                 {apt.status === 'Completed' && (
-                  <button 
-                    onClick={() => togglePaymentStatus(apt.id, apt.paymentStatus)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                      apt.paymentStatus === 'Paid' 
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                        : apt.paymentStatus === 'Pending'
-                        ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                    title="পেমেন্ট স্ট্যাটাস পরিবর্তন করুন"
-                  >
-                    {apt.paymentStatus === 'Paid' ? '✓ পেইড' : apt.paymentStatus === 'Pending' ? '⏳ বকেয়া' : '⊘ মওকুফ'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => viewEditCompletedConsultation(apt)}
+                      className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600"
+                      title="পরামর্শ দেখুন/সম্পাদনা করুন"
+                    >
+                      📋 দেখুন/সম্পাদনা
+                    </button>
+                    <button 
+                      onClick={() => togglePaymentStatus(apt.id, apt.paymentStatus)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                        apt.paymentStatus === 'Paid' 
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                          : apt.paymentStatus === 'Pending'
+                          ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      title="পেমেন্ট স্ট্যাটাস পরিবর্তন করুন"
+                    >
+                      {apt.paymentStatus === 'Paid' ? '✓ পেইড' : apt.paymentStatus === 'Pending' ? '⏳ বকেয়া' : '⊘ মওকুফ'}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1361,10 +1546,15 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         {/* Left: Patient Info & SOAP */}
         <div className="lg:col-span-2 space-y-6">
           {/* Patient Header */}
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white">
+          <div className={`rounded-2xl p-6 text-white ${isEditingCompleted ? 'bg-gradient-to-r from-orange-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-indigo-600'}`}>
             <div className="flex items-center gap-4">
               <img src={patientImage} alt="" className="w-20 h-20 rounded-xl border-4 border-white/30" />
               <div className="flex-1">
+                {isEditingCompleted && (
+                  <div className="mb-2 px-3 py-1 bg-white/20 rounded-full text-xs font-bold inline-block">
+                    📝 সম্পাদনা মোড
+                  </div>
+                )}
                 <h2 className="text-2xl font-bold">{patientName}</h2>
                 <p className="opacity-90">
                   {patientAge > 0 ? `${patientAge} বছর • ` : ''}
@@ -1432,7 +1622,12 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           {/* Prescription */}
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800">℞ প্রেসক্রিপশন</h3>
+              <div>
+                <h3 className="font-bold text-slate-800">℞ প্রেসক্রিপশন</h3>
+                {isEditingCompleted && (
+                  <p className="text-xs text-blue-600 mt-1">📝 সম্পাদনা মোড: পূর্ববর্তী প্রেসক্রিপশন সংরক্ষিত থাকবে</p>
+                )}
+              </div>
               <div className="flex gap-2">
                 <select onChange={(e) => { const t = PRESCRIPTION_TEMPLATES.find(t => t.name === e.target.value); if (t) addMedicine(t); e.target.value = ''; }} className="px-3 py-1.5 border rounded-lg text-sm">
                   <option value="">টেমপ্লেট থেকে যোগ করুন</option>
@@ -1445,6 +1640,41 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 </button>
               </div>
             </div>
+            
+            <div className="p-4">
+              {/* Existing Prescriptions (if editing) */}
+              {isEditingCompleted && existingPrescriptions.length > 0 && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-blue-800">📋 পূর্ববর্তী প্রেসক্রিপশন ({existingPrescriptions.length})</h4>
+                    <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">সংরক্ষিত</span>
+                  </div>
+                  <div className="space-y-2">
+                    {existingPrescriptions.map((med, i) => (
+                      <div key={i} className="bg-white rounded-lg p-3 border border-blue-100">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-slate-800">{med.medicine}</div>
+                            <div className="text-sm text-slate-600 mt-1">
+                              <span>মাত্রা: {med.dosage}</span>
+                              <span className="mx-2">•</span>
+                              <span>সময়কাল: {med.duration}</span>
+                              {med.instruction && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span>নির্দেশনা: {med.instruction}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Diagnosis */}
             
             <div className="p-4">
               {/* Diagnosis */}
