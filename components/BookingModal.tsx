@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Doctor, Chamber } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase, isSupabaseConfigured } from '../services/supabaseAuth';
@@ -14,8 +15,12 @@ type VisitType = 'NEW' | 'FOLLOW_UP' | 'REPORT';
 
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onClose }) => {
   const { language } = useLanguage();
-  const { user, role } = useAuth();
+  const { user, role, isAuthenticated } = useAuth();
   const isBn = language === 'bn';
+  const navigate = useNavigate();
+
+  // Check if user is a registered patient
+  const isPatient = isAuthenticated && user?.id && (role === 'patient' || role === 'PATIENT');
 
   // State
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -240,22 +245,22 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
         
         console.log('[BookingModal] Saving appointment with doctor_id:', doctorId);
         
-        // Create appointment in Supabase
+        // Create appointment in Supabase - only for registered patients
         const appointmentData = {
           doctor_id: doctorId,
-          patient_id: user?.id || null, // null for guest bookings
-          patient_name: patientName,
-          patient_phone: patientPhone,
+          patient_id: user!.id, // Must be registered patient
+          patient_name: patientName || user!.name,
+          patient_phone: patientPhone || user!.phone,
           appointment_date: selectedDate,
           appointment_time: selectedSlot?.time,
-          serial_number: selectedSlot?.serial,
+          serial_number: assignedSerial,
           visit_type: visitType.toLowerCase(),
           symptoms: symptoms || null,
           fee: fee,
           status: 'confirmed',
           chamber_name: chamber.name,
           chamber_address: chamber.address || 'Dhaka, Bangladesh',
-          is_guest_booking: !user,
+          is_guest_booking: false, // No guest bookings allowed
           created_at: new Date().toISOString()
         };
         
@@ -300,6 +305,63 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
         return false;
     }
   };
+
+  // Login Required Screen - if not a registered patient
+  if (!isPatient) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-scale-in">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-8 text-center text-white">
+            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fas fa-user-lock text-4xl"></i>
+            </div>
+            <h2 className="text-2xl font-bold mb-1">
+              {isBn ? 'লগইন প্রয়োজন' : 'Login Required'}
+            </h2>
+            <p className="opacity-90">
+              {isBn ? 'অ্যাপয়েন্টমেন্ট বুক করতে রেজিস্ট্রেশন করুন' : 'Register to book appointments'}
+            </p>
+          </div>
+          
+          <div className="p-6">
+            <div className="bg-blue-50 rounded-xl p-4 mb-4">
+              <p className="text-sm text-blue-800 text-center">
+                {isBn ? '✅ রেজিস্ট্রেশন বিনামূল্যে\n✅ ফোন নম্বর দিয়ে সহজে রেজিস্টার করুন' : '✅ Registration is FREE\n✅ Quick signup with phone number'}
+              </p>
+            </div>
+
+            {/* Doctor Info */}
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+              <img src={doctor.image} alt={doctor.name} className="w-12 h-12 rounded-lg object-cover" />
+              <div>
+                <p className="font-bold text-slate-800">{doctor.name}</p>
+                <p className="text-sm text-slate-500">{chamber.name}</p>
+              </div>
+              <div className="ml-auto text-right">
+                <p className="text-sm text-slate-500">{isBn ? 'ফি' : 'Fee'}</p>
+                <p className="font-bold text-blue-600">৳{chamber.fee}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition"
+              >
+                {isBn ? 'বাতিল' : 'Cancel'}
+              </button>
+              <button
+                onClick={() => { onClose(); navigate('/patient-auth'); }}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-3 rounded-xl font-bold hover:shadow-lg transition"
+              >
+                {isBn ? 'লগইন / রেজিস্টার' : 'Login / Register'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Success Screen
   if (bookingComplete) {

@@ -7,9 +7,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { adminService, DoctorListItem, AdminStats } from '../services/adminService';
+import { getFeedbacksAsync, updateFeedbackStatus, FeedbackData } from '../components/FeedbackWidget';
 
 // ============ TYPES ============
-type Tab = 'overview' | 'requests' | 'doctors' | 'patients' | 'settings';
+type Tab = 'overview' | 'requests' | 'doctors' | 'patients' | 'feedback' | 'settings';
 
 // ============ ADMIN PASSWORD (should be in env/backend in production) ============
 const ADMIN_PASSWORD = 'nirnoy2025';
@@ -29,11 +30,14 @@ export const AdminDashboardV2: React.FC = () => {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [pendingDoctors, setPendingDoctors] = useState<DoctorListItem[]>([]);
   const [approvedDoctors, setApprovedDoctors] = useState<DoctorListItem[]>([]);
+  const [feedbacks, setFeedbacks] = useState<FeedbackData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   // Action states
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
 
   // ============ DATA LOADING ============
   const loadData = useCallback(async () => {
@@ -41,26 +45,43 @@ export const AdminDashboardV2: React.FC = () => {
     try {
       console.log('[AdminV2] Loading data...');
       
-      const [statsData, pending, approved] = await Promise.all([
+      const [statsData, pending, approved, fbs] = await Promise.all([
         adminService.getStats(),
         adminService.getPendingDoctors(),
         adminService.getDoctors(1, 100, 'approved'),
+        getFeedbacksAsync(),
       ]);
 
       setStats(statsData);
       setPendingDoctors(pending);
       setApprovedDoctors(approved.data);
+      setFeedbacks(fbs);
       
       console.log('[AdminV2] Data loaded:', { 
         stats: statsData, 
         pendingCount: pending.length,
-        approvedCount: approved.data.length 
+        approvedCount: approved.data.length,
+        feedbackCount: fbs.length
       });
     } catch (error) {
       console.error('[AdminV2] Load error:', error);
     }
     setLoading(false);
   }, []);
+  
+  // Handle feedback status update
+  const handleFeedbackUpdate = async (feedbackId: string, status: FeedbackData['status'], reply?: string) => {
+    const success = await updateFeedbackStatus(feedbackId, status, reply);
+    if (success) {
+      setFeedbacks(prev => prev.map(fb => 
+        fb.id === feedbackId 
+          ? { ...fb, status, adminReply: reply || fb.adminReply, adminRepliedAt: reply ? new Date().toISOString() : fb.adminRepliedAt }
+          : fb
+      ));
+      setReplyingTo(null);
+      setReplyText('');
+    }
+  };
 
   // Initial load
   useEffect(() => {
@@ -233,6 +254,7 @@ export const AdminDashboardV2: React.FC = () => {
               { id: 'requests', icon: 'fa-user-clock', label: isBn ? 'ডাক্তার অনুরোধ' : 'Doctor Requests', badge: stats?.pendingDoctors },
               { id: 'doctors', icon: 'fa-user-md', label: isBn ? 'ডাক্তারগণ' : 'Doctors', badge: stats?.approvedDoctors },
               { id: 'patients', icon: 'fa-users', label: isBn ? 'রোগীগণ' : 'Patients', badge: stats?.totalPatients },
+              { id: 'feedback', icon: 'fa-comments', label: isBn ? 'ফিডব্যাক' : 'Feedback', badge: feedbacks.filter(f => f.status === 'new').length || undefined },
               { id: 'settings', icon: 'fa-cog', label: isBn ? 'সেটিংস' : 'Settings' },
             ].map(item => (
               <button
@@ -453,6 +475,122 @@ export const AdminDashboardV2: React.FC = () => {
                     <i className="fas fa-users text-4xl text-slate-500 mb-4"></i>
                     <p className="text-slate-400">{stats?.totalPatients || 0} {isBn ? 'জন রোগী' : 'patients'}</p>
                   </div>
+                </div>
+              )}
+
+              {/* Feedback Tab */}
+              {activeTab === 'feedback' && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-white">{isBn ? 'ইউজার ফিডব্যাক' : 'User Feedback'}</h2>
+                    <div className="flex gap-2">
+                      <span className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm">
+                        {feedbacks.length} {isBn ? 'মোট' : 'Total'}
+                      </span>
+                      <span className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm">
+                        {feedbacks.filter(f => f.status === 'new').length} {isBn ? 'নতুন' : 'New'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {feedbacks.length === 0 ? (
+                    <div className="bg-white/5 rounded-2xl p-12 text-center border border-white/10">
+                      <div className="text-4xl mb-4">💬</div>
+                      <p className="text-xl font-bold text-white mb-2">{isBn ? 'কোনো ফিডব্যাক নেই' : 'No Feedback Yet'}</p>
+                      <p className="text-slate-400">{isBn ? 'ইউজাররা এখনো কোনো ফিডব্যাক দেননি' : 'Users have not submitted any feedback yet'}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {feedbacks.map((fb) => (
+                        <div key={fb.id} className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-start gap-4">
+                              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center text-2xl">
+                                {fb.mood === 'happy' ? '😊' : fb.mood === 'sad' ? '😞' : '😐'}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-bold text-white">{fb.userName || 'User'}</p>
+                                  <span className={`px-2 py-0.5 rounded text-xs ${
+                                    fb.userRole === 'doctor' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
+                                  }`}>
+                                    {fb.userRole === 'doctor' ? (isBn ? 'ডাক্তার' : 'Doctor') : (isBn ? 'রোগী' : 'Patient')}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded text-xs ${
+                                    fb.type === 'bug' ? 'bg-red-500/20 text-red-400' : 
+                                    fb.type === 'feature' ? 'bg-blue-500/20 text-blue-400' :
+                                    fb.type === 'complaint' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-500/20 text-slate-400'
+                                  }`}>
+                                    {fb.type}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-slate-400">{new Date(fb.timestamp).toLocaleString('bn-BD')}</p>
+                              </div>
+                            </div>
+                            <select
+                              value={fb.status}
+                              onChange={(e) => handleFeedbackUpdate(fb.id, e.target.value as FeedbackData['status'])}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium bg-slate-700 text-white border border-slate-600`}
+                            >
+                              <option value="new">{isBn ? '🕐 নতুন' : '🕐 New'}</option>
+                              <option value="reviewed">{isBn ? '👁️ দেখা হয়েছে' : '👁️ Reviewed'}</option>
+                              <option value="resolved">{isBn ? '✅ সমাধান' : '✅ Resolved'}</option>
+                            </select>
+                          </div>
+
+                          <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
+                            <p className="text-slate-200">{fb.message}</p>
+                          </div>
+
+                          {/* Admin Reply Section */}
+                          {fb.adminReply ? (
+                            <div className="bg-green-500/10 rounded-xl p-4 border border-green-500/20">
+                              <p className="text-xs text-green-400 mb-2 font-bold">
+                                <i className="fas fa-reply mr-2"></i>
+                                {isBn ? 'অ্যাডমিন উত্তর' : 'Admin Reply'} • {fb.adminRepliedAt ? new Date(fb.adminRepliedAt).toLocaleDateString() : ''}
+                              </p>
+                              <p className="text-green-200">{fb.adminReply}</p>
+                            </div>
+                          ) : replyingTo === fb.id ? (
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder={isBn ? 'উত্তর লিখুন...' : 'Write reply...'}
+                                className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && replyText.trim()) {
+                                    handleFeedbackUpdate(fb.id, 'resolved', replyText.trim());
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={() => replyText.trim() && handleFeedbackUpdate(fb.id, 'resolved', replyText.trim())}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                              >
+                                <i className="fas fa-paper-plane"></i>
+                              </button>
+                              <button
+                                onClick={() => { setReplyingTo(null); setReplyText(''); }}
+                                className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition"
+                              >
+                                <i className="fas fa-times"></i>
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setReplyingTo(fb.id)}
+                              className="text-sm text-blue-400 hover:text-blue-300 transition"
+                            >
+                              <i className="fas fa-reply mr-2"></i>
+                              {isBn ? 'উত্তর দিন' : 'Reply'}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
