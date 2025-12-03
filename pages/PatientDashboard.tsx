@@ -1338,6 +1338,149 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           )}
         </div>
       </main>
+
+      {/* Appointment Details Modal */}
+      {showAppointmentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowAppointmentModal(false)}>
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-blue-600 text-white p-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-xl font-bold">পরামর্শের বিস্তারিত</h2>
+              <button onClick={() => setShowAppointmentModal(false)} className="text-white hover:text-gray-200">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {loadingHistory ? (
+                <div className="text-center py-8">
+                  <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-gray-500 mt-2 text-sm">লোড হচ্ছে...</p>
+                </div>
+              ) : selectedAppointmentDetails ? (
+                <>
+                  {/* Appointment Info */}
+                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">ডাক্তার:</span>
+                        <span className="ml-2 font-medium">{selectedAppointmentDetails.appointment?.profiles?.name || 'Unknown'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">তারিখ:</span>
+                        <span className="ml-2 font-medium">{selectedAppointmentDetails.appointment?.scheduled_date}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">সময়:</span>
+                        <span className="ml-2 font-medium">{selectedAppointmentDetails.appointment?.scheduled_time}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">সিরিয়াল:</span>
+                        <span className="ml-2 font-medium">#{selectedAppointmentDetails.appointment?.serial_number}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Diagnosis */}
+                  {selectedAppointmentDetails.consultation?.diagnosis && (
+                    <div className="bg-white rounded-xl p-4 border border-gray-200">
+                      <h3 className="font-bold text-gray-800 mb-3">🩺 রোগ নির্ণয়</h3>
+                      <p className="text-gray-700">{selectedAppointmentDetails.consultation.diagnosis}</p>
+                      {selectedAppointmentDetails.consultation.diagnosis_bn && selectedAppointmentDetails.consultation.diagnosis_bn !== selectedAppointmentDetails.consultation.diagnosis && (
+                        <p className="text-gray-600 mt-2">{selectedAppointmentDetails.consultation.diagnosis_bn}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SOAP Notes */}
+                  {(selectedAppointmentDetails.consultation?.subjective || selectedAppointmentDetails.consultation?.objective || selectedAppointmentDetails.consultation?.assessment || selectedAppointmentDetails.consultation?.plan) && (
+                    <div className="bg-white rounded-xl p-4 border border-gray-200">
+                      <h3 className="font-bold text-gray-800 mb-3">📝 SOAP নোট</h3>
+                      <div className="space-y-3 text-sm">
+                        {selectedAppointmentDetails.consultation.subjective && (
+                          <div>
+                            <span className="font-bold text-blue-600">S (Subjective):</span>
+                            <p className="text-gray-700 mt-1">{selectedAppointmentDetails.consultation.subjective}</p>
+                          </div>
+                        )}
+                        {selectedAppointmentDetails.consultation.objective && (
+                          <div>
+                            <span className="font-bold text-green-600">O (Objective):</span>
+                            <p className="text-gray-700 mt-1">{selectedAppointmentDetails.consultation.objective}</p>
+                          </div>
+                        )}
+                        {selectedAppointmentDetails.consultation.assessment && (
+                          <div>
+                            <span className="font-bold text-yellow-600">A (Assessment):</span>
+                            <p className="text-gray-700 mt-1">{selectedAppointmentDetails.consultation.assessment}</p>
+                          </div>
+                        )}
+                        {selectedAppointmentDetails.consultation.plan && (
+                          <div>
+                            <span className="font-bold text-purple-600">P (Plan):</span>
+                            <p className="text-gray-700 mt-1">{selectedAppointmentDetails.consultation.plan}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Prescriptions */}
+                  {selectedAppointmentDetails.prescriptions.length > 0 && (
+                    <div className="bg-white rounded-xl p-4 border border-gray-200">
+                      <h3 className="font-bold text-gray-800 mb-3">💊 প্রেসক্রিপশন</h3>
+                      <div className="space-y-3">
+                        {selectedAppointmentDetails.prescriptions.map((presc: any, i: number) => (
+                          <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                            <div className="font-medium text-gray-800">{presc.medicine_name}</div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              <span>মাত্রা: {presc.dosage}</span>
+                              <span className="mx-2">•</span>
+                              <span>সময়কাল: {presc.duration}</span>
+                              {presc.instruction && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span>নির্দেশনা: {presc.instruction}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Advice */}
+                  {selectedAppointmentDetails.consultation?.advice && selectedAppointmentDetails.consultation.advice.length > 0 && (
+                    <div className="bg-white rounded-xl p-4 border border-gray-200">
+                      <h3 className="font-bold text-gray-800 mb-3">💡 পরামর্শ</h3>
+                      <ul className="space-y-2">
+                        {selectedAppointmentDetails.consultation.advice.map((adv: string, i: number) => (
+                          <li key={i} className="text-gray-700 flex items-start gap-2">
+                            <span className="text-blue-500 mt-0.5">•</span>
+                            <span>{adv}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {!selectedAppointmentDetails.consultation && (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>এই অ্যাপয়েন্টমেন্টের জন্য এখনো পরামর্শ সম্পন্ন হয়নি।</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>বিস্তারিত লোড করতে সমস্যা হয়েছে।</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
