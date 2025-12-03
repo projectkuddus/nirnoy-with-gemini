@@ -760,8 +760,8 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
