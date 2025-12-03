@@ -11,10 +11,29 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth, PatientProfile } from '../contexts/AuthContext';
 import { saveFeedback, getUserFeedbacks, FeedbackData } from '../components/FeedbackWidget';
 import { chatWithHealthAssistant } from '../services/geminiService';
-import { aiChatService, authService } from '../services/supabaseAuth';
+import { aiChatService, authService, supabase, isSupabaseConfigured } from '../services/supabaseAuth';
 
 // ============ TYPES ============
-type TabId = 'home' | 'doctors' | 'ai' | 'medication' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback';
+type TabId = 'home' | 'appointments' | 'doctors' | 'ai' | 'medication' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback';
+
+interface AppointmentData {
+  id: string;
+  doctorId: string;
+  doctorName: string;
+  doctorSpecialty: string;
+  chamberName: string;
+  chamberAddress: string;
+  date: string;
+  time: string;
+  serialNumber: number;
+  visitType: string;
+  status: string;
+  fee: number;
+  symptoms?: string;
+  isFamilyBooking?: boolean;
+  familyMemberName?: string;
+  familyRelation?: string;
+}
 
 interface NavItem {
   id: TabId;
@@ -28,7 +47,8 @@ interface NavItem {
 // ============ NAVIGATION CONFIG ============
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', icon: '🏠', label: 'Home', labelBn: 'হোম' },
-  { id: 'doctors', icon: '👨‍⚕️', label: 'Doctors', labelBn: 'ডাক্তার' },
+  { id: 'appointments', icon: '📅', label: 'My Appointments', labelBn: 'আমার অ্যাপয়েন্টমেন্ট' },
+  { id: 'doctors', icon: '👨‍⚕️', label: 'Find Doctors', labelBn: 'ডাক্তার খুঁজুন' },
   { id: 'ai', icon: '🤖', label: 'AI Assistant', labelBn: 'এআই সহায়ক' },
   { id: 'medication', icon: '💊', label: 'Medication', labelBn: 'ওষুধ রিমাইন্ডার', paid: true },
   { id: 'food-scan', icon: '📷', label: 'Ki Khacchi', labelBn: 'কি খাচ্ছি', paid: true },
@@ -73,6 +93,10 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const [fbSent, setFbSent] = useState(false);
   const [myFeedbacks, setMyFeedbacks] = useState<FeedbackData[]>([]);
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false);
+  
+  // Appointments state
+  const [appointments, setAppointments] = useState<AppointmentData[]>([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
   
   // Doctor visits (mock for now, will be from Supabase)
   const [doctorVisits, setDoctorVisits] = useState<any[]>([]);
@@ -251,6 +275,104 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   useEffect(() => {
     if (activeTab === 'feedback') loadMyFeedbacks();
   }, [activeTab, loadMyFeedbacks]);
+
+  // Load user's appointments
+  const loadMyAppointments = useCallback(async () => {
+    if (!patientUser || !isSupabaseConfigured()) return;
+    setLoadingAppointments(true);
+    try {
+      // Query appointments for this patient (either as patient_id or booked_by_id)
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .or(`patient_id.eq.${patientUser.id},booked_by_id.eq.${patientUser.id}`)
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true });
+
+      if (error) {
+        console.error('[PatientDashboard] Error fetching appointments:', error);
+        setLoadingAppointments(false);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Get doctor info for each appointment
+        const doctorIds = [...new Set(data.map(apt => apt.doctor_id))];
+        
+        // Fetch doctor profiles
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', doctorIds);
+        
+        // Fetch doctor specialties
+        const { data: doctors } = await supabase
+          .from('doctors')
+          .select('profile_id, specialties')
+          .in('profile_id', doctorIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        const doctorMap = new Map(doctors?.map(d => [d.profile_id, d]) || []);
+        
+        const transformedAppointments: AppointmentData[] = data.map(apt => {
+          const profile = profileMap.get(apt.doctor_id);
+          const doctorData = doctorMap.get(apt.doctor_id);
+          
+          return {
+            id: apt.id,
+            doctorId: apt.doctor_id,
+            doctorName: profile?.name || 'Unknown Doctor',
+            doctorSpecialty: doctorData?.specialties?.[0] || 'General',
+            chamberName: apt.chamber_name || 'Chamber',
+            chamberAddress: apt.chamber_address || '',
+            date: apt.appointment_date,
+            time: apt.appointment_time,
+            serialNumber: apt.serial_number || 1,
+            visitType: apt.visit_type || 'new',
+            status: apt.status || 'confirmed',
+            fee: apt.fee || 500,
+            symptoms: apt.symptoms,
+            isFamilyBooking: apt.is_family_booking || false,
+            familyMemberName: apt.patient_name,
+            familyRelation: apt.family_relation,
+          };
+        });
+
+        console.log('[PatientDashboard] Loaded', transformedAppointments.length, 'appointments');
+        setAppointments(transformedAppointments);
+      } else {
+        setAppointments([]);
+      }
+    } catch (e) {
+      console.error('[PatientDashboard] Appointment load error:', e);
+    }
+    setLoadingAppointments(false);
+  }, [patientUser]);
+
+  // Load appointments when tab is active or on mount
+  useEffect(() => {
+    if (activeTab === 'appointments' || activeTab === 'home') loadMyAppointments();
+  }, [activeTab, loadMyAppointments]);
+
+  // Set up real-time subscription for appointments
+  useEffect(() => {
+    if (!patientUser || !isSupabaseConfigured()) return;
+
+    const subscription = supabase
+      .channel('patient-appointments')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'appointments' },
+        () => {
+          console.log('[PatientDashboard] Real-time appointment update');
+          loadMyAppointments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [patientUser, loadMyAppointments]);
 
   // Loading state
   if (isLoading || !patientUser) {
@@ -456,22 +578,173 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             </div>
           )}
 
-          {/* DOCTORS TAB */}
-          {activeTab === 'doctors' && (
+          {/* APPOINTMENTS TAB */}
+          {activeTab === 'appointments' && (
             <div className="space-y-6">
+              {/* Upcoming Appointments */}
               <div className="bg-white rounded-xl p-6 border">
-                <h2 className="text-lg font-bold text-gray-800 mb-4">👨‍⚕️ আপনার ডাক্তার</h2>
-                {doctorVisits.length === 0 ? (
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-800">📅 আমার অ্যাপয়েন্টমেন্ট</h2>
+                  <button onClick={loadMyAppointments} className="text-blue-600 text-sm hover:underline">
+                    {loadingAppointments ? '...' : '🔄 রিফ্রেশ'}
+                  </button>
+                </div>
+                
+                {loadingAppointments ? (
+                  <div className="text-center py-8">
+                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-gray-500 mt-2 text-sm">লোড হচ্ছে...</p>
+                  </div>
+                ) : appointments.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="text-5xl mb-4">🏥</div>
-                    <h3 className="text-lg font-medium text-gray-700">কোনো ডাক্তার ভিজিট নেই</h3>
-                    <p className="text-gray-500 mt-2">আপনি যখন ডাক্তারের কাছে যাবেন, তাদের তথ্য এখানে দেখা যাবে।</p>
+                    <div className="text-5xl mb-4">📅</div>
+                    <h3 className="text-lg font-medium text-gray-700">কোনো অ্যাপয়েন্টমেন্ট নেই</h3>
+                    <p className="text-gray-500 mt-2">আপনার বুক করা অ্যাপয়েন্টমেন্ট এখানে দেখা যাবে।</p>
                     <button onClick={() => navigate('/doctors')} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg">
                       ডাক্তার খুঁজুন
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {/* Separate upcoming and past appointments */}
+                    {(() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      const upcoming = appointments.filter(apt => apt.date >= today && apt.status !== 'cancelled');
+                      const past = appointments.filter(apt => apt.date < today || apt.status === 'completed');
+                      const cancelled = appointments.filter(apt => apt.status === 'cancelled');
+                      
+                      return (
+                        <>
+                          {/* Upcoming */}
+                          {upcoming.length > 0 && (
+                            <div className="mb-6">
+                              <h3 className="text-sm font-bold text-green-600 uppercase mb-3">🟢 আসন্ন অ্যাপয়েন্টমেন্ট ({upcoming.length})</h3>
+                              <div className="space-y-3">
+                                {upcoming.map((apt) => (
+                                  <div key={apt.id} className="p-4 bg-green-50 rounded-xl border border-green-200">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 bg-green-500 rounded-xl flex flex-col items-center justify-center text-white">
+                                          <span className="text-xs font-medium">সিরিয়াল</span>
+                                          <span className="text-xl font-bold">#{apt.serialNumber}</span>
+                                        </div>
+                                        <div>
+                                          <h4 className="font-bold text-gray-800">{apt.doctorName}</h4>
+                                          <p className="text-sm text-gray-500">{apt.doctorSpecialty}</p>
+                                          <p className="text-xs text-gray-400">{apt.chamberName}</p>
+                                          {apt.isFamilyBooking && (
+                                            <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full mt-1">
+                                              👪 {apt.familyMemberName} ({apt.familyRelation})
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="font-bold text-gray-800">{apt.date}</p>
+                                        <p className="text-sm text-blue-600 font-medium">{apt.time?.substring(0, 5)}</p>
+                                        <p className="text-sm text-gray-500">৳{apt.fee}</p>
+                                      </div>
+                                    </div>
+                                    {apt.symptoms && (
+                                      <div className="mt-3 pt-3 border-t border-green-200">
+                                        <p className="text-xs text-gray-500">সমস্যা: <span className="text-gray-700">{apt.symptoms}</span></p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Past */}
+                          {past.length > 0 && (
+                            <div className="mb-6">
+                              <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">⏳ পূর্ববর্তী ({past.length})</h3>
+                              <div className="space-y-3">
+                                {past.slice(0, 5).map((apt) => (
+                                  <div key={apt.id} className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-gray-400 rounded-lg flex items-center justify-center text-white">
+                                          <span className="font-bold">#{apt.serialNumber}</span>
+                                        </div>
+                                        <div>
+                                          <h4 className="font-medium text-gray-700">{apt.doctorName}</h4>
+                                          <p className="text-sm text-gray-500">{apt.doctorSpecialty}</p>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-gray-600">{apt.date}</p>
+                                        <span className="text-xs px-2 py-1 bg-gray-200 text-gray-600 rounded-full">
+                                          {apt.status === 'completed' ? '✓ সম্পন্ন' : 'পাস'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Cancelled */}
+                          {cancelled.length > 0 && (
+                            <div>
+                              <h3 className="text-sm font-bold text-red-500 uppercase mb-3">❌ বাতিল ({cancelled.length})</h3>
+                              <div className="space-y-2">
+                                {cancelled.slice(0, 3).map((apt) => (
+                                  <div key={apt.id} className="p-3 bg-red-50 rounded-lg border border-red-200 text-sm">
+                                    <span className="text-gray-700">{apt.doctorName}</span>
+                                    <span className="text-gray-400 mx-2">•</span>
+                                    <span className="text-gray-500">{apt.date}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+              
+              {/* Quick Actions */}
+              <div className="bg-white rounded-xl p-4 border">
+                <h3 className="font-bold text-gray-800 mb-3">⚡ দ্রুত কাজ</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => navigate('/doctors')} className="p-4 bg-blue-50 rounded-xl text-center hover:bg-blue-100 transition">
+                    <span className="text-2xl mb-2 block">🔍</span>
+                    <span className="text-sm font-medium text-blue-700">ডাক্তার খুঁজুন</span>
+                  </button>
+                  <button onClick={() => setActiveTab('ai')} className="p-4 bg-purple-50 rounded-xl text-center hover:bg-purple-100 transition">
+                    <span className="text-2xl mb-2 block">🤖</span>
+                    <span className="text-sm font-medium text-purple-700">এআই পরামর্শ</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DOCTORS TAB */}
+          {activeTab === 'doctors' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl p-6 border">
+                <h2 className="text-lg font-bold text-gray-800 mb-4">👨‍⚕️ ডাক্তার খুঁজুন</h2>
+                <div className="text-center py-8">
+                  <div className="text-5xl mb-4">🔍</div>
+                  <h3 className="text-lg font-medium text-gray-700">আপনার প্রয়োজন অনুযায়ী ডাক্তার খুঁজুন</h3>
+                  <p className="text-gray-500 mt-2">বিশেষজ্ঞ ডাক্তারদের সাথে অ্যাপয়েন্টমেন্ট বুক করুন।</p>
+                  <button onClick={() => navigate('/doctors')} className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition">
+                    🔍 ডাক্তার খুঁজুন
+                  </button>
+                </div>
+              </div>
+              
+              {/* Recent visits */}
+              {doctorVisits.length > 0 && (
+                <div className="bg-white rounded-xl p-6 border">
+                  <h3 className="font-bold text-gray-800 mb-4">📋 সাম্প্রতিক ভিজিট</h3>
+                  <div className="space-y-3">
                     {doctorVisits.map((visit, i) => (
                       <div key={i} className="p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-4">

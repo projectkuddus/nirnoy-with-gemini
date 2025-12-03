@@ -767,18 +767,36 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         <div className="p-4 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-800">রোগীর তালিকা</h3>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-1.5 border rounded-lg text-sm">
-              <option value="all">সব স্ট্যাটাস</option>
-              <option value="Waiting">অপেক্ষমান</option>
-              <option value="In-Progress">চলমান</option>
-              <option value="Completed">সম্পন্ন</option>
-              <option value="No-Show">নো-শো</option>
-            </select>
+            <div className="flex items-center gap-2">
+              {appointmentsLoading && <span className="text-blue-500 text-sm"><i className="fas fa-spinner fa-spin mr-1"></i>লোড হচ্ছে...</span>}
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-1.5 border rounded-lg text-sm">
+                <option value="all">সব স্ট্যাটাস</option>
+                <option value="Waiting">অপেক্ষমান</option>
+                <option value="In-Progress">চলমান</option>
+                <option value="Completed">সম্পন্ন</option>
+                <option value="No-Show">নো-শো</option>
+              </select>
+            </div>
           </div>
         </div>
         
         <div className="divide-y divide-slate-100">
-          {filteredAppointments.map((apt) => (
+          {appointmentsLoading ? (
+            <div className="p-8 text-center">
+              <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+              <p className="text-slate-500">অ্যাপয়েন্টমেন্ট লোড হচ্ছে...</p>
+            </div>
+          ) : filteredAppointments.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="text-5xl mb-4">📋</div>
+              <h3 className="text-lg font-medium text-slate-700">আজ কোনো অ্যাপয়েন্টমেন্ট নেই</h3>
+              <p className="text-slate-500 mt-2">নতুন অ্যাপয়েন্টমেন্ট এলে এখানে দেখা যাবে।</p>
+              <p className="text-sm text-blue-500 mt-4">
+                <i className="fas fa-info-circle mr-1"></i>
+                রিয়েল-টাইম আপডেট চালু আছে
+              </p>
+            </div>
+          ) : filteredAppointments.map((apt) => (
             <div key={apt.id} className={`p-4 flex items-center gap-4 hover:bg-slate-50 transition ${apt.status === 'In-Progress' ? 'bg-green-50' : ''}`}>
               <div className="w-12 text-center">
                 <div className={`text-lg font-bold ${apt.status === 'Completed' ? 'text-green-600' : apt.status === 'No-Show' ? 'text-red-400' : 'text-slate-800'}`}>

@@ -12,6 +12,17 @@ interface BookingModalProps {
 }
 
 type VisitType = 'NEW' | 'FOLLOW_UP' | 'REPORT';
+type BookingFor = 'self' | 'family';
+
+interface SlotData {
+  time: string;
+  display: string;
+  available: boolean;
+  period: string;
+  isPast: boolean;
+  bookedCount: number;
+  maxCapacity: number;
+}
 
 export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onClose }) => {
   const { language } = useLanguage();
@@ -28,27 +39,61 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const [visitType, setVisitType] = useState<VisitType>('NEW');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<{ time: string; serial: number; display: string } | null>(null);
+  
+  // Booking for self or family
+  const [bookingFor, setBookingFor] = useState<BookingFor>('self');
+  const [familyMemberName, setFamilyMemberName] = useState('');
+  const [familyMemberPhone, setFamilyMemberPhone] = useState('');
+  const [familyRelation, setFamilyRelation] = useState<string>('');
+  
+  // Patient info - auto-filled from profile for "self"
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
-  const [existingBookingsCount, setExistingBookingsCount] = useState(0);
+  
+  // Slot availability tracking
+  const [slotBookings, setSlotBookings] = useState<Map<string, number>>(new Map());
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [assignedSerial, setAssignedSerial] = useState<number>(1);
   
-  // Fetch existing bookings count for the selected date
+  // Max patients per slot (configurable per doctor, default 1)
+  const maxPatientsPerSlot = 1; // Each 15-min slot = 1 patient
+  
+  // Auto-fill patient info from logged-in user for "self" bookings
   useEffect(() => {
-    const fetchBookingsCount = async () => {
+    if (isPatient && user && bookingFor === 'self') {
+      setPatientName(user.name || '');
+      setPatientPhone(user.phone || '');
+    }
+  }, [isPatient, user, bookingFor]);
+  
+  // Clear family member fields when switching
+  useEffect(() => {
+    if (bookingFor === 'self' && user) {
+      setPatientName(user.name || '');
+      setPatientPhone(user.phone || '');
+    } else if (bookingFor === 'family') {
+      setPatientName(familyMemberName);
+      setPatientPhone(familyMemberPhone);
+    }
+  }, [bookingFor, user, familyMemberName, familyMemberPhone]);
+  
+  // Fetch slot bookings for the selected date
+  useEffect(() => {
+    const fetchSlotBookings = async () => {
       if (!selectedDate || !isSupabaseConfigured()) {
-        setExistingBookingsCount(0);
+        setSlotBookings(new Map());
         return;
       }
       
+      setLoadingSlots(true);
+      
       try {
-        // Get the profile_id - try multiple approaches
+        // Get the doctor's profile_id
         let doctorId = (doctor as any).userId || (doctor as any).profileId;
         
-        // If still not found, look up the profile_id from doctors table
         if (!doctorId) {
           const { data: doctorRecord } = await supabase
             .from('doctors')
@@ -59,26 +104,40 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           doctorId = doctorRecord?.profile_id || doctor.id;
         }
         
-        console.log('[BookingModal] Using doctor_id for count:', doctorId);
+        console.log('[BookingModal] Fetching slots for doctor:', doctorId, 'date:', selectedDate);
         
-        // Count using both possible IDs
-        const { count, error } = await supabase
+        // Get all appointments for this doctor on this date
+        const { data, error } = await supabase
           .from('appointments')
-          .select('*', { count: 'exact', head: true })
+          .select('appointment_time, id')
           .or(`doctor_id.eq.${doctorId},doctor_id.eq.${doctor.id}`)
-          .eq('appointment_date', selectedDate);
+          .eq('appointment_date', selectedDate)
+          .neq('status', 'cancelled');
         
-        if (!error && count !== null) {
-          setExistingBookingsCount(count);
-          setAssignedSerial(count + 1); // Next serial number
-          console.log('[BookingModal] Existing bookings for', selectedDate, ':', count, '-> Next serial:', count + 1);
+        if (!error && data) {
+          // Count bookings per time slot
+          const bookingsMap = new Map<string, number>();
+          data.forEach(apt => {
+            const time = apt.appointment_time?.substring(0, 5); // "HH:MM"
+            if (time) {
+              bookingsMap.set(time, (bookingsMap.get(time) || 0) + 1);
+            }
+          });
+          
+          console.log('[BookingModal] Slot bookings:', Object.fromEntries(bookingsMap));
+          setSlotBookings(bookingsMap);
+          
+          // Calculate next serial number (total bookings for the day + 1)
+          setAssignedSerial(data.length + 1);
         }
       } catch (e) {
-        console.error('[BookingModal] Error fetching bookings count:', e);
+        console.error('[BookingModal] Error fetching slot bookings:', e);
       }
+      
+      setLoadingSlots(false);
     };
     
-    fetchBookingsCount();
+    fetchSlotBookings();
   }, [selectedDate, doctor]);
   
   // Clear slot when date changes
@@ -126,6 +185,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     smsSent: isBn ? 'SMS পাঠানো হয়েছে' : 'SMS sent to',
     done: isBn ? 'ঠিক আছে' : 'Done',
     chamber: isBn ? 'চেম্বার' : 'Chamber',
+    bookingForSelf: isBn ? 'নিজের জন্য' : 'For Myself',
+    bookingForFamily: isBn ? 'পরিবারের সদস্যের জন্য' : 'For Family Member',
+    familyName: isBn ? 'পরিবারের সদস্যের নাম' : 'Family Member Name',
+    familyRelation: isBn ? 'সম্পর্ক' : 'Relation',
+    slotFull: isBn ? 'ফুল' : 'Full',
   };
 
   // Generate next 7 days
@@ -146,9 +210,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     });
   }, [isBn]);
 
-  // Generate time slots - filtering past times for today
-  const slots = useMemo(() => {
-    const result: { time: string; display: string; available: boolean; period: string; isPast: boolean }[] = [];
+  // Generate time slots with availability
+  const slots = useMemo((): SlotData[] => {
+    const result: SlotData[] = [];
     
     // Check if selected date is today
     const today = new Date().toISOString().split('T')[0];
@@ -165,50 +229,50 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
       return slotMinutes < currentMinutes;
     };
     
+    // Generate slots and check availability
+    const generateSlot = (hour: number, minute: number, period: string): SlotData => {
+      const isPast = isSlotPast(hour, minute);
+      const timeKey = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      const bookedCount = slotBookings.get(timeKey) || 0;
+      const isAvailable = !isPast && bookedCount < maxPatientsPerSlot;
+      
+      const displayHour = hour > 12 ? hour - 12 : hour;
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      
+      return {
+        time: timeKey,
+        display: `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`,
+        available: isAvailable,
+        period,
+        isPast,
+        bookedCount,
+        maxCapacity: maxPatientsPerSlot,
+      };
+    };
+    
     // Morning: 9 AM - 12 PM
     for (let h = 9; h < 12; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const isPast = isSlotPast(h, m);
-        result.push({
-          time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
-          display: `${h}:${m.toString().padStart(2, '0')} AM`,
-          available: !isPast,
-          period: 'morning',
-          isPast,
-        });
+        result.push(generateSlot(h, m, 'morning'));
       }
     }
     
     // Afternoon: 3 PM - 6 PM
     for (let h = 15; h < 18; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const isPast = isSlotPast(h, m);
-        result.push({
-          time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
-          display: `${h - 12}:${m.toString().padStart(2, '0')} PM`,
-          available: !isPast,
-          period: 'afternoon',
-          isPast,
-        });
+        result.push(generateSlot(h, m, 'afternoon'));
       }
     }
     
     // Evening: 6 PM - 9 PM
     for (let h = 18; h < 21; h++) {
       for (let m = 0; m < 60; m += 15) {
-        const isPast = isSlotPast(h, m);
-        result.push({
-          time: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
-          display: `${h - 12}:${m.toString().padStart(2, '0')} PM`,
-          available: !isPast,
-          period: 'evening',
-          isPast,
-        });
+        result.push(generateSlot(h, m, 'evening'));
       }
     }
     
     return result;
-  }, [selectedDate]);
+  }, [selectedDate, slotBookings]);
 
   // Calculate fee
   const baseFee = chamber.fee;
@@ -218,9 +282,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   // Validate phone - more lenient for BD numbers
   const isValidPhone = (phone: string) => {
     const digits = phone.replace(/\D/g, '');
-    // Accept: 01712345678 (11 digits) or 1712345678 (10 digits)
     return digits.length >= 10 && digits.length <= 11;
   };
+
+  // Get effective patient name/phone based on booking type
+  const effectivePatientName = bookingFor === 'self' ? patientName : familyMemberName;
+  const effectivePatientPhone = bookingFor === 'self' ? patientPhone : familyMemberPhone;
 
   // Handle booking - save to Supabase
   const handleBooking = async () => {
@@ -228,10 +295,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     
     try {
       if (isSupabaseConfigured()) {
-        // Get the profile_id - try multiple approaches
+        // Get the profile_id
         let doctorId = (doctor as any).userId || (doctor as any).profileId;
         
-        // If still not found, look up the profile_id from doctors table
         if (!doctorId) {
           console.log('[BookingModal] Looking up profile_id for doctor.id:', doctor.id);
           const { data: doctorRecord } = await supabase
@@ -245,12 +311,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
         
         console.log('[BookingModal] Saving appointment with doctor_id:', doctorId);
         
-        // Create appointment in Supabase - only for registered patients
+        // Create appointment in Supabase
         const appointmentData = {
           doctor_id: doctorId,
-          patient_id: user!.id, // Must be registered patient
-          patient_name: patientName || user!.name,
-          patient_phone: patientPhone || user!.phone,
+          patient_id: user!.id,
+          patient_name: effectivePatientName,
+          patient_phone: effectivePatientPhone,
           appointment_date: selectedDate,
           appointment_time: selectedSlot?.time,
           serial_number: assignedSerial,
@@ -260,7 +326,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           status: 'confirmed',
           chamber_name: chamber.name,
           chamber_address: chamber.address || 'Dhaka, Bangladesh',
-          is_guest_booking: false, // No guest bookings allowed
+          is_guest_booking: false,
+          is_family_booking: bookingFor === 'family',
+          family_relation: bookingFor === 'family' ? familyRelation : null,
+          booked_by_id: user!.id, // Track who made the booking
           created_at: new Date().toISOString()
         };
         
@@ -274,8 +343,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
         
         if (error) {
           console.error('[BookingModal] Error saving appointment:', error);
-          // Still show success for now, but log the error
-          // In production, you might want to show an error message
         } else {
           console.log('[BookingModal] Appointment saved:', data.id);
           setBookingId(data.id);
@@ -285,7 +352,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
       setBookingComplete(true);
     } catch (error) {
       console.error('[BookingModal] Booking error:', error);
-      // Show success anyway for demo purposes
       setBookingComplete(true);
     }
     
@@ -296,11 +362,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
   const canProceed = (): boolean => {
     switch (step) {
       case 1:
-        return true; // Always can proceed from step 1
+        return true;
       case 2:
-        return !!(selectedDate && selectedSlot); // Need date and slot
+        return !!(selectedDate && selectedSlot);
       case 3:
-        return !!(patientName.trim().length >= 2 && patientPhone.length >= 10); // Name and phone
+        if (bookingFor === 'self') {
+          return !!(patientName.trim().length >= 2 && isValidPhone(patientPhone));
+        } else {
+          return !!(familyMemberName.trim().length >= 2 && isValidPhone(familyMemberPhone) && familyRelation);
+        }
       default:
         return false;
     }
@@ -386,11 +456,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
               </div>
             </div>
 
+            {/* Patient Info */}
+            {bookingFor === 'family' && (
+              <div className="bg-purple-50 rounded-xl p-3 mb-4 border border-purple-200">
+                <p className="text-sm text-purple-800">
+                  <i className="fas fa-users mr-2"></i>
+                  {isBn ? 'পরিবারের সদস্যের জন্য বুক করা হয়েছে:' : 'Booked for family member:'} <strong>{familyMemberName}</strong> ({familyRelation})
+                </p>
+              </div>
+            )}
+
             {/* Booking Details */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-blue-50 rounded-xl p-4 text-center">
                 <p className="text-xs text-blue-600 uppercase font-bold mb-1">{t.serialNo}</p>
-                <p className="text-3xl font-bold text-blue-700">{selectedSlot?.serial || 1}</p>
+                <p className="text-3xl font-bold text-blue-700">{assignedSerial}</p>
               </div>
               <div className="bg-slate-50 rounded-xl p-4 text-center">
                 <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t.estTime}</p>
@@ -417,7 +497,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
 
             <div className="bg-green-50 rounded-xl p-3 flex items-center gap-3 mb-6">
               <i className="fas fa-sms text-green-600"></i>
-              <p className="text-sm text-green-700">{t.smsSent} <span className="font-bold">{patientPhone}</span></p>
+              <p className="text-sm text-green-700">{t.smsSent} <span className="font-bold">{effectivePatientPhone}</span></p>
             </div>
 
             <button
@@ -535,12 +615,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
           {/* Step 2: Date & Time */}
           {step === 2 && (
             <div className="space-y-4">
-                {/* Date Selection */}
-                <div>
+              {/* Date Selection */}
+              <div>
                 <p className="text-sm font-bold text-slate-500 uppercase mb-3">{t.selectDate}</p>
                 <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
                   {dates.map((d) => (
-                         <button
+                    <button
                       key={d.value}
                       onClick={() => setSelectedDate(d.value)}
                       className={`flex-shrink-0 w-16 py-3 rounded-xl text-center transition ${
@@ -553,95 +633,117 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                         {d.isToday ? t.today : d.isTomorrow ? t.tomorrow : d.day}
                       </p>
                       <p className="text-xl font-bold">{d.date}</p>
-                         </button>
-                      ))}
-                   </div>
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Time Selection */}
+              {/* Time Selection */}
               {selectedDate && (
                 <div>
-                  <p className="text-sm font-bold text-slate-500 uppercase mb-3">{t.selectTime}</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-bold text-slate-500 uppercase">{t.selectTime}</p>
+                    {loadingSlots && <span className="text-xs text-blue-500"><i className="fas fa-spinner fa-spin mr-1"></i>Loading...</span>}
+                  </div>
                   
-                  {/* Morning - only show if there are available slots */}
+                  {/* Legend */}
+                  <div className="flex items-center gap-4 mb-3 text-xs">
+                    <span className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-green-500 rounded"></div>
+                      <span className="text-slate-600">{t.available}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-red-500 rounded"></div>
+                      <span className="text-slate-600">{t.slotFull}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-slate-300 rounded"></div>
+                      <span className="text-slate-600">{isBn ? 'পাস' : 'Past'}</span>
+                    </span>
+                  </div>
+                  
+                  {/* Morning Slots */}
                   {slots.filter(s => s.period === 'morning' && !s.isPast).length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
-                      <i className="fas fa-sun text-amber-400"></i> {t.morning}
-                    </p>
-                    <div className="grid grid-cols-4 gap-2">
-                      {slots.filter(s => s.period === 'morning' && !s.isPast).slice(0, 8).map((slot) => (
-                         <button
-                          key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
-                          disabled={!slot.available}
-                          className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
-                            selectedSlot?.time === slot.time
-                              ? 'bg-blue-500 text-white'
-                              : slot.available
-                                ? 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
-                                : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
-                          }`}
-                        >
-                          {slot.display.replace(' AM', '').replace(' PM', '')}
-                         </button>
-                      ))}
-                   </div>
-                </div>
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
+                        <i className="fas fa-sun text-amber-400"></i> {t.morning}
+                      </p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {slots.filter(s => s.period === 'morning' && !s.isPast).slice(0, 8).map((slot) => (
+                          <button
+                            key={slot.time}
+                            onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
+                            disabled={!slot.available}
+                            className={`py-2 px-1 rounded-lg text-xs font-medium transition relative ${
+                              selectedSlot?.time === slot.time
+                                ? 'bg-blue-500 text-white ring-2 ring-blue-300'
+                                : slot.available
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+                                  : 'bg-red-100 text-red-700 cursor-not-allowed border border-red-300'
+                            }`}
+                          >
+                            {slot.display.replace(' AM', '').replace(' PM', '')}
+                            {!slot.available && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">✕</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 
-                  {/* Afternoon - only show if there are available slots */}
+                  {/* Afternoon Slots */}
                   {slots.filter(s => s.period === 'afternoon' && !s.isPast).length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
-                      <i className="fas fa-cloud-sun text-orange-400"></i> {t.afternoon}
-                    </p>
-                    <div className="grid grid-cols-4 gap-2">
-                      {slots.filter(s => s.period === 'afternoon' && !s.isPast).slice(0, 8).map((slot) => (
-                   <button 
-                          key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
-                          disabled={!slot.available}
-                          className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
-                            selectedSlot?.time === slot.time
-                              ? 'bg-blue-500 text-white'
-                              : slot.available
-                                ? 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
-                                : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
-                          }`}
-                        >
-                          {slot.display.replace(' AM', '').replace(' PM', '')}
-                   </button>
-                      ))}
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
+                        <i className="fas fa-cloud-sun text-orange-400"></i> {t.afternoon}
+                      </p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {slots.filter(s => s.period === 'afternoon' && !s.isPast).slice(0, 8).map((slot) => (
+                          <button 
+                            key={slot.time}
+                            onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
+                            disabled={!slot.available}
+                            className={`py-2 px-1 rounded-lg text-xs font-medium transition relative ${
+                              selectedSlot?.time === slot.time
+                                ? 'bg-blue-500 text-white ring-2 ring-blue-300'
+                                : slot.available
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+                                  : 'bg-red-100 text-red-700 cursor-not-allowed border border-red-300'
+                            }`}
+                          >
+                            {slot.display.replace(' AM', '').replace(' PM', '')}
+                            {!slot.available && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">✕</span>}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
                   )}
 
-                  {/* Evening - only show if there are available slots */}
+                  {/* Evening Slots */}
                   {slots.filter(s => s.period === 'evening' && !s.isPast).length > 0 && (
-                  <div>
-                    <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
-                      <i className="fas fa-moon text-indigo-400"></i> {t.evening}
-                    </p>
-                    <div className="grid grid-cols-4 gap-2">
-                      {slots.filter(s => s.period === 'evening' && !s.isPast).slice(0, 8).map((slot) => (
-                        <button
-                          key={slot.time}
-                          onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
-                          disabled={!slot.available}
-                          className={`py-2 px-1 rounded-lg text-xs font-medium transition ${
-                            selectedSlot?.time === slot.time
-                              ? 'bg-blue-500 text-white'
-                              : slot.available
-                                ? 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
-                                : 'bg-slate-50 text-slate-300 cursor-not-allowed line-through'
-                          }`}
-                        >
-                          {slot.display.replace(' AM', '').replace(' PM', '')}
-                        </button>
-                      ))}
+                    <div>
+                      <p className="text-xs text-slate-400 mb-2 flex items-center gap-2">
+                        <i className="fas fa-moon text-indigo-400"></i> {t.evening}
+                      </p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {slots.filter(s => s.period === 'evening' && !s.isPast).slice(0, 8).map((slot) => (
+                          <button
+                            key={slot.time}
+                            onClick={() => slot.available && setSelectedSlot({ time: slot.time, serial: assignedSerial, display: slot.display })}
+                            disabled={!slot.available}
+                            className={`py-2 px-1 rounded-lg text-xs font-medium transition relative ${
+                              selectedSlot?.time === slot.time
+                                ? 'bg-blue-500 text-white ring-2 ring-blue-300'
+                                : slot.available
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+                                  : 'bg-red-100 text-red-700 cursor-not-allowed border border-red-300'
+                            }`}
+                          >
+                            {slot.display.replace(' AM', '').replace(' PM', '')}
+                            {!slot.available && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">✕</span>}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                 </div>
                   )}
 
                   {/* Your Serial Number */}
@@ -654,7 +756,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                           </div>
                           <div>
                             <p className="text-sm font-bold text-green-800">{isBn ? 'আপনার সিরিয়াল' : 'Your Serial'}</p>
-                            <p className="text-xs text-green-600">{existingBookingsCount} {isBn ? 'জন আগে বুক করেছেন' : 'booked before you'}</p>
+                            <p className="text-xs text-green-600">{assignedSerial - 1} {isBn ? 'জন আগে বুক করেছেন' : 'booked before you'}</p>
                           </div>
                         </div>
                         <i className="fas fa-check-circle text-green-500 text-xl"></i>
@@ -682,70 +784,140 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
             </div>
           )}
 
-          {/* Step 3: Patient Details & Intake Form */}
+          {/* Step 3: Patient Details */}
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-sm font-bold text-slate-500 uppercase">{t.step3}</p>
               
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t.patientName} *</label>
-                    <input 
-                       type="text" 
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition"
-                    placeholder={isBn ? 'রোগীর পুরো নাম' : 'Full name of patient'}
-                    />
-                 </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{t.phone} *</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">+880</span>
-                    <input 
-                       type="tel" 
-                      value={patientPhone}
-                      onChange={(e) => setPatientPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                      className={`w-full p-3 pl-14 border-2 rounded-xl outline-none transition ${
-                        patientPhone && !isValidPhone(patientPhone) ? 'border-red-300' : 'border-slate-200 focus:border-blue-500'
-                      }`}
-                      placeholder="01712345678"
-                    />
-                    {patientPhone && isValidPhone(patientPhone) && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500">
-                        <i className="fas fa-check-circle"></i>
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">{isBn ? 'SMS এ কনফার্মেশন পাঠানো হবে' : 'Confirmation will be sent via SMS'}</p>
+              {/* Booking For Selection */}
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-sm font-medium text-slate-700 mb-2">{isBn ? 'কার জন্য বুকিং?' : 'Booking for?'}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setBookingFor('self')}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
+                      bookingFor === 'self'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <i className="fas fa-user mr-2"></i>
+                    {t.bookingForSelf}
+                  </button>
+                  <button
+                    onClick={() => setBookingFor('family')}
+                    className={`p-3 rounded-lg border-2 text-sm font-medium transition ${
+                      bookingFor === 'family'
+                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <i className="fas fa-users mr-2"></i>
+                    {t.bookingForFamily}
+                  </button>
                 </div>
-                 </div>
+              </div>
+
+              {/* Self Booking - Auto-filled */}
+              {bookingFor === 'self' && (
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                  <p className="text-sm font-medium text-blue-800 mb-3">
+                    <i className="fas fa-user-check mr-2"></i>
+                    {isBn ? 'আপনার প্রোফাইল থেকে তথ্য' : 'Info from your profile'}
+                  </p>
+                  <div className="grid gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">{t.patientName}</label>
+                      <div className="w-full p-3 bg-white border border-blue-200 rounded-xl text-slate-700 font-medium">
+                        {patientName || '-'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">{t.phone}</label>
+                      <div className="w-full p-3 bg-white border border-blue-200 rounded-xl text-slate-700 font-medium">
+                        +880{patientPhone || '-'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Family Member Booking */}
+              {bookingFor === 'family' && (
+                <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                  <p className="text-sm font-medium text-purple-800 mb-3">
+                    <i className="fas fa-users mr-2"></i>
+                    {isBn ? 'পরিবারের সদস্যের তথ্য দিন' : 'Enter family member details'}
+                  </p>
+                  <div className="grid gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">{t.familyName} *</label>
+                      <input 
+                        type="text" 
+                        value={familyMemberName}
+                        onChange={(e) => setFamilyMemberName(e.target.value)}
+                        className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 outline-none transition"
+                        placeholder={isBn ? 'পরিবারের সদস্যের নাম' : 'Family member name'}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">{t.phone} *</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">+880</span>
+                        <input 
+                          type="tel" 
+                          value={familyMemberPhone}
+                          onChange={(e) => setFamilyMemberPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                          className={`w-full p-3 pl-14 border-2 rounded-xl outline-none transition ${
+                            familyMemberPhone && !isValidPhone(familyMemberPhone) ? 'border-red-300' : 'border-slate-200 focus:border-purple-500'
+                          }`}
+                          placeholder="01712345678"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">{t.familyRelation} *</label>
+                      <select
+                        value={familyRelation}
+                        onChange={(e) => setFamilyRelation(e.target.value)}
+                        className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-purple-500 outline-none transition"
+                      >
+                        <option value="">{isBn ? 'সম্পর্ক নির্বাচন করুন' : 'Select relation'}</option>
+                        <option value="spouse">{isBn ? 'স্বামী/স্ত্রী' : 'Spouse'}</option>
+                        <option value="child">{isBn ? 'সন্তান' : 'Child'}</option>
+                        <option value="parent">{isBn ? 'মা/বাবা' : 'Parent'}</option>
+                        <option value="sibling">{isBn ? 'ভাই/বোন' : 'Sibling'}</option>
+                        <option value="grandparent">{isBn ? 'দাদা/দাদি/নানা/নানি' : 'Grandparent'}</option>
+                        <option value="other">{isBn ? 'অন্যান্য' : 'Other'}</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Patient Intake Form */}
-              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                <p className="text-sm font-bold text-blue-800 mb-3 flex items-center gap-2">
-                  <i className="fas fa-clipboard-list"></i>
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                <p className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                  <i className="fas fa-clipboard-list text-blue-500"></i>
                   {isBn ? 'সমস্যার বিবরণ (ঐচ্ছিক)' : 'Health Information (Optional)'}
                 </p>
                 
                 {/* Chief Complaint */}
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    {isBn ? 'প্রধান সমস্যা' : 'Chief Complaint'} *
+                    {isBn ? 'প্রধান সমস্যা' : 'Chief Complaint'}
                   </label>
-                    <textarea 
+                  <textarea 
                     value={symptoms}
                     onChange={(e) => setSymptoms(e.target.value)}
                     className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-400 outline-none transition resize-none text-sm bg-white"
                     rows={2}
                     placeholder={isBn ? 'আপনার প্রধান সমস্যা সংক্ষেপে লিখুন...' : 'Briefly describe your main problem...'}
                   />
-                 </div>
+                </div>
 
                 {/* Quick Symptom Tags */}
-                <div className="mb-3">
+                <div>
                   <label className="block text-xs font-medium text-slate-600 mb-2">
                     {isBn ? 'সাধারণ লক্ষণ (প্রযোজ্য হলে ক্লিক করুন)' : 'Common Symptoms (click if applicable)'}
                   </label>
@@ -757,13 +929,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                       { en: 'Chest Pain', bn: 'বুকে ব্যথা' },
                       { en: 'Breathing Issue', bn: 'শ্বাসকষ্ট' },
                       { en: 'Weakness', bn: 'দুর্বলতা' },
-                      { en: 'Stomach Pain', bn: 'পেটে ব্যথা' },
-                      { en: 'Nausea', bn: 'বমি ভাব' },
                     ].map((symptom, i) => {
                       const text = isBn ? symptom.bn : symptom.en;
                       const isSelected = symptoms.toLowerCase().includes(text.toLowerCase());
                       return (
-                    <button 
+                        <button 
                           key={i}
                           type="button"
                           onClick={() => {
@@ -780,68 +950,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                           }`}
                         >
                           {text}
-                    </button>
+                        </button>
                       );
                     })}
                   </div>
                 </div>
-
-                {/* Duration */}
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label htmlFor="duration" className="block text-xs font-medium text-slate-600 mb-1">
-                      {isBn ? 'কতদিন ধরে?' : 'Duration'}
-                    </label>
-                    <select id="duration" title="Duration" className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-400 outline-none">
-                      <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
-                      <option value="today">{isBn ? 'আজ থেকে' : 'Started today'}</option>
-                      <option value="2-3days">{isBn ? '২-৩ দিন' : '2-3 days'}</option>
-                      <option value="1week">{isBn ? '১ সপ্তাহ' : '1 week'}</option>
-                      <option value="2weeks">{isBn ? '২ সপ্তাহ' : '2 weeks'}</option>
-                      <option value="1month">{isBn ? '১ মাস+' : '1 month+'}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="severity" className="block text-xs font-medium text-slate-600 mb-1">
-                      {isBn ? 'তীব্রতা' : 'Severity'}
-                    </label>
-                    <select id="severity" title="Severity" className="w-full p-2 border border-slate-200 rounded-lg text-sm bg-white focus:border-blue-400 outline-none">
-                      <option value="">{isBn ? 'নির্বাচন করুন' : 'Select'}</option>
-                      <option value="mild">{isBn ? 'হালকা' : 'Mild'}</option>
-                      <option value="moderate">{isBn ? 'মাঝারি' : 'Moderate'}</option>
-                      <option value="severe">{isBn ? 'তীব্র' : 'Severe'}</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Previous Reports */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    {isBn ? 'আগে কোনো রিপোর্ট/টেস্ট করেছেন?' : 'Any previous reports/tests?'}
-                  </label>
-                  <div className="flex gap-2">
-                    <label className="flex-1 flex items-center gap-2 p-2 border border-slate-200 rounded-lg bg-white cursor-pointer hover:border-blue-300 transition">
-                      <input type="radio" name="hasReports" value="yes" className="text-blue-500" />
-                      <span className="text-sm text-slate-600">{isBn ? 'হ্যাঁ' : 'Yes'}</span>
-                    </label>
-                    <label className="flex-1 flex items-center gap-2 p-2 border border-slate-200 rounded-lg bg-white cursor-pointer hover:border-blue-300 transition">
-                      <input type="radio" name="hasReports" value="no" className="text-blue-500" defaultChecked />
-                      <span className="text-sm text-slate-600">{isBn ? 'না' : 'No'}</span>
-                    </label>
-                  </div>
-                 </div>
-              </div>
-
-              {/* Additional Notes */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  {isBn ? 'অতিরিক্ত মন্তব্য' : 'Additional Notes'}
-                </label>
-                <textarea
-                  className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none transition resize-none"
-                  rows={2}
-                  placeholder={t.symptomsPlaceholder}
-                />
               </div>
 
               {/* Booking Summary */}
@@ -855,6 +968,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                   <span className="font-medium text-slate-700">{chamber.name}</span>
                 </div>
                 <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">{isBn ? 'রোগী' : 'Patient'}</span>
+                  <span className="font-medium text-slate-700">
+                    {effectivePatientName}
+                    {bookingFor === 'family' && <span className="text-purple-600 text-xs ml-1">({familyRelation})</span>}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
                   <span className="text-slate-500">{isBn ? 'তারিখ' : 'Date'}</span>
                   <span className="font-medium text-slate-700">{selectedDate}</span>
                 </div>
@@ -864,15 +984,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">{t.serial}</span>
-                  <span className="font-bold text-blue-600">#{selectedSlot?.serial}</span>
-                 </div>
+                  <span className="font-bold text-blue-600">#{assignedSerial}</span>
+                </div>
                 <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between">
                   <span className="font-bold text-slate-700">{t.total}</span>
                   <span className="font-bold text-blue-600 text-lg">৳{fee}</span>
-                 </div>
+                </div>
               </div>
-              </div>
-           )}
+            </div>
+          )}
         </div>
 
         {/* Footer - Fixed at bottom */}
