@@ -12,7 +12,7 @@ import { useAuth, PatientProfile } from '../contexts/AuthContext';
 import { saveFeedback, getUserFeedbacks, FeedbackData } from '../components/FeedbackWidget';
 import { chatWithHealthAssistant } from '../services/geminiService';
 import { aiChatService, authService, supabase, isSupabaseConfigured } from '../services/supabaseAuth';
-import { getPatientMedicalHistory, CompleteMedicalHistory } from '../services/medicalHistoryService';
+import { getPatientMedicalHistory, CompleteMedicalHistory, getPatientHistoryForDoctor } from '../services/medicalHistoryService';
 
 // ============ TYPES ============
 type TabId = 'home' | 'appointments' | 'medical-history' | 'doctors' | 'ai' | 'medication' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback';
@@ -103,6 +103,8 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   // Medical History state
   const [medicalHistory, setMedicalHistory] = useState<CompleteMedicalHistory | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedAppointmentDetails, setSelectedAppointmentDetails] = useState<any>(null);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   
   // Doctor visits (mock for now, will be from Supabase)
   const [doctorVisits, setDoctorVisits] = useState<any[]>([]);
@@ -373,6 +375,49 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   useEffect(() => {
     if (activeTab === 'medical-history') loadMedicalHistory();
   }, [activeTab, loadMedicalHistory]);
+
+  // View appointment details (diagnosis, prescription, etc.)
+  const viewAppointmentDetails = async (appointmentId: string) => {
+    if (!patientUser) return;
+    
+    setShowAppointmentModal(true);
+    setLoadingHistory(true);
+    
+    try {
+      // Get consultation for this appointment
+      const { data: consultation } = await supabase
+        .from('consultations')
+        .select('*')
+        .eq('appointment_id', appointmentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      // Get prescriptions for this appointment
+      const { data: prescriptions } = await supabase
+        .from('prescriptions')
+        .select('*')
+        .eq('appointment_id', appointmentId)
+        .order('created_at', { ascending: true });
+      
+      // Get appointment details
+      const { data: appointment } = await supabase
+        .from('appointments')
+        .select('*, profiles!doctor_id(name)')
+        .eq('id', appointmentId)
+        .single();
+      
+      setSelectedAppointmentDetails({
+        appointment,
+        consultation,
+        prescriptions: prescriptions || []
+      });
+    } catch (e) {
+      console.error('[PatientDashboard] Error loading appointment details:', e);
+    }
+    
+    setLoadingHistory(false);
+  };
 
   // Load appointments when tab is active or on mount
   useEffect(() => {
@@ -687,7 +732,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                               <h3 className="text-sm font-bold text-gray-500 uppercase mb-3">⏳ পূর্ববর্তী ({past.length})</h3>
                               <div className="space-y-3">
                                 {past.slice(0, 5).map((apt) => (
-                                  <div key={apt.id} className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                  <div key={apt.id} className="p-4 bg-gray-50 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition cursor-pointer" onClick={() => viewAppointmentDetails(apt.id)}>
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 bg-gray-400 rounded-lg flex items-center justify-center text-white">
@@ -696,6 +741,9 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                                         <div>
                                           <h4 className="font-medium text-gray-700">{apt.doctorName}</h4>
                                           <p className="text-sm text-gray-500">{apt.doctorSpecialty}</p>
+                                          {apt.status === 'completed' && (
+                                            <p className="text-xs text-blue-600 mt-1">📋 রোগ নির্ণয় দেখুন</p>
+                                          )}
                                         </div>
                                       </div>
                                       <div className="text-right">

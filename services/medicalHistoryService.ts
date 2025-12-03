@@ -75,8 +75,16 @@ export async function getPatientMedicalHistory(patientId: string): Promise<Compl
   if (!isSupabaseConfigured() || !patientId) return null;
 
   try {
-    // Fetch consultations
-    const { data: consultations, error: consultationsError } = await supabase
+    // First, get all appointment IDs for this patient (check both patient_id and booked_by_id)
+    const { data: patientAppointments } = await supabase
+      .from('appointments')
+      .select('id')
+      .or(`patient_id.eq.${patientId},booked_by_id.eq.${patientId}`);
+
+    const appointmentIds = patientAppointments?.map(apt => apt.id) || [];
+
+    // Fetch consultations - check both direct patient_id and via appointments
+    let consultationsQuery = supabase
       .from('consultations')
       .select(`
         id,
@@ -100,57 +108,151 @@ export async function getPatientMedicalHistory(patientId: string): Promise<Compl
           scheduled_time
         )
       `)
-      .eq('patient_id', patientId)
-      .order('consultation_date', { ascending: false })
-      .order('consultation_time', { ascending: false });
+      .eq('patient_id', patientId);
+    
+    // Also fetch consultations linked via appointments
+    if (appointmentIds.length > 0) {
+      const { data: consultationsViaAppointments } = await supabase
+        .from('consultations')
+        .select(`
+          id,
+          appointment_id,
+          doctor_id,
+          patient_id,
+          subjective,
+          objective,
+          assessment,
+          plan,
+          diagnosis,
+          diagnosis_bn,
+          advice,
+          vitals,
+          consultation_date,
+          consultation_time,
+          appointments!inner(
+            id,
+            patient_name,
+            scheduled_date,
+            scheduled_time
+          )
+        `)
+        .in('appointment_id', appointmentIds);
+      
+      // Combine results
+      const { data: directConsultations } = await consultationsQuery;
+      const allConsultations = [
+        ...(directConsultations || []),
+        ...(consultationsViaAppointments || [])
+      ];
+      
+      // Remove duplicates
+      const uniqueConsultations = Array.from(
+        new Map(allConsultations.map(c => [c.id, c])).values()
+      );
+      
+      var consultations = uniqueConsultations.sort((a, b) => {
+        const dateCompare = new Date(b.consultation_date).getTime() - new Date(a.consultation_date).getTime();
+        if (dateCompare !== 0) return dateCompare;
+        return b.consultation_time.localeCompare(a.consultation_time);
+      });
+      
+      var consultationsError = null;
+    } else {
+      const { data, error } = await consultationsQuery
+        .order('consultation_date', { ascending: false })
+        .order('consultation_time', { ascending: false });
+      var consultations = data;
+      var consultationsError = error;
+    }
 
     if (consultationsError) {
       console.error('[MedicalHistory] Consultations error:', consultationsError);
     }
 
-    // Fetch prescriptions
-    const { data: prescriptions, error: prescriptionsError } = await supabase
+    // Fetch prescriptions - check both direct patient_id and via appointments/consultations
+    const consultationIds = consultations?.map(c => c.id) || [];
+    
+    // Fetch prescriptions by patient_id
+    const { data: prescriptionsByPatient } = await supabase
       .from('prescriptions')
-      .select(`
-        id,
-        consultation_id,
-        appointment_id,
-        doctor_id,
-        medicine_name,
-        medicine_name_bn,
-        dosage,
-        duration,
-        instruction,
-        prescription_date,
-        follow_up_date
-      `)
-      .eq('patient_id', patientId)
-      .order('prescription_date', { ascending: false });
+      .select('*')
+      .eq('patient_id', patientId);
+    
+    // Fetch prescriptions by appointment_id
+    let prescriptionsByAppointment: any[] = [];
+    if (appointmentIds.length > 0) {
+      const { data } = await supabase
+        .from('prescriptions')
+        .select('*')
+        .in('appointment_id', appointmentIds);
+      prescriptionsByAppointment = data || [];
+    }
+    
+    // Fetch prescriptions by consultation_id
+    let prescriptionsByConsultation: any[] = [];
+    if (consultationIds.length > 0) {
+      const { data } = await supabase
+        .from('prescriptions')
+        .select('*')
+        .in('consultation_id', consultationIds);
+      prescriptionsByConsultation = data || [];
+    }
+    
+    // Combine and deduplicate
+    const allPrescriptions = [
+      ...(prescriptionsByPatient || []),
+      ...prescriptionsByAppointment,
+      ...prescriptionsByConsultation
+    ];
+    const uniquePrescriptions = Array.from(
+      new Map(allPrescriptions.map(p => [p.id, p])).values()
+    );
+    const prescriptions = uniquePrescriptions.sort((a, b) => 
+      new Date(b.prescription_date).getTime() - new Date(a.prescription_date).getTime()
+    );
+    const prescriptionsError = null;
 
     if (prescriptionsError) {
       console.error('[MedicalHistory] Prescriptions error:', prescriptionsError);
     }
 
-    // Fetch test reports
-    const { data: testReports, error: testReportsError } = await supabase
+    // Fetch test reports - check both direct patient_id and via appointments/consultations
+    const { data: testReportsByPatient } = await supabase
       .from('test_reports')
-      .select(`
-        id,
-        consultation_id,
-        appointment_id,
-        doctor_id,
-        test_name,
-        test_name_bn,
-        test_type,
-        test_date,
-        file_url,
-        file_name,
-        findings,
-        recommendations,
-        doctor_notes
-      `)
-      .eq('patient_id', patientId)
-      .order('test_date', { ascending: false });
+      .select('*')
+      .eq('patient_id', patientId);
+    
+    let testReportsByAppointment: any[] = [];
+    if (appointmentIds.length > 0) {
+      const { data } = await supabase
+        .from('test_reports')
+        .select('*')
+        .in('appointment_id', appointmentIds);
+      testReportsByAppointment = data || [];
+    }
+    
+    let testReportsByConsultation: any[] = [];
+    if (consultationIds.length > 0) {
+      const { data } = await supabase
+        .from('test_reports')
+        .select('*')
+        .in('consultation_id', consultationIds);
+      testReportsByConsultation = data || [];
+    }
+    
+    // Combine and deduplicate
+    const allTestReports = [
+      ...(testReportsByPatient || []),
+      ...testReportsByAppointment,
+      ...testReportsByConsultation
+    ];
+    const uniqueTestReports = Array.from(
+      new Map(allTestReports.map(tr => [tr.id, tr])).values()
+    );
+    const testReports = uniqueTestReports.sort((a, b) => 
+      new Date(b.test_date).getTime() - new Date(a.test_date).getTime()
+    );
+    const testReportsError = null;
 
     if (testReportsError) {
       console.error('[MedicalHistory] Test reports error:', testReportsError);

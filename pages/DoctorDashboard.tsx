@@ -770,7 +770,23 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
             })
             .eq('id', selectedAppointment.id);
           
-          // 2. Create or update consultation record
+          // 2. Get actual patient_id from appointment (check both patient_id and booked_by_id)
+          let actualPatientId: string | null = null;
+          if (!selectedAppointment.patientId.startsWith('guest-')) {
+            actualPatientId = selectedAppointment.patientId;
+          } else {
+            // For guest bookings, check if there's a booked_by_id in the appointment
+            const { data: appointmentData } = await supabase
+              .from('appointments')
+              .select('patient_id, booked_by_id')
+              .eq('id', selectedAppointment.id)
+              .single();
+            
+            actualPatientId = appointmentData?.patient_id || appointmentData?.booked_by_id || null;
+            console.log('[Consultation] Resolved patient_id from appointment:', actualPatientId);
+          }
+          
+          // 3. Create or update consultation record
           const consultationDate = selectedAppointment.date || new Date().toISOString().split('T')[0];
           const consultationTime = selectedAppointment.time || new Date().toTimeString().split(' ')[0].substring(0, 5);
           
@@ -807,7 +823,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
               .insert({
                 appointment_id: selectedAppointment.id,
                 doctor_id: user?.id,
-                patient_id: selectedAppointment.patientId.startsWith('guest-') ? null : selectedAppointment.patientId,
+                patient_id: actualPatientId, // Use resolved patient_id
                 subjective: soapNote.subjective,
                 objective: soapNote.objective,
                 assessment: soapNote.assessment,
@@ -829,13 +845,13 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
             }
           }
           
-          // 3. Create new prescription records (existing ones are preserved)
+          // 4. Create new prescription records (existing ones are preserved)
           if (prescription.length > 0 && consultationData) {
             const prescriptionRecords = prescription.map(med => ({
               consultation_id: consultationData.id,
               appointment_id: selectedAppointment.id,
               doctor_id: user?.id,
-              patient_id: selectedAppointment.patientId.startsWith('guest-') ? null : selectedAppointment.patientId,
+              patient_id: actualPatientId, // Use resolved patient_id
               medicine_name: med.medicine,
               medicine_name_bn: med.medicine,
               dosage: med.dosage,
