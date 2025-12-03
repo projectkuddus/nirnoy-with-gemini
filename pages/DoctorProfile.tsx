@@ -5,6 +5,7 @@ import { BookingModal } from '../components/BookingModal';
 import { Chamber } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import PageHeader from '../components/PageHeader';
+import { supabase, isSupabaseConfigured } from '../services/supabaseAuth';
 
 export const DoctorProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,34 +19,117 @@ export const DoctorProfile: React.FC = () => {
   const [selectedChamber, setSelectedChamber] = useState<Chamber | null>(null);
   const [activeSection, setActiveSection] = useState<'info' | 'chambers' | 'reviews'>('info');
 
-  // Load doctor
+  // Load doctor - from Supabase for real doctors, mock data for demo
   useEffect(() => {
-    const found = MOCK_DOCTORS.find(d => d.id === id);
-    if (found) {
-      // Enhance with mock data
-      setDoctor({
-        ...found,
-        experienceYears: found.experience || Math.floor(Math.random() * 20) + 5,
-        totalPatients: Math.floor(Math.random() * 10000) + 1000,
-        totalReviews: Math.floor(Math.random() * 300) + 50,
-        avgRating: 4.2 + Math.random() * 0.7,
-        bmdcNumber: `A-${10000 + Math.floor(Math.random() * 50000)}`,
-        bio: `${found.name} is a highly experienced ${found.specialties?.[0] || 'medical'} specialist with expertise in diagnosis and treatment. Known for patient-centered care and evidence-based practice.`,
-        qualifications: [
-          { degree: 'MBBS', institution: 'Dhaka Medical College', year: 2000 + Math.floor(Math.random() * 10) },
-          { degree: 'FCPS', field: found.specialties?.[0], institution: 'BCPS', year: 2005 + Math.floor(Math.random() * 10) },
-        ],
-        languages: ['Bangla', 'English'],
-        reviews: Array.from({ length: 5 }, (_, i) => ({
-          id: i,
-          name: ['রহিম', 'করিম', 'সালমা', 'ফাতিমা', 'জামাল'][i],
-          rating: 4 + Math.floor(Math.random() * 2),
-          comment: ['অনেক ভালো ডাক্তার', 'সময় দিয়ে দেখেন', 'চিকিৎসায় সুফল পেয়েছি', 'রোগী বান্ধব', 'সবাইকে রেকমেন্ড করি'][i],
-          date: '2024-11-' + (10 + i),
-        })),
-      });
-    }
-    setLoading(false);
+    const loadDoctor = async () => {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+
+      // Check if it's a UUID (real Supabase doctor) or mock ID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      
+      if (isUUID && isSupabaseConfigured()) {
+        // Fetch from Supabase
+        console.log('[DoctorProfile] Fetching from Supabase:', id);
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', id)
+            .single();
+          
+          if (profileError || !profile) {
+            console.error('[DoctorProfile] Profile not found:', profileError);
+            setLoading(false);
+            return;
+          }
+
+          const { data: doctorData, error: doctorError } = await supabase
+            .from('doctors')
+            .select('*')
+            .eq('profile_id', id)
+            .single();
+          
+          if (doctorError || !doctorData) {
+            console.error('[DoctorProfile] Doctor data not found:', doctorError);
+            setLoading(false);
+            return;
+          }
+
+          // Build doctor object from Supabase data
+          const specialties = doctorData.specialties || [];
+          setDoctor({
+            id: profile.id,
+            name: profile.name,
+            image: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=3b82f6&color=fff&size=200`,
+            specialties: specialties,
+            experienceYears: doctorData.experience_years || 5,
+            totalPatients: doctorData.total_patients || 500,
+            totalReviews: 50,
+            avgRating: parseFloat(doctorData.rating) || 4.5,
+            bmdcNumber: doctorData.bmdc_number || 'N/A',
+            bio: doctorData.bio || `${profile.name} is an experienced ${specialties[0] || 'medical'} specialist.`,
+            qualifications: doctorData.qualifications || [
+              { degree: 'MBBS', institution: 'Medical College', year: 2010 }
+            ],
+            languages: ['Bangla', 'English'],
+            chambers: [{
+              id: 'c1',
+              name: doctorData.institution || 'Primary Chamber',
+              address: 'Dhaka, Bangladesh',
+              fee: doctorData.consultation_fee || 500,
+              followUpFee: doctorData.follow_up_fee || Math.round((doctorData.consultation_fee || 500) * 0.5),
+              startTime: '10:00',
+              endTime: '18:00',
+              days: ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']
+            }],
+            reviews: Array.from({ length: 5 }, (_, i) => ({
+              id: i,
+              name: ['রহিম', 'করিম', 'সালমা', 'ফাতিমা', 'জামাল'][i],
+              rating: 4 + Math.floor(Math.random() * 2),
+              comment: ['অনেক ভালো ডাক্তার', 'সময় দিয়ে দেখেন', 'চিকিৎসায় সুফল পেয়েছি', 'রোগী বান্ধব', 'সবাইকে রেকমেন্ড করি'][i],
+              date: '2024-11-' + (10 + i),
+            })),
+            isFromDatabase: true
+          });
+          console.log('[DoctorProfile] Loaded from Supabase:', profile.name);
+        } catch (e) {
+          console.error('[DoctorProfile] Supabase error:', e);
+        }
+      } else {
+        // Fallback to mock data
+        const found = MOCK_DOCTORS.find(d => d.id === id);
+        if (found) {
+          setDoctor({
+            ...found,
+            experienceYears: found.experience || Math.floor(Math.random() * 20) + 5,
+            totalPatients: Math.floor(Math.random() * 10000) + 1000,
+            totalReviews: Math.floor(Math.random() * 300) + 50,
+            avgRating: 4.2 + Math.random() * 0.7,
+            bmdcNumber: `A-${10000 + Math.floor(Math.random() * 50000)}`,
+            bio: `${found.name} is a highly experienced ${found.specialties?.[0] || 'medical'} specialist with expertise in diagnosis and treatment. Known for patient-centered care and evidence-based practice.`,
+            qualifications: [
+              { degree: 'MBBS', institution: 'Dhaka Medical College', year: 2000 + Math.floor(Math.random() * 10) },
+              { degree: 'FCPS', field: found.specialties?.[0], institution: 'BCPS', year: 2005 + Math.floor(Math.random() * 10) },
+            ],
+            languages: ['Bangla', 'English'],
+            reviews: Array.from({ length: 5 }, (_, i) => ({
+              id: i,
+              name: ['রহিম', 'করিম', 'সালমা', 'ফাতিমা', 'জামাল'][i],
+              rating: 4 + Math.floor(Math.random() * 2),
+              comment: ['অনেক ভালো ডাক্তার', 'সময় দিয়ে দেখেন', 'চিকিৎসায় সুফল পেয়েছি', 'রোগী বান্ধব', 'সবাইকে রেকমেন্ড করি'][i],
+              date: '2024-11-' + (10 + i),
+            })),
+            isDemo: true
+          });
+        }
+      }
+      setLoading(false);
+    };
+
+    loadDoctor();
   }, [id]);
 
   // Translations
