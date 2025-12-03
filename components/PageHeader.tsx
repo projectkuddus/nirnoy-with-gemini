@@ -50,7 +50,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
             <button onClick={() => navigate('/search')} className="text-sm font-semibold text-slate-600 hover:text-blue-600 transition">
               {isBn ? 'ডাক্তার' : 'Doctors'}
             </button>
-            <button onClick={() => navigate('/my-appointments')} className="text-sm font-semibold text-slate-600 hover:text-blue-600 transition">
+            <button onClick={() => navigate('/patient-dashboard')} className="text-sm font-semibold text-slate-600 hover:text-blue-600 transition">
               {isBn ? 'অ্যাপয়েন্টমেন্ট' : 'Appointments'}
             </button>
             <button onClick={() => navigate('/about')} className="text-sm font-semibold text-slate-600 hover:text-blue-600 transition">

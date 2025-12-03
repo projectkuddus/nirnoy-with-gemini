@@ -59,8 +59,8 @@ export const Navbar: React.FC<NavbarProps> = ({ userRole: propUserRole, onLogout
                 {t('nav.myHealth')}
               </button>
               <button 
-                onClick={() => navigate('/my-appointments')}
-                className={`text-sm font-semibold transition ${isActive('/my-appointments') ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                onClick={() => navigate('/patient-dashboard')}
+                className={`text-sm font-semibold transition ${isActive('/patient-dashboard') ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
               >
                 {t('nav.appointments')}
               </button>
