@@ -283,13 +283,25 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       }
 
       try {
-        console.log('[DoctorDashboard] Fetching appointments for doctor_id:', user.id);
-        console.log('[DoctorDashboard] User object:', user);
+        // First, get the doctors table ID for this profile
+        const { data: doctorRecord } = await supabase
+          .from('doctors')
+          .select('id')
+          .eq('profile_id', user.id)
+          .single();
+
+        const doctorsTableId = doctorRecord?.id;
+        const profileId = user.id;
         
+        console.log('[DoctorDashboard] Looking for appointments with:');
+        console.log('  - profile_id (user.id):', profileId);
+        console.log('  - doctors.id:', doctorsTableId);
+        
+        // Query appointments using BOTH possible IDs (profile_id OR doctors.id)
         const { data, error } = await supabase
           .from('appointments')
           .select('*')
-          .eq('doctor_id', user.id)
+          .or(`doctor_id.eq.${profileId}${doctorsTableId ? `,doctor_id.eq.${doctorsTableId}` : ''}`)
           .order('appointment_date', { ascending: true })
           .order('appointment_time', { ascending: true });
 
@@ -298,6 +310,8 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
           setAppointmentsLoading(false);
           return;
         }
+
+        console.log('[DoctorDashboard] Raw appointments data:', data);
 
         if (data && data.length > 0) {
           // Transform Supabase data to match Appointment interface
@@ -308,7 +322,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
             patientNameBn: apt.patient_name,
             patientImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(apt.patient_name)}&background=${apt.patient_id ? '3b82f6' : 'ec4899'}&color=fff&size=200`,
             patientPhone: apt.patient_phone,
-            patientAge: 0, // Not stored in appointments
+            patientAge: 0,
             patientGender: 'Male' as const,
             date: apt.appointment_date,
             time: apt.appointment_time,
@@ -324,6 +338,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
           setAppointments(transformedAppointments);
         } else {
           console.log('[DoctorDashboard] No appointments found');
+          setAppointments([]);
         }
       } catch (e) {
         console.error('[DoctorDashboard] Fetch error:', e);
@@ -338,7 +353,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     const subscription = supabase
       .channel('appointments-changes')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'appointments', filter: `doctor_id=eq.${user?.id}` },
+        { event: '*', schema: 'public', table: 'appointments' },
         (payload) => {
           console.log('[DoctorDashboard] Real-time update:', payload);
           fetchAppointments(); // Refresh appointments on any change

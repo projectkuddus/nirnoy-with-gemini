@@ -40,14 +40,27 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
       }
       
       try {
-        // Get the profile_id - check multiple possible fields
-        const doctorId = (doctor as any).userId || (doctor as any).profileId || doctor.id;
+        // Get the profile_id - try multiple approaches
+        let doctorId = (doctor as any).userId || (doctor as any).profileId;
+        
+        // If still not found, look up the profile_id from doctors table
+        if (!doctorId) {
+          const { data: doctorRecord } = await supabase
+            .from('doctors')
+            .select('profile_id')
+            .eq('id', doctor.id)
+            .single();
+          
+          doctorId = doctorRecord?.profile_id || doctor.id;
+        }
+        
         console.log('[BookingModal] Using doctor_id for count:', doctorId);
         
+        // Count using both possible IDs
         const { count, error } = await supabase
           .from('appointments')
           .select('*', { count: 'exact', head: true })
-          .eq('doctor_id', doctorId)
+          .or(`doctor_id.eq.${doctorId},doctor_id.eq.${doctor.id}`)
           .eq('appointment_date', selectedDate);
         
         if (!error && count !== null) {
@@ -210,8 +223,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({ doctor, chamber, onC
     
     try {
       if (isSupabaseConfigured()) {
-        // Get the profile_id - check multiple possible fields (userId from useDoctors, profileId from DoctorProfile)
-        const doctorId = (doctor as any).userId || (doctor as any).profileId || doctor.id;
+        // Get the profile_id - try multiple approaches
+        let doctorId = (doctor as any).userId || (doctor as any).profileId;
+        
+        // If still not found, look up the profile_id from doctors table
+        if (!doctorId) {
+          console.log('[BookingModal] Looking up profile_id for doctor.id:', doctor.id);
+          const { data: doctorRecord } = await supabase
+            .from('doctors')
+            .select('profile_id')
+            .eq('id', doctor.id)
+            .single();
+          
+          doctorId = doctorRecord?.profile_id || doctor.id;
+        }
+        
         console.log('[BookingModal] Saving appointment with doctor_id:', doctorId);
         
         // Create appointment in Supabase
