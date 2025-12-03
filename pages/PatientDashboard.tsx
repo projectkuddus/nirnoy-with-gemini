@@ -12,9 +12,10 @@ import { useAuth, PatientProfile } from '../contexts/AuthContext';
 import { saveFeedback, getUserFeedbacks, FeedbackData } from '../components/FeedbackWidget';
 import { chatWithHealthAssistant } from '../services/geminiService';
 import { aiChatService, authService, supabase, isSupabaseConfigured } from '../services/supabaseAuth';
+import { getPatientMedicalHistory, CompleteMedicalHistory } from '../services/medicalHistoryService';
 
 // ============ TYPES ============
-type TabId = 'home' | 'appointments' | 'doctors' | 'ai' | 'medication' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback';
+type TabId = 'home' | 'appointments' | 'medical-history' | 'doctors' | 'ai' | 'medication' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback';
 
 interface AppointmentData {
   id: string;
@@ -48,6 +49,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', icon: '🏠', label: 'Home', labelBn: 'হোম' },
   { id: 'appointments', icon: '📅', label: 'My Appointments', labelBn: 'আমার অ্যাপয়েন্টমেন্ট' },
+  { id: 'medical-history', icon: '📋', label: 'Medical History', labelBn: 'চিকিৎসা ইতিহাস' },
   { id: 'doctors', icon: '👨‍⚕️', label: 'Find Doctors', labelBn: 'ডাক্তার খুঁজুন' },
   { id: 'ai', icon: '🤖', label: 'AI Assistant', labelBn: 'এআই সহায়ক' },
   { id: 'medication', icon: '💊', label: 'Medication', labelBn: 'ওষুধ রিমাইন্ডার', paid: true },
@@ -97,6 +99,10 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   // Appointments state
   const [appointments, setAppointments] = useState<AppointmentData[]>([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
+  
+  // Medical History state
+  const [medicalHistory, setMedicalHistory] = useState<CompleteMedicalHistory | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   
   // Doctor visits (mock for now, will be from Supabase)
   const [doctorVisits, setDoctorVisits] = useState<any[]>([]);
@@ -348,6 +354,25 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     }
     setLoadingAppointments(false);
   }, [patientUser]);
+
+  // Load medical history
+  const loadMedicalHistory = useCallback(async () => {
+    if (!patientUser || !isSupabaseConfigured()) return;
+    setLoadingHistory(true);
+    try {
+      const history = await getPatientMedicalHistory(patientUser.id);
+      setMedicalHistory(history);
+      console.log('[PatientDashboard] Loaded medical history:', history?.consultations.length || 0, 'consultations');
+    } catch (e) {
+      console.error('[PatientDashboard] Medical history load error:', e);
+    }
+    setLoadingHistory(false);
+  }, [patientUser]);
+
+  // Load history when tab is active
+  useEffect(() => {
+    if (activeTab === 'medical-history') loadMedicalHistory();
+  }, [activeTab, loadMedicalHistory]);
 
   // Load appointments when tab is active or on mount
   useEffect(() => {
@@ -721,6 +746,206 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                     <span className="text-sm font-medium text-purple-700">এআই পরামর্শ</span>
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* MEDICAL HISTORY TAB */}
+          {activeTab === 'medical-history' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl p-6 border">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-800">📋 চিকিৎসা ইতিহাস</h2>
+                  <button onClick={loadMedicalHistory} className="text-blue-600 text-sm hover:underline">
+                    {loadingHistory ? '...' : '🔄 রিফ্রেশ'}
+                  </button>
+                </div>
+                
+                {loadingHistory ? (
+                  <div className="text-center py-8">
+                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-gray-500 mt-2 text-sm">লোড হচ্ছে...</p>
+                  </div>
+                ) : !medicalHistory || (medicalHistory.consultations.length === 0 && medicalHistory.prescriptions.length === 0 && medicalHistory.testReports.length === 0) ? (
+                  <div className="text-center py-12">
+                    <div className="text-5xl mb-4">📋</div>
+                    <h3 className="text-lg font-medium text-gray-700">কোনো চিকিৎসা ইতিহাস নেই</h3>
+                    <p className="text-gray-500 mt-2">আপনার পরামর্শ সম্পন্ন হলে এখানে দেখা যাবে।</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Doctors Summary */}
+                    {medicalHistory.doctors.length > 0 && (
+                      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                        <h3 className="font-bold text-blue-800 mb-3">👨‍⚕️ পরামর্শকৃত ডাক্তার ({medicalHistory.doctors.length})</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {medicalHistory.doctors.map((doc, i) => (
+                            <div key={i} className="bg-white rounded-lg p-3 border border-blue-100">
+                              <div className="font-medium text-gray-800">{doc.name}</div>
+                              <div className="text-sm text-gray-600">{doc.specialty}</div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {doc.totalConsultations} বার পরামর্শ • শেষ: {new Date(doc.lastVisit).toLocaleDateString('bn-BD')}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Consultations */}
+                    {medicalHistory.consultations.length > 0 && (
+                      <div>
+                        <h3 className="font-bold text-gray-800 mb-3">🩺 পরামর্শের ইতিহাস ({medicalHistory.consultations.length})</h3>
+                        <div className="space-y-4">
+                          {medicalHistory.consultations.map((consultation) => (
+                            <div key={consultation.id} className="bg-white rounded-xl p-5 border border-gray-200 hover:border-blue-300 transition">
+                              <div className="flex items-start justify-between mb-3">
+                                <div>
+                                  <div className="font-bold text-gray-800">{consultation.doctorName}</div>
+                                  <div className="text-sm text-gray-600">{consultation.doctorSpecialty}</div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {new Date(consultation.consultationDate).toLocaleDateString('bn-BD')} • {consultation.consultationTime}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {consultation.diagnosis && (
+                                <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                  <div className="text-xs font-bold text-blue-700 mb-1">রোগ নির্ণয়:</div>
+                                  <div className="text-sm text-gray-800">{consultation.diagnosis}</div>
+                                  {consultation.diagnosisBn && consultation.diagnosisBn !== consultation.diagnosis && (
+                                    <div className="text-sm text-gray-600 mt-1">{consultation.diagnosisBn}</div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {(consultation.subjective || consultation.objective || consultation.assessment || consultation.plan) && (
+                                <div className="mt-3 space-y-2">
+                                  {consultation.subjective && (
+                                    <div className="text-xs">
+                                      <span className="font-bold text-blue-600">S (Subjective):</span>
+                                      <span className="text-gray-700 ml-2">{consultation.subjective}</span>
+                                    </div>
+                                  )}
+                                  {consultation.objective && (
+                                    <div className="text-xs">
+                                      <span className="font-bold text-green-600">O (Objective):</span>
+                                      <span className="text-gray-700 ml-2">{consultation.objective}</span>
+                                    </div>
+                                  )}
+                                  {consultation.assessment && (
+                                    <div className="text-xs">
+                                      <span className="font-bold text-yellow-600">A (Assessment):</span>
+                                      <span className="text-gray-700 ml-2">{consultation.assessment}</span>
+                                    </div>
+                                  )}
+                                  {consultation.plan && (
+                                    <div className="text-xs">
+                                      <span className="font-bold text-purple-600">P (Plan):</span>
+                                      <span className="text-gray-700 ml-2">{consultation.plan}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {consultation.advice && consultation.advice.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <div className="text-xs font-bold text-gray-600 mb-1">পরামর্শ:</div>
+                                  <ul className="text-xs text-gray-700 space-y-1">
+                                    {consultation.advice.map((adv, i) => (
+                                      <li key={i} className="flex items-start gap-2">
+                                        <span className="text-blue-500 mt-0.5">•</span>
+                                        <span>{adv}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Prescriptions */}
+                    {medicalHistory.prescriptions.length > 0 && (
+                      <div>
+                        <h3 className="font-bold text-gray-800 mb-3">💊 প্রেসক্রিপশন ({medicalHistory.prescriptions.length})</h3>
+                        <div className="space-y-4">
+                          {medicalHistory.prescriptions.map((prescription) => (
+                            <div key={prescription.id} className="bg-white rounded-xl p-4 border border-gray-200">
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <div className="font-bold text-gray-800">{prescription.medicineName}</div>
+                                  {prescription.medicineNameBn && prescription.medicineNameBn !== prescription.medicineName && (
+                                    <div className="text-sm text-gray-600">{prescription.medicineNameBn}</div>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {new Date(prescription.prescriptionDate).toLocaleDateString('bn-BD')}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-xs">
+                                <div>
+                                  <span className="text-gray-500">মাত্রা:</span>
+                                  <span className="ml-1 font-medium text-gray-800">{prescription.dosage}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">সময়কাল:</span>
+                                  <span className="ml-1 font-medium text-gray-800">{prescription.duration}</span>
+                                </div>
+                                {prescription.instruction && (
+                                  <div className="col-span-2">
+                                    <span className="text-gray-500">নির্দেশনা:</span>
+                                    <span className="ml-1 font-medium text-gray-800">{prescription.instruction}</span>
+                                  </div>
+                                )}
+                              </div>
+                              {prescription.followUpDate && (
+                                <div className="mt-2 text-xs text-blue-600">
+                                  পরবর্তী ভিজিট: {new Date(prescription.followUpDate).toLocaleDateString('bn-BD')}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Test Reports */}
+                    {medicalHistory.testReports.length > 0 && (
+                      <div>
+                        <h3 className="font-bold text-gray-800 mb-3">🔬 টেস্ট রিপোর্ট ({medicalHistory.testReports.length})</h3>
+                        <div className="space-y-3">
+                          {medicalHistory.testReports.map((report) => (
+                            <div key={report.id} className="bg-white rounded-xl p-4 border border-gray-200">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className="font-bold text-gray-800">{report.testName}</div>
+                                  {report.testNameBn && (
+                                    <div className="text-sm text-gray-600">{report.testNameBn}</div>
+                                  )}
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {report.testType && `${report.testType} • `}
+                                    {new Date(report.testDate).toLocaleDateString('bn-BD')}
+                                  </div>
+                                  {report.findings && (
+                                    <div className="text-sm text-gray-700 mt-2">{report.findings}</div>
+                                  )}
+                                </div>
+                                {report.fileUrl && (
+                                  <a href={report.fileUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700">
+                                    দেখুন
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

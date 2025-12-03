@@ -6,6 +6,7 @@ import { ChatMessage, PrescriptionItem } from '../types';
 import { useAuth, DoctorProfile } from "../contexts/AuthContext";
 import { openPrescriptionWindow, PrescriptionData } from '../utils/prescriptionPDF';
 import { supabase, isSupabaseConfigured } from '../services/supabaseAuth';
+import { getPatientHistoryForDoctor, CompleteMedicalHistory } from '../services/medicalHistoryService';
 
 // ============ TYPES ============
 interface PatientRecord {
@@ -370,6 +371,8 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   }, [user?.id]);
   const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [patientHistory, setPatientHistory] = useState<CompleteMedicalHistory | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   
   // Consultation state
@@ -531,6 +534,21 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     setPrescription([]);
     setDiagnosis('');
     setAdvice([]);
+    
+    // Load patient history if patient_id exists
+    if (apt.patientId && !apt.patientId.startsWith('guest-')) {
+      setLoadingHistory(true);
+      try {
+        const history = await getPatientHistoryForDoctor(apt.patientId, user?.id);
+        setPatientHistory(history);
+        console.log('[Consultation] Loaded patient history:', history?.consultations.length || 0, 'consultations');
+      } catch (e) {
+        console.error('[Consultation] Error loading history:', e);
+      }
+      setLoadingHistory(false);
+    } else {
+      setPatientHistory(null);
+    }
   };
 
   const addMedicine = (template?: typeof PRESCRIPTION_TEMPLATES[0]) => {
@@ -588,7 +606,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   };
 
   const completeConsultation = async () => {
-    if (selectedAppointment) {
+    if (selectedAppointment && selectedPatient) {
       updateAppointmentStatus(selectedAppointment.id, 'Completed');
       
       // If payment status not set, default to Pending (doctor can change it)
@@ -600,23 +618,74 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
       // Save consultation data to Supabase
       if (isSupabaseConfigured()) {
         try {
-          // Update appointment status, payment status, and notes
+          // 1. Update appointment status and payment
           await supabase
             .from('appointments')
             .update({ 
               status: 'completed',
               payment_status: finalPaymentStatus.toLowerCase(), // 'paid', 'pending', 'waived'
-              notes: JSON.stringify({
-                soapNote,
-                diagnosis,
-                advice,
-                prescription,
-                completedAt: new Date().toISOString()
-              })
             })
             .eq('id', selectedAppointment.id);
           
-          console.log('[Consultation] ✅ Saved to database with payment status:', finalPaymentStatus);
+          // 2. Create consultation record
+          const consultationDate = selectedAppointment.date || new Date().toISOString().split('T')[0];
+          const consultationTime = selectedAppointment.time || new Date().toTimeString().split(' ')[0].substring(0, 5);
+          
+          const { data: consultationData, error: consultationError } = await supabase
+            .from('consultations')
+            .insert({
+              appointment_id: selectedAppointment.id,
+              doctor_id: user?.id,
+              patient_id: selectedAppointment.patientId.startsWith('guest-') ? null : selectedAppointment.patientId,
+              subjective: soapNote.subjective,
+              objective: soapNote.objective,
+              assessment: soapNote.assessment,
+              plan: soapNote.plan,
+              diagnosis: diagnosis,
+              diagnosis_bn: diagnosis, // Can be enhanced later
+              advice: advice.filter(a => a.trim()),
+              consultation_date: consultationDate,
+              consultation_time: consultationTime,
+            })
+            .select()
+            .single();
+          
+          if (consultationError) {
+            console.error('[Consultation] ❌ Error creating consultation:', consultationError);
+          } else {
+            console.log('[Consultation] ✅ Consultation record created:', consultationData?.id);
+            
+            // 3. Create prescription records
+            if (prescription.length > 0 && consultationData) {
+              const prescriptionRecords = prescription.map(med => ({
+                consultation_id: consultationData.id,
+                appointment_id: selectedAppointment.id,
+                doctor_id: user?.id,
+                patient_id: selectedAppointment.patientId.startsWith('guest-') ? null : selectedAppointment.patientId,
+                medicine_name: med.medicine,
+                medicine_name_bn: med.medicine, // Can be enhanced later
+                dosage: med.dosage,
+                duration: med.duration,
+                instruction: med.instruction,
+                prescription_date: consultationDate,
+                follow_up_date: followUpDays > 0 
+                  ? new Date(Date.now() + followUpDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                  : null,
+              }));
+              
+              const { error: prescriptionError } = await supabase
+                .from('prescriptions')
+                .insert(prescriptionRecords);
+              
+              if (prescriptionError) {
+                console.error('[Consultation] ❌ Error creating prescriptions:', prescriptionError);
+              } else {
+                console.log('[Consultation] ✅ Prescriptions saved:', prescriptionRecords.length);
+              }
+            }
+          }
+          
+          console.log('[Consultation] ✅ All data saved to database');
         } catch (e) {
           console.error('[Consultation] ❌ Error saving:', e);
         }
@@ -1614,58 +1683,82 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
             <div className="p-4 border-b border-slate-200 bg-slate-50">
               <h3 className="font-bold text-slate-800">রোগীর ইতিহাস</h3>
             </div>
-            <div className="p-4 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">মোট ভিজিট:</span>
-                <span className="font-medium">{selectedPatient?.totalVisits || 1} বার</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">আজকের ভিজিট:</span>
-                <span className="font-medium">{new Date(selectedAppointment.date).toLocaleDateString('bn-BD')}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">সমস্যা:</span>
-                <span className="font-medium text-blue-600">{selectedAppointment.chiefComplaint || 'উল্লেখ নেই'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">ভিজিটের ধরন:</span>
-                <span className="font-medium">
-                  {selectedAppointment.type === 'New' ? 'নতুন রোগী' : 
-                   selectedAppointment.type === 'Follow-up' ? 'ফলো-আপ' : 
-                   selectedAppointment.type === 'Report' ? 'রিপোর্ট দেখানো' : 
-                   selectedAppointment.type}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">ফি:</span>
-                <span className="font-medium text-green-600">৳{selectedAppointment.fee}</span>
-              </div>
-              
-              {selectedPatient?.medications && selectedPatient.medications.length > 0 && (
-                <div className="pt-3 border-t">
-                  <div className="text-sm font-medium text-slate-600 mb-2">বর্তমান ওষুধ:</div>
-                  <div className="space-y-1">
-                    {selectedPatient.medications.map((med, i) => (
-                      <div key={i} className="text-sm px-2 py-1 bg-blue-50 text-blue-700 rounded">{med}</div>
-                    ))}
-                  </div>
+            <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
+              {/* Current Appointment Info */}
+              <div className="pb-3 border-b">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-slate-500">আজকের ভিজিট:</span>
+                  <span className="font-medium">{new Date(selectedAppointment.date).toLocaleDateString('bn-BD')}</span>
                 </div>
-              )}
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-slate-500">সমস্যা:</span>
+                  <span className="font-medium text-blue-600">{selectedAppointment.chiefComplaint || 'উল্লেখ নেই'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">ভিজিটের ধরন:</span>
+                  <span className="font-medium">
+                    {selectedAppointment.type === 'New' ? 'নতুন রোগী' : 
+                     selectedAppointment.type === 'Follow-up' ? 'ফলো-আপ' : 
+                     selectedAppointment.type === 'Report' ? 'রিপোর্ট দেখানো' : 
+                     selectedAppointment.type}
+                  </span>
+                </div>
+              </div>
 
-              {selectedPatient?.familyHistory && selectedPatient.familyHistory.length > 0 && (
-                <div className="pt-3 border-t">
-                  <div className="text-sm font-medium text-slate-600 mb-2">পারিবারিক ইতিহাস:</div>
-                  <div className="space-y-1">
-                    {selectedPatient.familyHistory.map((h, i) => (
-                      <div key={i} className="text-sm text-slate-600">{h.condition} ({h.relation})</div>
-                    ))}
-                  </div>
+              {/* Medical History */}
+              {loadingHistory ? (
+                <div className="text-center py-4">
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-xs text-slate-500 mt-2">ইতিহাস লোড হচ্ছে...</p>
                 </div>
-              )}
-              
-              {!selectedPatient?.medications?.length && !selectedPatient?.familyHistory?.length && (
-                <div className="pt-3 border-t">
-                  <p className="text-sm text-slate-400 text-center py-2">এই রোগীর পূর্ববর্তী তথ্য নেই</p>
+              ) : patientHistory && (patientHistory.consultations.length > 0 || patientHistory.prescriptions.length > 0) ? (
+                <div className="space-y-4">
+                  {/* Previous Consultations */}
+                  {patientHistory.consultations.length > 0 && (
+                    <div>
+                      <div className="text-xs font-bold text-slate-600 mb-2">পূর্ববর্তী পরামর্শ ({patientHistory.consultations.length})</div>
+                      <div className="space-y-2">
+                        {patientHistory.consultations.slice(0, 3).map((consultation) => (
+                          <div key={consultation.id} className="p-2 bg-slate-50 rounded-lg border border-slate-200">
+                            <div className="text-xs font-medium text-slate-700">
+                              {new Date(consultation.consultationDate).toLocaleDateString('bn-BD')}
+                            </div>
+                            {consultation.diagnosis && (
+                              <div className="text-xs text-blue-600 mt-1">রোগ নির্ণয়: {consultation.diagnosis}</div>
+                            )}
+                            {consultation.assessment && (
+                              <div className="text-xs text-slate-600 mt-1 line-clamp-2">{consultation.assessment}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Current Medications */}
+                  {patientHistory.prescriptions.length > 0 && (
+                    <div>
+                      <div className="text-xs font-bold text-slate-600 mb-2">বর্তমান ওষুধ</div>
+                      <div className="space-y-1">
+                        {patientHistory.prescriptions
+                          .filter(p => {
+                            const prescDate = new Date(p.prescriptionDate);
+                            const daysSince = (Date.now() - prescDate.getTime()) / (1000 * 60 * 60 * 24);
+                            return daysSince < 30; // Show medications from last 30 days
+                          })
+                          .slice(0, 5)
+                          .map((prescription) => (
+                            <div key={prescription.id} className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded">
+                              {prescription.medicineName} ({prescription.dosage}) - {prescription.duration}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-xs text-slate-400">এই রোগীর পূর্ববর্তী তথ্য নেই</p>
                 </div>
               )}
             </div>
