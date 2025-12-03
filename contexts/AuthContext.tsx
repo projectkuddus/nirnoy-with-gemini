@@ -120,7 +120,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const updateProfile = async (updates: any) => {
     if (!user) return false;
-    const success = await authService.updatePatient(user.id, updates);
+    
+    let success: boolean;
+    if (role === 'doctor') {
+      success = await authService.updateDoctor(user.id, updates);
+    } else {
+      success = await authService.updatePatient(user.id, updates);
+    }
+    
     if (success) {
       setUser(prev => prev ? { ...prev, ...updates } : null);
     }

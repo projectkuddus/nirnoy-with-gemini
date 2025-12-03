@@ -181,7 +181,7 @@ interface DoctorDashboardProps {
 
 export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) => {
   const navigate = useNavigate();
-  const { user, role, logout, isLoading } = useAuth();
+  const { user, role, logout, isLoading, updateProfile } = useAuth();
   
   // Debug: Log user state
   console.log('DoctorDashboard - user:', user);
@@ -1668,24 +1668,53 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
   const [profileForm, setProfileForm] = useState({
     name: doctorProfile.name,
     nameBn: doctorProfile.nameBn,
-    email: 'dr.kashem@nirnoy.health',
-    phone: '01700-123456',
+    email: doctorUser.email || '',
+    phone: doctorUser.phone || '',
     specialty: doctorProfile.specialty,
     degrees: doctorProfile.degrees,
     bmdcNo: doctorProfile.bmdcNo,
     experience: doctorProfile.experience,
-    bio: 'Experienced cardiologist with 15+ years of practice. Specialized in interventional cardiology and heart failure management.',
+    bio: doctorUser.bio || `Experienced ${doctorProfile.specialty} specialist.`,
     consultationFee: doctorProfile.consultationFee,
-    followUpFee: 500,
+    followUpFee: doctorUser.followUpFee || Math.round(doctorProfile.consultationFee * 0.5),
   });
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
   const [profileImage, setProfileImage] = useState(doctorProfile.image);
   const [settingsTab, setSettingsTab] = useState<'profile' | 'security' | 'billing' | 'notifications'>('profile');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleProfileSave = () => {
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  const handleProfileSave = async () => {
+    setSaving(true);
+    try {
+      const updates = {
+        name: profileForm.name,
+        email: profileForm.email || undefined,
+        phone: profileForm.phone || undefined,
+        specializations: [profileForm.specialty],
+        qualifications: profileForm.degrees.split(',').map(d => d.trim()),
+        bmdcNumber: profileForm.bmdcNo,
+        experienceYears: profileForm.experience,
+        bio: profileForm.bio,
+        consultationFee: profileForm.consultationFee,
+        followUpFee: profileForm.followUpFee,
+      };
+      
+      console.log('[DoctorDashboard] Saving profile updates:', updates);
+      const success = await updateProfile(updates);
+      
+      if (success) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+        console.log('[DoctorDashboard] Profile saved successfully');
+      } else {
+        alert('সংরক্ষণ ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।');
+      }
+    } catch (error) {
+      console.error('[DoctorDashboard] Save error:', error);
+      alert('একটি ত্রুটি হয়েছে');
+    }
+    setSaving(false);
   };
 
   const handlePasswordChange = () => {
@@ -1825,8 +1854,17 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                     <textarea value={profileForm.bio} onChange={(e) => setProfileForm(p => ({...p, bio: e.target.value}))} rows={3} className="w-full px-4 py-2 border rounded-lg mt-1" />
                   </div>
                 </div>
-                <button onClick={handleProfileSave} className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700">
-                  সংরক্ষণ করুন
+                <button 
+                  onClick={handleProfileSave} 
+                  disabled={saving}
+                  className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {saving ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      সংরক্ষণ হচ্ছে...
+                    </>
+                  ) : 'সংরক্ষণ করুন'}
                 </button>
               </div>
             </>
@@ -1879,7 +1917,13 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                     <input type="number" value={profileForm.followUpFee} onChange={(e) => setProfileForm(p => ({...p, followUpFee: parseInt(e.target.value)}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
                   </div>
                 </div>
-                <button onClick={handleProfileSave} className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700">সংরক্ষণ করুন</button>
+                <button 
+                  onClick={handleProfileSave} 
+                  disabled={saving}
+                  className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'সংরক্ষণ হচ্ছে...' : 'সংরক্ষণ করুন'}
+                </button>
               </div>
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h3 className="font-bold text-slate-800 mb-4">পেমেন্ট মেথড</h3>

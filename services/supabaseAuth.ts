@@ -48,6 +48,7 @@ export interface DoctorProfile {
   id: string;
   phone: string;
   name: string;
+  nameBn?: string;
   email?: string;
   dateOfBirth?: string;
   gender?: 'male' | 'female' | 'other';
@@ -58,12 +59,15 @@ export interface DoctorProfile {
   institution?: string;
   experienceYears: number;
   consultationFee: number;
+  followUpFee?: number;
+  bio?: string;
   chambers: any[];
   avatarUrl?: string;
   status: 'pending' | 'approved' | 'rejected' | 'suspended';
   isVerified: boolean;
   rating: number;
   totalPatients: number;
+  rejectionReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -415,6 +419,68 @@ const db = {
     const all = await this.getAllDoctors();
     // Filter by is_verified=false (pending approval)
     return all.filter(d => !d.isVerified);
+  },
+
+  async getFullDoctorProfile(profileId: string): Promise<DoctorProfile | null> {
+    if (!isSupabaseConfigured()) return null;
+    
+    try {
+      // Get profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', profileId)
+        .single();
+      
+      if (profileError || !profile) {
+        console.error('[DB] Profile fetch error:', profileError);
+        return null;
+      }
+      
+      // Get doctor data
+      const { data: doctorData, error: doctorError } = await supabase
+        .from('doctors')
+        .select('*')
+        .eq('profile_id', profileId)
+        .single();
+      
+      if (doctorError || !doctorData) {
+        console.error('[DB] Doctor fetch error:', doctorError);
+        return null;
+      }
+      
+      const doctor: DoctorProfile = {
+        id: profile.id,
+        phone: profile.phone,
+        name: profile.name,
+        email: profile.email,
+        dateOfBirth: profile.date_of_birth,
+        gender: profile.gender,
+        bmdcNumber: doctorData.bmdc_number || '',
+        nidNumber: doctorData.nid_number,
+        specializations: doctorData.specialties || [],
+        qualifications: doctorData.qualifications || [],
+        institution: doctorData.institution,
+        experienceYears: doctorData.experience_years || 0,
+        consultationFee: doctorData.consultation_fee || 500,
+        chambers: [],
+        avatarUrl: profile.avatar_url,
+        status: doctorData.is_verified ? 'approved' : 'pending',
+        isVerified: doctorData.is_verified,
+        rating: parseFloat(doctorData.rating) || 0,
+        totalPatients: doctorData.total_patients || 0,
+        bio: doctorData.bio || '',
+        followUpFee: doctorData.follow_up_fee || Math.round((doctorData.consultation_fee || 500) * 0.5),
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at
+      };
+      
+      console.log('[DB] Full doctor profile loaded:', doctor.name);
+      return doctor;
+    } catch (e) {
+      console.error('[DB] getFullDoctorProfile exception:', e);
+      return null;
+    }
   },
 
   async updateDoctorStatus(profileId: string, status: 'approved' | 'rejected'): Promise<boolean> {
@@ -781,6 +847,73 @@ export const authService = {
       return true;
     } catch (e) {
       console.error('[Auth] Update exception:', e);
+      return false;
+    }
+  },
+
+  async updateDoctor(id: string, updates: any): Promise<boolean> {
+    console.log('[Auth] updateDoctor:', id, updates);
+    
+    if (!isSupabaseConfigured()) {
+      console.error('[Auth] Supabase not configured');
+      return false;
+    }
+    
+    try {
+      // Update profiles table (name, email, phone)
+      const profileUpdates: any = { updated_at: new Date().toISOString() };
+      if (updates.name !== undefined) profileUpdates.name = updates.name;
+      if (updates.email !== undefined) profileUpdates.email = updates.email;
+      if (updates.phone !== undefined) profileUpdates.phone = normalizePhone(updates.phone);
+      if (updates.avatarUrl !== undefined) profileUpdates.avatar_url = updates.avatarUrl;
+      
+      console.log('[Auth] Updating profiles table:', profileUpdates);
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', id);
+      
+      if (profileError) {
+        console.error('[Auth] Profile update error:', profileError);
+        return false;
+      }
+      
+      // Update doctors table (specialties, fee, experience, bio, etc.)
+      const doctorUpdates: any = {};
+      if (updates.specialties !== undefined) doctorUpdates.specialties = updates.specialties;
+      if (updates.specializations !== undefined) doctorUpdates.specialties = updates.specializations;
+      if (updates.qualifications !== undefined) doctorUpdates.qualifications = updates.qualifications;
+      if (updates.consultationFee !== undefined) doctorUpdates.consultation_fee = updates.consultationFee;
+      if (updates.followUpFee !== undefined) doctorUpdates.follow_up_fee = updates.followUpFee;
+      if (updates.experienceYears !== undefined) doctorUpdates.experience_years = updates.experienceYears;
+      if (updates.bio !== undefined) doctorUpdates.bio = updates.bio;
+      if (updates.bmdcNumber !== undefined) doctorUpdates.bmdc_number = updates.bmdcNumber;
+      if (updates.institution !== undefined) doctorUpdates.institution = updates.institution;
+      
+      if (Object.keys(doctorUpdates).length > 0) {
+        console.log('[Auth] Updating doctors table:', doctorUpdates);
+        const { error: doctorError } = await supabase
+          .from('doctors')
+          .update(doctorUpdates)
+          .eq('profile_id', id);
+        
+        if (doctorError) {
+          console.error('[Auth] Doctor update error:', doctorError);
+          return false;
+        }
+      }
+      
+      // Refresh session with updated data from DB
+      const refreshedDoctor = await db.getFullDoctorProfile(id);
+      if (refreshedDoctor) {
+        session.save(id, 'doctor', refreshedDoctor);
+        console.log('[Auth] Session refreshed with new doctor data');
+      }
+      
+      console.log('[Auth] Doctor profile updated successfully');
+      return true;
+    } catch (e) {
+      console.error('[Auth] Update doctor exception:', e);
       return false;
     }
   },
