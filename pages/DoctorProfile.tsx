@@ -31,29 +31,44 @@ export const DoctorProfile: React.FC = () => {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       
       if (isUUID && isSupabaseConfigured()) {
-        // Fetch from Supabase
+        // Fetch from Supabase - ID could be doctors.id OR profiles.id
         console.log('[DoctorProfile] Fetching from Supabase:', id);
         try {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
+          // First try: Query doctors table with ID (this is the ID from useDoctors)
+          let { data: doctorData, error: doctorError } = await supabase
+            .from('doctors')
+            .select(`
+              *,
+              profile:profiles!profile_id(*)
+            `)
             .eq('id', id)
             .single();
           
-          if (profileError || !profile) {
-            console.error('[DoctorProfile] Profile not found:', profileError);
+          // Second try: If not found, maybe ID is the profile_id
+          if (doctorError || !doctorData) {
+            console.log('[DoctorProfile] Trying profile_id lookup...');
+            const result = await supabase
+              .from('doctors')
+              .select(`
+                *,
+                profile:profiles!profile_id(*)
+              `)
+              .eq('profile_id', id)
+              .single();
+            
+            doctorData = result.data;
+            doctorError = result.error;
+          }
+          
+          if (doctorError || !doctorData) {
+            console.error('[DoctorProfile] Doctor not found:', doctorError);
             setLoading(false);
             return;
           }
 
-          const { data: doctorData, error: doctorError } = await supabase
-            .from('doctors')
-            .select('*')
-            .eq('profile_id', id)
-            .single();
-          
-          if (doctorError || !doctorData) {
-            console.error('[DoctorProfile] Doctor data not found:', doctorError);
+          const profile = doctorData.profile;
+          if (!profile) {
+            console.error('[DoctorProfile] Profile data missing');
             setLoading(false);
             return;
           }
@@ -61,7 +76,8 @@ export const DoctorProfile: React.FC = () => {
           // Build doctor object from Supabase data
           const specialties = doctorData.specialties || [];
           setDoctor({
-            id: profile.id,
+            id: doctorData.id,
+            profileId: profile.id,
             name: profile.name,
             image: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=3b82f6&color=fff&size=200`,
             specialties: specialties,
