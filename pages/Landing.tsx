@@ -347,6 +347,7 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
             {[
               { icon: 'fa-microphone-alt', title: isBn ? 'ভয়েস বুকিং' : 'Voice Booking', desc: isBn ? 'বাংলায় কথা বলে অ্যাপয়েন্টমেন্ট নিন' : 'Book appointments by speaking in Bangla', color: 'from-blue-500 to-indigo-500' },
               { icon: 'fa-users', title: isBn ? 'পারিবারিক স্বাস্থ্য' : 'Family Health', desc: isBn ? 'পুরো পরিবারের স্বাস্থ্য এক জায়গায়' : 'Manage your entire family health', color: 'from-pink-500 to-rose-500' },
+              { icon: 'fa-clipboard-list', title: isBn ? 'চিকিৎসা ইতিহাস' : 'Treatment History', desc: isBn ? 'পরিবারের চিকিৎসা আর হারাবেন না' : 'Never lose track of your family\'s treatment again', color: 'from-green-500 to-emerald-500' },
               { icon: 'fa-brain', title: isBn ? 'AI হেলথ ব্রেইন' : 'AI Health Brain', desc: isBn ? 'আপনার স্বাস্থ্যের সম্পূর্ণ চিত্র' : 'Complete picture of your health', color: 'from-amber-500 to-orange-500' },
               { icon: 'fa-clock', title: isBn ? 'লাইভ কিউ' : 'Live Queue', desc: isBn ? 'রিয়েল-টাইম সিরিয়াল ট্র্যাকিং' : 'Real-time serial tracking', color: 'from-blue-500 to-indigo-500' },
               { icon: 'fa-file-medical', title: isBn ? 'ডিজিটাল রেকর্ড' : 'Digital Records', desc: isBn ? 'সব রিপোর্ট ও প্রেসক্রিপশন এক জায়গায়' : 'All reports & prescriptions in one place', color: 'from-purple-500 to-violet-500' },
