@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({ userRole: propUserRole, onLogout
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100">
+    <header className="fixed left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100" style={{ top: '60px' }}>
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <button onClick={() => navigate('/')} className="flex items-center gap-3">

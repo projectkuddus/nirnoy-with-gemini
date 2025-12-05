@@ -80,8 +80,8 @@ const HealthTriviaStrip: React.FC = () => {
   };
   
   return (
-    <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 border-y border-slate-700/50">
-      <div className="max-w-7xl mx-auto px-4 py-4">
+    <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 border-b border-slate-700/50 shadow-lg">
+      <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center gap-4">
           {/* Fun Icon with bounce animation */}
           <div 
@@ -228,13 +228,14 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Health Trivia Strip - Topmost of Page (Fixed at very top) */}
+      <HealthTriviaStrip />
+      
+      {/* Navbar - Below Trivia Strip (Fixed, positioned below trivia) */}
       <Navbar userRole={userRole} onLogout={handleLogout} />
 
-      {/* Health Trivia Strip - Top of Page */}
-      <HealthTriviaStrip />
-
-      {/* Hero Section */}
-      <section className="pt-8 pb-16 px-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      {/* Hero Section - Adjusted padding for fixed navbar + trivia */}
+      <section className="pt-32 pb-16 px-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
