@@ -8,7 +8,7 @@
     <loc>https://www.nirnoy.ai/</loc>
     <xhtml:link rel="alternate" hreflang="bn" href="https://www.nirnoy.ai/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.nirnoy.ai/?lang=en"/>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
@@ -16,7 +16,7 @@
   <!-- Doctor Search -->
   <url>
     <loc>https://www.nirnoy.ai/search</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
@@ -24,7 +24,7 @@
   <!-- Patient Login/Registration -->
   <url>
     <loc>https://www.nirnoy.ai/patient-auth</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -32,7 +32,7 @@
   <!-- Doctor Registration -->
   <url>
     <loc>https://www.nirnoy.ai/doctor-registration</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -40,7 +40,7 @@
   <!-- Pricing -->
   <url>
     <loc>https://www.nirnoy.ai/pricing</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -48,7 +48,7 @@
   <!-- About -->
   <url>
     <loc>https://www.nirnoy.ai/about</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -56,7 +56,7 @@
   <!-- Help -->
   <url>
     <loc>https://www.nirnoy.ai/help</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -64,7 +64,7 @@
   <!-- Free Care -->
   <url>
     <loc>https://www.nirnoy.ai/free-care</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -72,7 +72,7 @@
   <!-- Privacy Policy -->
   <url>
     <loc>https://www.nirnoy.ai/privacy</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
@@ -80,7 +80,7 @@
   <!-- Terms of Service -->
   <url>
     <loc>https://www.nirnoy.ai/terms</loc>
-    <lastmod>2024-11-30</lastmod>
+    <lastmod>2024-12-06</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
