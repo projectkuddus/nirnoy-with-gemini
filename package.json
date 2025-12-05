@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "og-image:help": "echo 'To create og-image.png: 1) npm run dev 2) Open http://localhost:5173/og-image.html 3) Use browser DevTools to capture screenshot 4) Save as public/og-image.png'"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
