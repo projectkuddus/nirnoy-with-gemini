@@ -230,8 +230,11 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
     <div className="min-h-screen bg-slate-50">
       <Navbar userRole={userRole} onLogout={handleLogout} />
 
-      {/* Health Trivia Strip */}
-      <section className="pt-24 pb-16 px-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      {/* Health Trivia Strip - Top of Page */}
+      <HealthTriviaStrip />
+
+      {/* Hero Section */}
+      <section className="pt-8 pb-16 px-6 bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
@@ -332,9 +335,6 @@ export const Landing: React.FC<LandingProps> = ({ onLogin, userRole: propUserRol
         </div>
       </section>
 
-
-      {/* Fun Health Trivia - Above Why Nirnoy */}
-      <HealthTriviaStrip />
       {/* Features Section */}
       <section className="py-16 px-6 bg-gradient-to-br from-slate-900 to-slate-800">
         <div className="max-w-7xl mx-auto">
