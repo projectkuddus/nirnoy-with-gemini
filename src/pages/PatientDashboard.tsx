@@ -114,19 +114,76 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   
   const patientUser = useMemo(() => (user && (role === 'patient' || role === 'PATIENT')) ? user as PatientProfile : null, [user, role]);
 
-  // Health score calculation
-  const healthScore = useMemo(() => {
-    if (!patientUser) return 75;
-    let score = 75;
+  // Comprehensive Health Metrics Calculation
+  const healthMetrics = useMemo(() => {
+    if (!patientUser) return { score: 75, bmi: null, bmiCategory: 'Unknown', age: null, riskLevel: 'Low' };
+    
+    let score = 85; // Start with good baseline
+    let bmi: number | null = null;
+    let bmiCategory = 'Unknown';
+    let age: number | null = null;
+    let riskLevel = 'Low';
+    
+    // Calculate BMI
     if (patientUser.heightCm && patientUser.weightKg) {
-      const bmi = patientUser.weightKg / Math.pow(patientUser.heightCm / 100, 2);
-      if (bmi >= 18.5 && bmi <= 24.9) score += 10;
-      else if (bmi < 18.5 || bmi > 30) score -= 10;
+      bmi = patientUser.weightKg / Math.pow(patientUser.heightCm / 100, 2);
+      if (bmi < 16) { bmiCategory = 'Severely Underweight'; score -= 20; }
+      else if (bmi < 18.5) { bmiCategory = 'Underweight'; score -= 10; }
+      else if (bmi < 25) { bmiCategory = 'Normal'; score += 10; }
+      else if (bmi < 30) { bmiCategory = 'Overweight'; score -= 5; }
+      else if (bmi < 35) { bmiCategory = 'Obese (Class I)'; score -= 15; }
+      else { bmiCategory = 'Obese (Class II+)'; score -= 25; }
     }
-    if (patientUser.chronicConditions?.length) score -= patientUser.chronicConditions.length * 5;
-    if (patientUser.allergies?.length) score -= patientUser.allergies.length * 2;
-    return Math.max(20, Math.min(100, score));
-  }, [patientUser]);
+    
+    // Calculate Age
+    if (patientUser.dateOfBirth) {
+      const today = new Date();
+      const birthDate = new Date(patientUser.dateOfBirth);
+      age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+      
+      // Age-based adjustments
+      if (age && age > 60) score -= 5;
+      if (age && age > 70) score -= 10;
+    }
+    
+    // Chronic conditions impact
+    if (patientUser.chronicConditions?.length) {
+      const conditionCount = patientUser.chronicConditions.length;
+      score -= conditionCount * 8;
+      if (conditionCount >= 3) riskLevel = 'High';
+      else if (conditionCount >= 1) riskLevel = 'Medium';
+    }
+    
+    // Allergies impact
+    if (patientUser.allergies?.length) {
+      score -= patientUser.allergies.length * 3;
+    }
+    
+    // Blood group bonus (just for having complete profile)
+    if (patientUser.bloodGroup) score += 2;
+    
+    // Emergency contact bonus
+    if (patientUser.emergencyContactName && patientUser.emergencyContactPhone) score += 3;
+    
+    // Recent consultation bonus (health-conscious)
+    if (medicalHistory && medicalHistory.consultations.length > 0) {
+      const lastConsultDate = new Date(medicalHistory.consultations[0].consultationDate);
+      const monthsSinceConsult = (new Date().getTime() - lastConsultDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+      if (monthsSinceConsult < 6) score += 5;
+    }
+    
+    return {
+      score: Math.max(20, Math.min(100, Math.round(score))),
+      bmi: bmi ? Math.round(bmi * 10) / 10 : null,
+      bmiCategory,
+      age,
+      riskLevel
+    };
+  }, [patientUser, medicalHistory]);
+
+  const healthScore = healthMetrics.score;
 
   // Patient context for AI
   const patientContext = useMemo(() => {
@@ -614,53 +671,235 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           {/* HOME TAB */}
           {activeTab === 'home' && (
             <div className="space-y-6">
-              {/* Health Score Card */}
-              <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white">
-                <div className="flex items-center justify-between">
+              {/* Health Score Card - Enhanced */}
+              <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 rounded-2xl p-6 text-white shadow-xl">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold">স্বাস্থ্য স্কোর</h2>
-                    <p className="text-blue-100">আপনার সামগ্রিক স্বাস্থ্য অবস্থা</p>
+                    <h2 className="text-3xl font-bold flex items-center gap-2">
+                      স্বাস্থ্য স্কোর
+                      {healthMetrics.score >= 80 && <span className="text-2xl">🌟</span>}
+                      {healthMetrics.score >= 90 && <span className="text-2xl">🏆</span>}
+                    </h2>
+                    <p className="text-blue-100 mt-1">আপনার সামগ্রিক স্বাস্থ্য অবস্থা</p>
                   </div>
                   <div className="text-center">
-                    <div className="text-5xl font-bold">{healthScore}</div>
-                    <div className="text-sm text-blue-200">/100</div>
+                    <div className="text-6xl font-bold leading-none">{healthScore}</div>
+                    <div className="text-sm text-blue-200 mt-1">/100</div>
+                    <div className={`text-xs font-bold mt-2 px-3 py-1 rounded-full ${
+                      healthScore >= 90 ? 'bg-green-500' : 
+                      healthScore >= 75 ? 'bg-yellow-500' : 
+                      healthScore >= 60 ? 'bg-orange-500' : 'bg-red-500'
+                    }`}>
+                      {healthScore >= 90 ? 'চমৎকার' : 
+                       healthScore >= 75 ? 'ভালো' : 
+                       healthScore >= 60 ? 'সাবধান' : 'ঝুঁকিপূর্ণ'}
+                    </div>
                   </div>
                 </div>
-                <div className="mt-4 bg-blue-500 rounded-full h-3">
-                  <div className="bg-white rounded-full h-3 transition-all" style={{ width: `${healthScore}%` }}></div>
+                <div className="mt-4">
+                  <div className="bg-blue-400/30 rounded-full h-4 overflow-hidden">
+                    <div 
+                      className={`h-4 rounded-full transition-all duration-1000 ${
+                        healthScore >= 90 ? 'bg-gradient-to-r from-green-400 to-green-300' : 
+                        healthScore >= 75 ? 'bg-gradient-to-r from-yellow-300 to-green-300' : 
+                        healthScore >= 60 ? 'bg-gradient-to-r from-orange-400 to-yellow-300' : 
+                        'bg-gradient-to-r from-red-400 to-orange-400'
+                      }`} 
+                      style={{ width: `${healthScore}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center justify-between text-sm opacity-90">
+                  <span>ঝুঁকি স্তর: <strong>{healthMetrics.riskLevel === 'High' ? '⚠️ উচ্চ' : healthMetrics.riskLevel === 'Medium' ? '⚠️ মাঝারি' : '✅ নিম্ন'}</strong></span>
+                  {healthMetrics.age && <span>বয়স: <strong>{healthMetrics.age} বছর</strong></span>}
                 </div>
               </div>
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { icon: '📏', value: patientUser.heightCm ? `${patientUser.heightCm} cm` : '-', label: 'উচ্চতা' },
-                  { icon: '⚖️', value: patientUser.weightKg ? `${patientUser.weightKg} kg` : '-', label: 'ওজন' },
-                  { icon: '🩸', value: patientUser.bloodGroup || '-', label: 'রক্তের গ্রুপ' },
-                  { icon: '🏆', value: patientUser.quizPoints || 0, label: 'পয়েন্ট' },
-                ].map((stat, i) => (
-                  <div key={i} className="bg-white rounded-xl p-4 border">
-                    <div className="text-2xl mb-2">{stat.icon}</div>
-                    <div className="text-xl font-bold text-gray-800">{stat.value}</div>
-                    <div className="text-sm text-gray-500">{stat.label}</div>
+              {/* Health Metrics Grid - Enhanced */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Height */}
+                <div className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-blue-300 hover:shadow-lg transition">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-3xl">📏</div>
+                    <span className="text-xs text-gray-400 font-medium">HEIGHT</span>
                   </div>
-                ))}
+                  <div className="text-2xl font-bold text-gray-800">{patientUser.heightCm || '-'}</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {patientUser.heightCm ? `${patientUser.heightCm} cm` : 'উচ্চতা যোগ করুন'}
+                  </div>
+                </div>
+
+                {/* Weight */}
+                <div className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-green-300 hover:shadow-lg transition">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-3xl">⚖️</div>
+                    <span className="text-xs text-gray-400 font-medium">WEIGHT</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-800">{patientUser.weightKg || '-'}</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {patientUser.weightKg ? `${patientUser.weightKg} kg` : 'ওজন যোগ করুন'}
+                  </div>
+                </div>
+
+                {/* Blood Group */}
+                <div className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-red-300 hover:shadow-lg transition">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-3xl">🩸</div>
+                    <span className="text-xs text-gray-400 font-medium">BLOOD</span>
+                  </div>
+                  <div className="text-2xl font-bold text-red-600">{patientUser.bloodGroup || '-'}</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {patientUser.bloodGroup ? 'রক্তের গ্রুপ' : 'গ্রুপ যোগ করুন'}
+                  </div>
+                </div>
+
+                {/* Points */}
+                <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl p-5 border-2 border-yellow-300 hover:shadow-lg transition">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-3xl">🏆</div>
+                    <span className="text-xs text-yellow-700 font-medium">POINTS</span>
+                  </div>
+                  <div className="text-2xl font-bold text-yellow-800">{patientUser.quizPoints || 0}</div>
+                  <div className="text-sm text-yellow-700 mt-1">পয়েন্ট</div>
+                </div>
               </div>
+
+              {/* BMI Card - New Comprehensive */}
+              {healthMetrics.bmi && (
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        📊 Body Mass Index (BMI)
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">আপনার শরীরের ভর সূচক</p>
+                    </div>
+                    <div className="text-center bg-white rounded-xl px-4 py-3 shadow-sm">
+                      <div className="text-3xl font-bold text-purple-600">{healthMetrics.bmi}</div>
+                      <div className="text-xs text-gray-500">BMI</div>
+                    </div>
+                  </div>
+                  
+                  {/* BMI Category Badge */}
+                  <div className={`inline-block px-4 py-2 rounded-full text-sm font-bold ${
+                    healthMetrics.bmiCategory === 'Normal' ? 'bg-green-500 text-white' :
+                    healthMetrics.bmiCategory === 'Overweight' || healthMetrics.bmiCategory === 'Underweight' ? 'bg-yellow-500 text-white' :
+                    'bg-red-500 text-white'
+                  }`}>
+                    {healthMetrics.bmiCategory === 'Normal' ? '✓ স্বাভাবিক' :
+                     healthMetrics.bmiCategory === 'Overweight' ? '⚠ অতিরিক্ত ওজন' :
+                     healthMetrics.bmiCategory === 'Underweight' ? '⚠ কম ওজন' :
+                     healthMetrics.bmiCategory === 'Obese (Class I)' ? '⚠ স্থূলতা (মাত্রা ১)' :
+                     healthMetrics.bmiCategory === 'Obese (Class II+)' ? '⚠ স্থূলতা (মাত্রা ২+)' :
+                     healthMetrics.bmiCategory === 'Severely Underweight' ? '⚠ গুরুতর কম ওজন' :
+                     healthMetrics.bmiCategory}
+                  </div>
+
+                  {/* BMI Visual Scale */}
+                  <div className="mt-4 relative">
+                    <div className="h-3 rounded-full overflow-hidden flex">
+                      <div className="bg-blue-300 flex-1"></div>
+                      <div className="bg-green-400 flex-1"></div>
+                      <div className="bg-yellow-400 flex-1"></div>
+                      <div className="bg-orange-400 flex-1"></div>
+                      <div className="bg-red-400 flex-1"></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-2">
+                      <span>16</span>
+                      <span>18.5</span>
+                      <span>25</span>
+                      <span>30</span>
+                      <span>35+</span>
+                    </div>
+                    {/* BMI Indicator */}
+                    <div 
+                      className="absolute -top-1 w-0.5 h-5 bg-gray-800 transition-all"
+                      style={{ 
+                        left: `${Math.min(Math.max(((healthMetrics.bmi - 16) / (35 - 16)) * 100, 0), 100)}%` 
+                      }}
+                    >
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-gray-800 rounded-full border-2 border-white"></div>
+                    </div>
+                  </div>
+
+                  {/* BMI Recommendations */}
+                  {healthMetrics.bmiCategory !== 'Normal' && (
+                    <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
+                      <p className="text-xs font-medium text-gray-700">
+                        💡 <strong>পরামর্শ:</strong> {
+                          healthMetrics.bmiCategory.includes('Underweight') 
+                            ? 'পুষ্টিকর খাবার গ্রহণ করুন এবং একজন পুষ্টিবিদের সাথে পরামর্শ করুন।'
+                            : healthMetrics.bmiCategory.includes('Overweight')
+                            ? 'স্বাস্থ্যকর খাদ্যাভ্যাস এবং নিয়মিত ব্যায়াম করুন।'
+                            : healthMetrics.bmiCategory.includes('Obese')
+                            ? 'একজন ডাক্তার এবং পুষ্টিবিদের সাথে পরামর্শ করুন। ওজন কমাতে পরিকল্পনা করুন।'
+                            : 'একজন বিশেষজ্ঞের সাথে পরামর্শ করুন।'
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Health Alerts */}
               {(patientUser.chronicConditions?.length || patientUser.allergies?.length) ? (
-                <div className="bg-white rounded-xl p-4 border">
-                  <h3 className="font-bold text-gray-800 mb-3">⚠️ স্বাস্থ্য সতর্কতা</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {patientUser.chronicConditions?.map((c, i) => (
-                      <span key={i} className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm">{c}</span>
-                    ))}
-                    {patientUser.allergies?.map((a, i) => (
-                      <span key={i} className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm">এলার্জি: {a}</span>
-                    ))}
+                <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-5 border-2 border-red-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">⚠️</span>
+                    <h3 className="font-bold text-red-800 text-lg">স্বাস্থ্য সতর্কতা</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {patientUser.chronicConditions?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-red-700 mb-2 uppercase">দীর্ঘমেয়াদী অবস্থা:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {patientUser.chronicConditions.map((c, i) => (
+                            <span key={i} className="px-3 py-2 bg-red-100 text-red-800 rounded-lg text-sm font-medium border border-red-300 flex items-center gap-1">
+                              <span className="text-red-600">●</span> {c}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {patientUser.allergies?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold text-yellow-700 mb-2 uppercase">এলার্জি:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {patientUser.allergies.map((a, i) => (
+                            <span key={i} className="px-3 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium border border-yellow-300 flex items-center gap-1">
+                              <span className="text-yellow-600">⚠</span> {a}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : null}
+
+              {/* Health Summary Stats */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                  <div className="text-2xl mb-2">📅</div>
+                  <div className="text-2xl font-bold text-blue-800">{medicalHistory?.consultations.length || 0}</div>
+                  <div className="text-xs text-blue-600 font-medium mt-1">মোট পরামর্শ</div>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                  <div className="text-2xl mb-2">💊</div>
+                  <div className="text-2xl font-bold text-green-800">{medicalHistory?.prescriptions.length || 0}</div>
+                  <div className="text-xs text-green-600 font-medium mt-1">প্রেসক্রিপশন</div>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
+                  <div className="text-2xl mb-2">🔬</div>
+                  <div className="text-2xl font-bold text-purple-800">{medicalHistory?.testReports.length || 0}</div>
+                  <div className="text-xs text-purple-600 font-medium mt-1">টেস্ট রিপোর্ট</div>
+                </div>
+                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200">
+                  <div className="text-2xl mb-2">👨‍⚕️</div>
+                  <div className="text-2xl font-bold text-orange-800">{medicalHistory?.doctors.length || 0}</div>
+                  <div className="text-xs text-orange-600 font-medium mt-1">ডাক্তার দেখেছেন</div>
+                </div>
+              </div>
 
               {/* Profile Summary */}
               <div className="bg-white rounded-xl p-4 border">
