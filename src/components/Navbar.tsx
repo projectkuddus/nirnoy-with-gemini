@@ -28,16 +28,16 @@ export const Navbar: React.FC<NavbarProps> = ({ userRole: propUserRole, onLogout
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="relative z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100">
+    <header className="relative z-50 glass-strong border-b border-white/40">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
-        <button onClick={() => navigate('/')} className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-            <span className="text-white font-black text-lg">ন</span>
+        <button onClick={() => navigate('/')} className="flex items-center gap-3 group">
+          <div className="w-10 h-10 glass-card rounded-xl flex items-center justify-center border border-blue-200/40 group-hover:shadow-lg transition">
+            <span className="text-blue-500 font-black text-lg">ন</span>
           </div>
           <div className="leading-tight text-left">
-            <span className="font-black text-slate-900 text-lg tracking-tight">{t('brand.name')}</span>
-            <span className="text-[10px] text-blue-600 font-semibold block -mt-0.5 tracking-widest uppercase">{t('brand.tagline')}</span>
+            <span className="font-black text-slate-700 text-lg tracking-tight">{t('brand.name')}</span>
+            <span className="text-[10px] text-blue-500 font-semibold block -mt-0.5 tracking-widest uppercase">{t('brand.tagline')}</span>
           </div>
         </button>
 
@@ -45,7 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({ userRole: propUserRole, onLogout
         <nav className="hidden md:flex items-center gap-6">
           <button 
             onClick={() => navigate('/search')}
-            className={`text-sm font-semibold transition ${isActive('/search') ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`text-sm font-semibold transition px-3 py-1.5 rounded-lg ${isActive('/search') ? 'text-blue-600 glass-subtle' : 'text-slate-500 hover:text-slate-700 hover:glass-subtle'}`}
           >
             {t('nav.findDoctor')}
           </button>
@@ -54,13 +54,13 @@ export const Navbar: React.FC<NavbarProps> = ({ userRole: propUserRole, onLogout
             <>
               <button 
                 onClick={() => navigate('/patient-dashboard')}
-                className={`text-sm font-semibold transition ${isActive('/my-health') || isActive('/patient-dashboard') ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`text-sm font-semibold transition px-3 py-1.5 rounded-lg ${isActive('/my-health') || isActive('/patient-dashboard') ? 'text-blue-600 glass-subtle' : 'text-slate-500 hover:text-slate-700 hover:glass-subtle'}`}
               >
                 {t('nav.myHealth')}
               </button>
               <button 
                 onClick={() => navigate('/patient-dashboard')}
-                className={`text-sm font-semibold transition ${isActive('/patient-dashboard') ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`text-sm font-semibold transition px-3 py-1.5 rounded-lg ${isActive('/patient-dashboard') ? 'text-blue-600 glass-subtle' : 'text-slate-500 hover:text-slate-700 hover:glass-subtle'}`}
               >
                 {t('nav.appointments')}
               </button>
@@ -70,7 +70,7 @@ export const Navbar: React.FC<NavbarProps> = ({ userRole: propUserRole, onLogout
           {userRole === UserRole.DOCTOR && (
             <button 
               onClick={() => navigate('/doctor-dashboard')}
-              className={`text-sm font-semibold transition ${isActive('/doctor-dashboard') || isActive('/my-practice') ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`text-sm font-semibold transition px-3 py-1.5 rounded-lg ${isActive('/doctor-dashboard') || isActive('/my-practice') ? 'text-blue-600 glass-subtle' : 'text-slate-500 hover:text-slate-700 hover:glass-subtle'}`}
             >
               {t('nav.myPractice')}
             </button>
@@ -85,18 +85,18 @@ export const Navbar: React.FC<NavbarProps> = ({ userRole: propUserRole, onLogout
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => navigate(user.role === 'DOCTOR' ? '/doctor-dashboard' : '/patient-dashboard')}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-full hover:bg-slate-200 transition"
+                className="flex items-center gap-2 px-3 py-1.5 glass rounded-full hover:glass-strong transition border border-white/50"
               >
-                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                <div className="w-6 h-6 glass-card rounded-full flex items-center justify-center text-blue-500 text-xs font-bold border border-blue-200/40">
                   {user.name?.charAt(0).toUpperCase() || '?'}
                 </div>
-                <span className="text-sm font-medium text-slate-700 hidden sm:block max-w-[100px] truncate">
+                <span className="text-sm font-medium text-slate-600 hidden sm:block max-w-[100px] truncate">
                   {user.name}
                 </span>
               </button>
               <button 
                 onClick={handleLogout}
-                className="text-sm font-semibold text-slate-500 hover:text-red-600 transition"
+                className="text-sm font-semibold text-slate-400 hover:text-red-500 transition p-2 rounded-lg hover:glass-subtle"
               >
                 <i className="fas fa-sign-out-alt"></i>
               </button>
@@ -104,7 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({ userRole: propUserRole, onLogout
           ) : (
             <button 
               onClick={() => navigate('/login')}
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/30 hover:shadow-xl transition"
+              className="px-4 py-2 btn-glass-primary rounded-xl text-sm font-bold shadow-lg hover:shadow-xl transition"
             >
               {t('nav.login')}
             </button>

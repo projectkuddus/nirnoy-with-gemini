@@ -574,62 +574,67 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* LEFT SIDEBAR - 60% Blue */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-blue-600 text-white flex flex-col transition-all duration-300 fixed h-full z-40`}>
-        {/* Logo */}
-        <div className="p-4 border-b border-blue-500">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-              <span className="text-blue-600 font-bold text-xl">ন</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-slate-100 flex">
+      {/* GLASSMORPHIC SIDEBAR */}
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} flex flex-col transition-all duration-300 fixed h-full z-40`}>
+        {/* Glass Background */}
+        <div className="absolute inset-0 glass-strong rounded-r-3xl"></div>
+        
+        {/* Content */}
+        <div className="relative flex flex-col h-full">
+          {/* Logo */}
+          <div className="p-4 border-b border-slate-200/40">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 glass-card rounded-xl flex items-center justify-center">
+                <span className="text-slate-700 font-bold text-xl">ন</span>
+              </div>
+              {sidebarOpen && <span className="font-bold text-lg text-slate-700">নির্ণয়</span>}
             </div>
-            {sidebarOpen && <span className="font-bold text-lg">নির্ণয়</span>}
           </div>
-        </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-4 overflow-y-auto">
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                activeTab === item.id 
-                  ? 'bg-blue-700 border-r-4 border-white' 
-                  : 'hover:bg-blue-500'
-              }`}
-            >
-              <span className="text-xl">{item.icon}</span>
+          {/* Navigation */}
+          <nav className="flex-1 py-4 px-3 overflow-y-auto">
+            {NAV_ITEMS.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all rounded-xl mb-1 ${
+                  activeTab === item.id 
+                    ? 'glass-card text-blue-600 font-medium shadow-lg' 
+                    : 'text-slate-600 hover:glass-subtle'
+                }`}
+              >
+                <span className="text-xl">{item.icon}</span>
+                {sidebarOpen && (
+                  <div className="flex-1">
+                    <span className="block text-sm font-medium">{item.labelBn}</span>
+                    {item.paid && !isPremium && (
+                      <span className="text-xs text-slate-400">🔒 প্রিমিয়াম</span>
+                    )}
+                    {item.comingSoon && (
+                      <span className="text-xs text-amber-500">শীঘ্রই আসছে</span>
+                    )}
+                  </div>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          {/* User Info */}
+          <div className="p-4 border-t border-slate-200/40">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 glass-card rounded-full flex items-center justify-center">
+                <span className="font-bold text-blue-600 text-lg">{patientUser.name.charAt(0)}</span>
+              </div>
               {sidebarOpen && (
-                <div className="flex-1">
-                  <span className="block text-sm font-medium">{item.labelBn}</span>
-                  {item.paid && !isPremium && (
-                    <span className="text-xs text-blue-200">🔒 প্রিমিয়াম</span>
-                  )}
-                  {item.comingSoon && (
-                    <span className="text-xs text-yellow-300">শীঘ্রই আসছে</span>
-                  )}
-                </div>
-              )}
-            </button>
-          ))}
-        </nav>
-
-        {/* User Info */}
-        <div className="p-4 border-t border-blue-500">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-              <span className="font-bold">{patientUser.name.charAt(0)}</span>
-            </div>
-            {sidebarOpen && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{patientUser.name}</p>
-                <p className="text-xs text-blue-200">{isPremium ? '⭐ Premium' : 'Free'}</p>
+                <p className="text-sm font-medium text-slate-700 truncate">{patientUser.name}</p>
+                <p className="text-xs text-slate-500">{isPremium ? '⭐ Premium' : 'Free'}</p>
               </div>
             )}
           </div>
           {sidebarOpen && (
-            <button onClick={handleLogout} className="w-full mt-3 py-2 bg-blue-500 hover:bg-blue-400 rounded text-sm">
+            <button onClick={handleLogout} className="w-full mt-3 py-2 glass-card hover:glass-strong text-slate-700 rounded-xl text-sm transition-all">
               লগআউট
             </button>
           )}
@@ -638,29 +643,30 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
         {/* Toggle */}
         <button 
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute -right-3 top-20 w-6 h-6 bg-white text-blue-600 rounded-full shadow flex items-center justify-center text-xs"
+          className="absolute -right-3 top-20 w-8 h-8 glass-card text-slate-600 rounded-full shadow-lg flex items-center justify-center text-xs hover:scale-110 transition-transform"
         >
           {sidebarOpen ? '◀' : '▶'}
         </button>
+        </div>
       </aside>
 
-      {/* MAIN CONTENT - 30% White/Light, 10% Accent */}
-      <main className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300`}>
-        {/* Header */}
-        <header className="bg-white border-b px-6 py-4 sticky top-0 z-30">
-          <div className="flex items-center justify-between">
+      {/* GLASSMORPHIC MAIN CONTENT */}
+      <main className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 min-h-screen`}>
+        {/* Floating Glass Header */}
+        <header className="glass-strong sticky top-4 z-30 mx-4 mt-4 rounded-2xl border border-white/60 shadow-xl">
+          <div className="px-6 py-4 flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-gray-800">
+              <h1 className="text-xl font-bold text-slate-700">
                 {NAV_ITEMS.find(n => n.id === activeTab)?.labelBn}
               </h1>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-slate-500">
                 {NAV_ITEMS.find(n => n.id === activeTab)?.label}
               </p>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-800">{patientUser.name}</p>
-                <p className="text-xs text-gray-500">{patientUser.phone}</p>
+                <p className="text-sm font-medium text-slate-700">{patientUser.name}</p>
+                <p className="text-xs text-slate-500">{patientUser.phone}</p>
               </div>
             </div>
           </div>
@@ -672,23 +678,27 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           {activeTab === 'home' && (
             <div className="space-y-6">
               {/* Health Score Card - Enhanced */}
-              <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 rounded-2xl p-6 text-white shadow-xl">
-                <div className="flex items-center justify-between mb-4">
+              <div className="glass-strong rounded-3xl p-8 border border-white/60 shadow-2xl relative overflow-hidden">
+                {/* Subtle gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/20 pointer-events-none"></div>
+                
+                <div className="relative flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-3xl font-bold flex items-center gap-2">
+                    <h2 className="text-3xl font-bold text-slate-700 flex items-center gap-2">
                       স্বাস্থ্য স্কোর
-                      {healthMetrics.score >= 80 && <span className="text-2xl">🌟</span>}
-                      {healthMetrics.score >= 90 && <span className="text-2xl">🏆</span>}
+                      {healthMetrics.score >= 80 && <span className="text-2xl opacity-50">🌟</span>}
+                      {healthMetrics.score >= 90 && <span className="text-2xl opacity-50">🏆</span>}
                     </h2>
-                    <p className="text-blue-100 mt-1">আপনার সামগ্রিক স্বাস্থ্য অবস্থা</p>
+                    <p className="text-slate-500 mt-1">আপনার সামগ্রিক স্বাস্থ্য অবস্থা</p>
                   </div>
-                  <div className="text-center">
-                    <div className="text-6xl font-bold leading-none">{healthScore}</div>
-                    <div className="text-sm text-blue-200 mt-1">/100</div>
-                    <div className={`text-xs font-bold mt-2 px-3 py-1 rounded-full ${
-                      healthScore >= 90 ? 'bg-green-500' : 
-                      healthScore >= 75 ? 'bg-yellow-500' : 
-                      healthScore >= 60 ? 'bg-orange-500' : 'bg-red-500'
+                  <div className="text-center glass-card rounded-2xl px-6 py-4 shadow-lg">
+                    <div className="text-6xl font-bold leading-none bg-gradient-to-br from-slate-600 to-slate-700 bg-clip-text text-transparent">{healthScore}</div>
+                    <div className="text-sm text-slate-400 mt-1">/100</div>
+                    <div className={`text-xs font-bold mt-3 px-3 py-1.5 rounded-full border ${
+                      healthScore >= 90 ? 'bg-green-50/60 text-green-700 border-green-200/40' : 
+                      healthScore >= 75 ? 'bg-amber-50/60 text-amber-700 border-amber-200/40' : 
+                      healthScore >= 60 ? 'bg-orange-50/60 text-orange-700 border-orange-200/40' : 
+                      'bg-red-50/60 text-red-700 border-red-200/40'
                     }`}>
                       {healthScore >= 90 ? 'চমৎকার' : 
                        healthScore >= 75 ? 'ভালো' : 
@@ -696,115 +706,122 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                     </div>
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="bg-blue-400/30 rounded-full h-4 overflow-hidden">
+                <div className="relative mt-6">
+                  <div className="glass-subtle rounded-full h-4 overflow-hidden">
                     <div 
                       className={`h-4 rounded-full transition-all duration-1000 ${
-                        healthScore >= 90 ? 'bg-gradient-to-r from-green-400 to-green-300' : 
-                        healthScore >= 75 ? 'bg-gradient-to-r from-yellow-300 to-green-300' : 
-                        healthScore >= 60 ? 'bg-gradient-to-r from-orange-400 to-yellow-300' : 
-                        'bg-gradient-to-r from-red-400 to-orange-400'
+                        healthScore >= 90 ? 'bg-gradient-to-r from-green-400/50 to-green-300/50' : 
+                        healthScore >= 75 ? 'bg-gradient-to-r from-amber-300/50 to-green-300/50' : 
+                        healthScore >= 60 ? 'bg-gradient-to-r from-orange-400/50 to-amber-300/50' : 
+                        'bg-gradient-to-r from-red-400/50 to-orange-400/50'
                       }`} 
                       style={{ width: `${healthScore}%` }}
                     ></div>
                   </div>
                 </div>
-                <div className="mt-4 flex items-center justify-between text-sm opacity-90">
-                  <span>ঝুঁকি স্তর: <strong>{healthMetrics.riskLevel === 'High' ? '⚠️ উচ্চ' : healthMetrics.riskLevel === 'Medium' ? '⚠️ মাঝারি' : '✅ নিম্ন'}</strong></span>
-                  {healthMetrics.age && <span>বয়স: <strong>{healthMetrics.age} বছর</strong></span>}
+                <div className="relative mt-4 flex items-center justify-between text-sm text-slate-600">
+                  <span>ঝুঁকি স্তর: <strong className={healthMetrics.riskLevel === 'High' ? 'text-red-600/80' : healthMetrics.riskLevel === 'Medium' ? 'text-amber-600/80' : 'text-green-600/80'}>
+                    {healthMetrics.riskLevel === 'High' ? '⚠️ উচ্চ' : healthMetrics.riskLevel === 'Medium' ? '⚠️ মাঝারি' : '✅ নিম্ন'}
+                  </strong></span>
+                  {healthMetrics.age && <span>বয়স: <strong className="text-slate-700">{healthMetrics.age} বছর</strong></span>}
                 </div>
               </div>
 
               {/* Health Metrics Grid - Enhanced */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Height */}
-                <div className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-blue-300 hover:shadow-lg transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-3xl">📏</div>
-                    <span className="text-xs text-gray-400 font-medium">HEIGHT</span>
+                <div className="glass-card p-6 border border-white/50 hover:shadow-xl transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-3xl opacity-50">📏</div>
+                    <span className="text-xs text-slate-400 font-medium tracking-wider">HEIGHT</span>
                   </div>
-                  <div className="text-2xl font-bold text-gray-800">{patientUser.heightCm || '-'}</div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-2xl font-bold text-slate-700">{patientUser.heightCm || '-'}</div>
+                  <div className="text-sm text-slate-500 mt-1">
                     {patientUser.heightCm ? `${patientUser.heightCm} cm` : 'উচ্চতা যোগ করুন'}
                   </div>
                 </div>
 
                 {/* Weight */}
-                <div className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-green-300 hover:shadow-lg transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-3xl">⚖️</div>
-                    <span className="text-xs text-gray-400 font-medium">WEIGHT</span>
+                <div className="glass-card p-6 border border-white/50 hover:shadow-xl transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-3xl opacity-50">⚖️</div>
+                    <span className="text-xs text-slate-400 font-medium tracking-wider">WEIGHT</span>
                   </div>
-                  <div className="text-2xl font-bold text-gray-800">{patientUser.weightKg || '-'}</div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-2xl font-bold text-slate-700">{patientUser.weightKg || '-'}</div>
+                  <div className="text-sm text-slate-500 mt-1">
                     {patientUser.weightKg ? `${patientUser.weightKg} kg` : 'ওজন যোগ করুন'}
                   </div>
                 </div>
 
                 {/* Blood Group */}
-                <div className="bg-white rounded-xl p-5 border-2 border-gray-100 hover:border-red-300 hover:shadow-lg transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-3xl">🩸</div>
-                    <span className="text-xs text-gray-400 font-medium">BLOOD</span>
+                <div className="glass-card p-6 border border-white/50 hover:shadow-xl transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-3xl opacity-50">🩸</div>
+                    <span className="text-xs text-slate-400 font-medium tracking-wider">BLOOD</span>
                   </div>
-                  <div className="text-2xl font-bold text-red-600">{patientUser.bloodGroup || '-'}</div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className="text-2xl font-bold text-red-600/70">{patientUser.bloodGroup || '-'}</div>
+                  <div className="text-sm text-slate-500 mt-1">
                     {patientUser.bloodGroup ? 'রক্তের গ্রুপ' : 'গ্রুপ যোগ করুন'}
                   </div>
                 </div>
 
                 {/* Points */}
-                <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl p-5 border-2 border-yellow-300 hover:shadow-lg transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-3xl">🏆</div>
-                    <span className="text-xs text-yellow-700 font-medium">POINTS</span>
+                <div className="glass-card p-6 border border-white/50 hover:shadow-xl transition-all relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-50/30 to-yellow-50/20 pointer-events-none"></div>
+                  <div className="relative flex items-center justify-between mb-3">
+                    <div className="text-3xl opacity-50">🏆</div>
+                    <span className="text-xs text-amber-600/60 font-medium tracking-wider">POINTS</span>
                   </div>
-                  <div className="text-2xl font-bold text-yellow-800">{patientUser.quizPoints || 0}</div>
-                  <div className="text-sm text-yellow-700 mt-1">পয়েন্ট</div>
+                  <div className="relative text-2xl font-bold text-amber-700/70">{patientUser.quizPoints || 0}</div>
+                  <div className="relative text-sm text-slate-500 mt-1">পয়েন্ট</div>
                 </div>
               </div>
 
               {/* BMI Card - New Comprehensive */}
               {healthMetrics.bmi && (
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="glass-card p-6 border border-white/50 shadow-xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 via-transparent to-pink-50/15 pointer-events-none"></div>
+                  
+                  <div className="relative flex items-center justify-between mb-5">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-slate-700 flex items-center gap-2">
                         📊 Body Mass Index (BMI)
                       </h3>
-                      <p className="text-sm text-gray-600 mt-1">আপনার শরীরের ভর সূচক</p>
+                      <p className="text-sm text-slate-500 mt-1">আপনার শরীরের ভর সূচক</p>
                     </div>
-                    <div className="text-center bg-white rounded-xl px-4 py-3 shadow-sm">
-                      <div className="text-3xl font-bold text-purple-600">{healthMetrics.bmi}</div>
-                      <div className="text-xs text-gray-500">BMI</div>
+                    <div className="text-center glass-subtle rounded-2xl px-5 py-3 shadow-sm border border-white/40">
+                      <div className="text-3xl font-bold text-purple-600/70">{healthMetrics.bmi}</div>
+                      <div className="text-xs text-slate-400 mt-1">BMI</div>
                     </div>
                   </div>
                   
                   {/* BMI Category Badge */}
-                  <div className={`inline-block px-4 py-2 rounded-full text-sm font-bold ${
-                    healthMetrics.bmiCategory === 'Normal' ? 'bg-green-500 text-white' :
-                    healthMetrics.bmiCategory === 'Overweight' || healthMetrics.bmiCategory === 'Underweight' ? 'bg-yellow-500 text-white' :
-                    'bg-red-500 text-white'
-                  }`}>
-                    {healthMetrics.bmiCategory === 'Normal' ? '✓ স্বাভাবিক' :
-                     healthMetrics.bmiCategory === 'Overweight' ? '⚠ অতিরিক্ত ওজন' :
-                     healthMetrics.bmiCategory === 'Underweight' ? '⚠ কম ওজন' :
-                     healthMetrics.bmiCategory === 'Obese (Class I)' ? '⚠ স্থূলতা (মাত্রা ১)' :
-                     healthMetrics.bmiCategory === 'Obese (Class II+)' ? '⚠ স্থূলতা (মাত্রা ২+)' :
-                     healthMetrics.bmiCategory === 'Severely Underweight' ? '⚠ গুরুতর কম ওজন' :
-                     healthMetrics.bmiCategory}
+                  <div className="relative">
+                    <div className={`inline-block px-4 py-2 rounded-xl text-sm font-bold border ${
+                      healthMetrics.bmiCategory === 'Normal' ? 'bg-green-50/60 text-green-700 border-green-200/40' :
+                      healthMetrics.bmiCategory === 'Overweight' || healthMetrics.bmiCategory === 'Underweight' ? 'bg-amber-50/60 text-amber-700 border-amber-200/40' :
+                      'bg-red-50/60 text-red-700 border-red-200/40'
+                    }`}>
+                      {healthMetrics.bmiCategory === 'Normal' ? '✓ স্বাভাবিক' :
+                       healthMetrics.bmiCategory === 'Overweight' ? '⚠ অতিরিক্ত ওজন' :
+                       healthMetrics.bmiCategory === 'Underweight' ? '⚠ কম ওজন' :
+                       healthMetrics.bmiCategory === 'Obese (Class I)' ? '⚠ স্থূলতা (মাত্রা ১)' :
+                       healthMetrics.bmiCategory === 'Obese (Class II+)' ? '⚠ স্থূলতা (মাত্রা ২+)' :
+                       healthMetrics.bmiCategory === 'Severely Underweight' ? '⚠ গুরুতর কম ওজন' :
+                       healthMetrics.bmiCategory}
+                    </div>
                   </div>
 
                   {/* BMI Visual Scale */}
-                  <div className="mt-4 relative">
-                    <div className="h-3 rounded-full overflow-hidden flex">
-                      <div className="bg-blue-300 flex-1"></div>
-                      <div className="bg-green-400 flex-1"></div>
-                      <div className="bg-yellow-400 flex-1"></div>
-                      <div className="bg-orange-400 flex-1"></div>
-                      <div className="bg-red-400 flex-1"></div>
+                  <div className="relative mt-6">
+                    <div className="h-3 rounded-full overflow-hidden flex glass-subtle">
+                      <div className="bg-blue-300/30 flex-1"></div>
+                      <div className="bg-green-400/30 flex-1"></div>
+                      <div className="bg-amber-400/30 flex-1"></div>
+                      <div className="bg-orange-400/30 flex-1"></div>
+                      <div className="bg-red-400/30 flex-1"></div>
                     </div>
-                    <div className="flex justify-between text-xs text-gray-600 mt-2">
+                    <div className="flex justify-between text-xs text-slate-400 mt-2">
                       <span>16</span>
                       <span>18.5</span>
                       <span>25</span>
@@ -813,19 +830,19 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                     </div>
                     {/* BMI Indicator */}
                     <div 
-                      className="absolute -top-1 w-0.5 h-5 bg-gray-800 transition-all"
+                      className="absolute -top-1 w-0.5 h-5 bg-slate-600 transition-all"
                       style={{ 
                         left: `${Math.min(Math.max(((healthMetrics.bmi - 16) / (35 - 16)) * 100, 0), 100)}%` 
                       }}
                     >
-                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-gray-800 rounded-full border-2 border-white"></div>
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-slate-600 rounded-full border-2 border-white shadow-lg"></div>
                     </div>
                   </div>
 
                   {/* BMI Recommendations */}
                   {healthMetrics.bmiCategory !== 'Normal' && (
-                    <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
-                      <p className="text-xs font-medium text-gray-700">
+                    <div className="relative mt-5 p-4 glass-subtle rounded-xl border border-slate-200/30">
+                      <p className="text-xs font-medium text-slate-600">
                         💡 <strong>পরামর্শ:</strong> {
                           healthMetrics.bmiCategory.includes('Underweight') 
                             ? 'পুষ্টিকর খাবার গ্রহণ করুন এবং একজন পুষ্টিবিদের সাথে পরামর্শ করুন।'
@@ -843,19 +860,21 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
               {/* Health Alerts */}
               {(patientUser.chronicConditions?.length || patientUser.allergies?.length) ? (
-                <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-5 border-2 border-red-200">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl">⚠️</span>
-                    <h3 className="font-bold text-red-800 text-lg">স্বাস্থ্য সতর্কতা</h3>
+                <div className="glass-card p-6 border border-white/50 shadow-lg relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-50/15 to-orange-50/10 pointer-events-none"></div>
+                  
+                  <div className="relative flex items-center gap-2 mb-4">
+                    <span className="text-2xl opacity-50">⚠️</span>
+                    <h3 className="font-bold text-slate-700 text-lg">স্বাস্থ্য সতর্কতা</h3>
                   </div>
-                  <div className="space-y-3">
+                  <div className="relative space-y-4">
                     {patientUser.chronicConditions?.length > 0 && (
                       <div>
-                        <p className="text-xs font-bold text-red-700 mb-2 uppercase">দীর্ঘমেয়াদী অবস্থা:</p>
+                        <p className="text-xs font-bold text-red-600/60 mb-2 uppercase tracking-wide">দীর্ঘমেয়াদী অবস্থা:</p>
                         <div className="flex flex-wrap gap-2">
                           {patientUser.chronicConditions.map((c, i) => (
-                            <span key={i} className="px-3 py-2 bg-red-100 text-red-800 rounded-lg text-sm font-medium border border-red-300 flex items-center gap-1">
-                              <span className="text-red-600">●</span> {c}
+                            <span key={i} className="px-3 py-2 glass-subtle text-red-700/80 rounded-xl text-sm font-medium border border-red-200/30">
+                              <span className="text-red-500 opacity-40">●</span> {c}
                             </span>
                           ))}
                         </div>
@@ -863,11 +882,11 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
                     )}
                     {patientUser.allergies?.length > 0 && (
                       <div>
-                        <p className="text-xs font-bold text-yellow-700 mb-2 uppercase">এলার্জি:</p>
+                        <p className="text-xs font-bold text-amber-600/60 mb-2 uppercase tracking-wide">এলার্জি:</p>
                         <div className="flex flex-wrap gap-2">
                           {patientUser.allergies.map((a, i) => (
-                            <span key={i} className="px-3 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium border border-yellow-300 flex items-center gap-1">
-                              <span className="text-yellow-600">⚠</span> {a}
+                            <span key={i} className="px-3 py-2 glass-subtle text-amber-700/80 rounded-xl text-sm font-medium border border-amber-200/30">
+                              <span className="text-amber-500 opacity-40">⚠</span> {a}
                             </span>
                           ))}
                         </div>
@@ -879,25 +898,29 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
               {/* Health Summary Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
-                  <div className="text-2xl mb-2">📅</div>
-                  <div className="text-2xl font-bold text-blue-800">{medicalHistory?.consultations.length || 0}</div>
-                  <div className="text-xs text-blue-600 font-medium mt-1">মোট পরামর্শ</div>
+                <div className="glass-card p-5 border border-white/50 hover:shadow-xl transition-all relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 to-transparent pointer-events-none"></div>
+                  <div className="relative text-2xl mb-2 opacity-50">📅</div>
+                  <div className="relative text-2xl font-bold text-blue-600/70">{medicalHistory?.consultations.length || 0}</div>
+                  <div className="relative text-xs text-slate-500 font-medium mt-1">মোট পরামর্শ</div>
                 </div>
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
-                  <div className="text-2xl mb-2">💊</div>
-                  <div className="text-2xl font-bold text-green-800">{medicalHistory?.prescriptions.length || 0}</div>
-                  <div className="text-xs text-green-600 font-medium mt-1">প্রেসক্রিপশন</div>
+                <div className="glass-card p-5 border border-white/50 hover:shadow-xl transition-all relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-50/20 to-transparent pointer-events-none"></div>
+                  <div className="relative text-2xl mb-2 opacity-50">💊</div>
+                  <div className="relative text-2xl font-bold text-green-600/70">{medicalHistory?.prescriptions.length || 0}</div>
+                  <div className="relative text-xs text-slate-500 font-medium mt-1">প্রেসক্রিপশন</div>
                 </div>
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
-                  <div className="text-2xl mb-2">🔬</div>
-                  <div className="text-2xl font-bold text-purple-800">{medicalHistory?.testReports.length || 0}</div>
-                  <div className="text-xs text-purple-600 font-medium mt-1">টেস্ট রিপোর্ট</div>
+                <div className="glass-card p-5 border border-white/50 hover:shadow-xl transition-all relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-50/20 to-transparent pointer-events-none"></div>
+                  <div className="relative text-2xl mb-2 opacity-50">🔬</div>
+                  <div className="relative text-2xl font-bold text-purple-600/70">{medicalHistory?.testReports.length || 0}</div>
+                  <div className="relative text-xs text-slate-500 font-medium mt-1">টেস্ট রিপোর্ট</div>
                 </div>
-                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200">
-                  <div className="text-2xl mb-2">👨‍⚕️</div>
-                  <div className="text-2xl font-bold text-orange-800">{medicalHistory?.doctors.length || 0}</div>
-                  <div className="text-xs text-orange-600 font-medium mt-1">ডাক্তার দেখেছেন</div>
+                <div className="glass-card p-5 border border-white/50 hover:shadow-xl transition-all relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-50/20 to-transparent pointer-events-none"></div>
+                  <div className="relative text-2xl mb-2 opacity-50">👨‍⚕️</div>
+                  <div className="relative text-2xl font-bold text-orange-600/70">{medicalHistory?.doctors.length || 0}</div>
+                  <div className="relative text-xs text-slate-500 font-medium mt-1">ডাক্তার দেখেছেন</div>
                 </div>
               </div>
 

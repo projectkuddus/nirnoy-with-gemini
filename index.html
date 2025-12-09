@@ -97,8 +97,23 @@
     tailwind.config = {
       theme: {
         extend: {
-          colors: { primary: '#3b82f6', secondary: '#0f172a' },
-          fontFamily: { sans: ['Inter', 'Noto Sans Bengali', 'system-ui', 'sans-serif'] }
+          colors: { 
+            primary: '#93c5fd',  // Soft blue-200
+            secondary: '#cbd5e1', // Soft slate-300
+            glass: {
+              DEFAULT: 'rgba(255, 255, 255, 0.7)',
+              strong: 'rgba(255, 255, 255, 0.85)',
+              subtle: 'rgba(255, 255, 255, 0.5)'
+            }
+          },
+          fontFamily: { 
+            sans: ['Inter', 'Noto Sans Bengali', 'system-ui', 'sans-serif'] 
+          },
+          backdropBlur: {
+            'xs': '2px',
+            'glass': '20px',
+            'glass-strong': '30px'
+          }
         }
       }
     }
@@ -368,15 +383,221 @@
   </script>
   
   <style>
-    * { -webkit-tap-highlight-color: transparent; }
-    html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #1e293b; }
-    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    /* ==================== GLASSMORPHISM DESIGN SYSTEM ==================== */
+    
+    * { 
+      -webkit-tap-highlight-color: transparent; 
+    }
+    
+    html { 
+      scroll-behavior: smooth; 
+    }
+    
+    body { 
+      font-family: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif; 
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%, #f8fafc 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+    
+    /* Glassmorphism Base Classes */
+    .glass {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 
+        0 8px 32px 0 rgba(31, 38, 135, 0.08),
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
+    }
+    
+    .glass-strong {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(30px) saturate(200%);
+      -webkit-backdrop-filter: blur(30px) saturate(200%);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 
+        0 12px 40px 0 rgba(31, 38, 135, 0.12),
+        inset 0 1px 2px 0 rgba(255, 255, 255, 1);
+    }
+    
+    .glass-subtle {
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(15px) saturate(160%);
+      -webkit-backdrop-filter: blur(15px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 
+        0 4px 16px 0 rgba(31, 38, 135, 0.04),
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.8);
+    }
+    
+    .glass-card {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(25px) saturate(190%);
+      -webkit-backdrop-filter: blur(25px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 24px;
+      box-shadow: 
+        0 10px 36px 0 rgba(31, 38, 135, 0.1),
+        inset 0 1px 2px 0 rgba(255, 255, 255, 0.95);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .glass-card:hover {
+      background: rgba(255, 255, 255, 0.8);
+      box-shadow: 
+        0 14px 44px 0 rgba(31, 38, 135, 0.14),
+        inset 0 1px 2px 0 rgba(255, 255, 255, 1);
+      transform: translateY(-2px);
+    }
+    
+    /* Subtle Gradient Overlays */
+    .gradient-overlay-subtle {
+      background: linear-gradient(135deg, 
+        rgba(241, 245, 249, 0.5) 0%, 
+        rgba(226, 232, 240, 0.3) 100%);
+    }
+    
+    .gradient-blue-subtle {
+      background: linear-gradient(135deg, 
+        rgba(219, 234, 254, 0.3) 0%, 
+        rgba(191, 219, 254, 0.2) 100%);
+    }
+    
+    .gradient-purple-subtle {
+      background: linear-gradient(135deg, 
+        rgba(233, 213, 255, 0.3) 0%, 
+        rgba(216, 180, 254, 0.2) 100%);
+    }
+    
+    .gradient-green-subtle {
+      background: linear-gradient(135deg, 
+        rgba(220, 252, 231, 0.3) 0%, 
+        rgba(187, 247, 208, 0.2) 100%);
+    }
+    
+    .gradient-orange-subtle {
+      background: linear-gradient(135deg, 
+        rgba(254, 243, 199, 0.3) 0%, 
+        rgba(253, 230, 138, 0.2) 100%);
+    }
+    
+    /* Text Styles - Muted Professional */
+    .text-glass {
+      color: #475569;
+    }
+    
+    .text-glass-strong {
+      color: #334155;
+    }
+    
+    .text-glass-subtle {
+      color: #64748b;
+    }
+    
+    /* Borders - Ultra Subtle */
+    .border-glass {
+      border-color: rgba(226, 232, 240, 0.6);
+    }
+    
+    .border-glass-strong {
+      border-color: rgba(226, 232, 240, 0.8);
+    }
+    
+    /* Buttons - Glassmorphic */
+    .btn-glass {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 
+        0 4px 16px 0 rgba(59, 130, 246, 0.15),
+        inset 0 1px 1px 0 rgba(255, 255, 255, 1);
+      transition: all 0.3s ease;
+    }
+    
+    .btn-glass:hover {
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 
+        0 6px 24px 0 rgba(59, 130, 246, 0.2),
+        inset 0 1px 2px 0 rgba(255, 255, 255, 1);
+      transform: translateY(-1px);
+    }
+    
+    .btn-glass-primary {
+      background: linear-gradient(135deg, 
+        rgba(219, 234, 254, 0.9) 0%, 
+        rgba(191, 219, 254, 0.8) 100%);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(147, 197, 253, 0.4);
+      color: #1e40af;
+      box-shadow: 
+        0 4px 16px 0 rgba(59, 130, 246, 0.2),
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
+    }
+    
+    .btn-glass-primary:hover {
+      background: linear-gradient(135deg, 
+        rgba(219, 234, 254, 1) 0%, 
+        rgba(191, 219, 254, 0.95) 100%);
+      box-shadow: 
+        0 6px 24px 0 rgba(59, 130, 246, 0.3),
+        inset 0 1px 2px 0 rgba(255, 255, 255, 1);
+    }
+    
+    /* Scrollbar - Glassmorphic */
+    ::-webkit-scrollbar { 
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track { 
+      background: rgba(241, 245, 249, 0.5);
+      backdrop-filter: blur(10px);
+    }
+    
+    ::-webkit-scrollbar-thumb { 
+      background: rgba(203, 213, 225, 0.8);
+      border-radius: 10px;
+      border: 2px solid rgba(241, 245, 249, 0.5);
+    }
+    
+    ::-webkit-scrollbar-thumb:hover { 
+      background: rgba(148, 163, 184, 0.9);
+    }
+    
+    /* Animations */
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    .animate-float {
+      animation: float 6s ease-in-out infinite;
+    }
+    
+    @keyframes glow-subtle {
+      0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.1); }
+      50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.2); }
+    }
+    
+    .animate-glow-subtle {
+      animation: glow-subtle 3s ease-in-out infinite;
+    }
+    
+    /* Focus States - Professional */
+    *:focus-visible {
+      outline: 2px solid rgba(59, 130, 246, 0.4);
+      outline-offset: 2px;
+    }
+    
+    /* Selection */
+    ::selection {
+      background: rgba(191, 219, 254, 0.5);
+      color: #1e40af;
+    }
   </style>
 </head>
-<body class="bg-white">
+<body class="bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100">
   <!-- Hidden SEO Content -->
   <div style="position:absolute;left:-9999px;" aria-hidden="true">
     <h1>Nirnoy - নির্ণয় | Bangladesh's #1 AI Healthcare Platform</h1>

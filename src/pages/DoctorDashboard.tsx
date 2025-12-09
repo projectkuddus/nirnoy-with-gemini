@@ -200,10 +200,10 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   // Show loading while checking auth
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-400">লোড হচ্ছে...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="glass-card p-8 rounded-3xl text-center">
+          <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500">লোড হচ্ছে...</p>
         </div>
       </div>
     );
@@ -218,18 +218,18 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const doctorUser = user as DoctorProfile;
   if (doctorUser.status !== 'approved') {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-slate-800 rounded-2xl p-8 max-w-md text-center border border-slate-700">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="glass-strong rounded-3xl p-8 max-w-md text-center border border-white/50 shadow-2xl">
           <div className="text-6xl mb-4">{doctorUser.status === 'pending' ? '⏳' : '❌'}</div>
-          <h2 className="text-2xl font-bold text-white mb-2">
+          <h2 className="text-2xl font-bold text-slate-700 mb-2">
             {doctorUser.status === 'pending' ? 'অনুমোদনের অপেক্ষায়' : 'আবেদন প্রত্যাখ্যান করা হয়েছে'}
           </h2>
-          <p className="text-slate-400 mb-4">
+          <p className="text-slate-500 mb-4">
             {doctorUser.status === 'pending' 
               ? 'আপনার ডাক্তার অ্যাকাউন্ট এখনো অনুমোদিত হয়নি। অনুগ্রহ করে অপেক্ষা করুন।'
               : doctorUser.rejectionReason || 'আপনার আবেদন প্রত্যাখ্যান করা হয়েছে।'}
           </p>
-          <button onClick={() => { logout(); navigate('/'); }} className="px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-700 transition">
+          <button onClick={() => { logout(); navigate('/'); }} className="px-6 py-3 btn-glass-primary rounded-xl font-bold transition">
             হোমে ফিরে যান
           </button>
         </div>
@@ -1075,7 +1075,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       {/* Current & Next Patient */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Current Patient */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="glass-card rounded-2xl p-6">
           <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
             <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
             বর্তমান রোগী
@@ -1088,7 +1088,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 <p className="text-slate-500 text-sm">সিরিয়াল #{currentPatient.serial} • {currentPatient.type}</p>
                 <p className="text-slate-600 text-sm mt-1">{currentPatient.chiefComplaint}</p>
               </div>
-              <button onClick={() => startConsultation(currentPatient)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700">
+              <button onClick={() => startConsultation(currentPatient)} className="px-4 py-2 btn-glass-primary text-blue-700 rounded-lg font-medium hover:shadow-lg">
                 কনসাল্ট
               </button>
             </div>
@@ -1098,7 +1098,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         </div>
 
         {/* Next in Queue */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="glass-card rounded-2xl p-6">
           <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
             <span className="w-3 h-3 bg-yellow-500 rounded-full"></span>
             পরবর্তী রোগী
@@ -1111,7 +1111,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 <p className="text-slate-500 text-sm">সিরিয়াল #{nextInQueue.serial} • {nextInQueue.type}</p>
                 <p className="text-slate-600 text-sm mt-1">{nextInQueue.chiefComplaint}</p>
               </div>
-              <button onClick={callNextPatient} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600">
+              <button onClick={callNextPatient} className="px-4 py-2 btn-glass-primary text-blue-700 rounded-lg font-medium hover:bg-blue-600">
                 ডাকুন
               </button>
             </div>
@@ -1122,7 +1122,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       </div>
 
       {/* Business Panel */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+      <div className="glass-card rounded-2xl p-6">
         <h3 className="font-bold text-slate-800 mb-4">আজকের ব্যবসায়িক সারাংশ</h3>
         <div className="grid grid-cols-4 gap-4">
           <div className="bg-green-50 rounded-xl p-4">
@@ -1180,7 +1180,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           <p className="text-slate-500">{new Date().toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={callNextPatient} disabled={!nextInQueue} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+          <button onClick={callNextPatient} disabled={!nextInQueue} className="px-4 py-2 btn-glass-primary text-blue-700 rounded-lg font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
             <span>📢</span> পরবর্তী রোগী ডাকুন
           </button>
         </div>
@@ -1233,8 +1233,8 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       </div>
 
       {/* Queue List */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 bg-slate-50">
+      <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="p-4 border-b border-white/30 glass-subtle">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-800">রোগীর তালিকা</h3>
             <div className="flex items-center gap-2">
@@ -1267,7 +1267,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               </p>
             </div>
           ) : filteredAppointments.map((apt) => (
-            <div key={apt.id} className={`p-4 flex items-center gap-4 hover:bg-slate-50 transition ${apt.status === 'In-Progress' ? 'bg-green-50' : ''}`}>
+            <div key={apt.id} className={`p-4 flex items-center gap-4 hover:glass-subtle transition ${apt.status === 'In-Progress' ? 'bg-green-50' : ''}`}>
               <div className="w-12 text-center">
                 <div className={`text-lg font-bold ${apt.status === 'Completed' ? 'text-green-600' : apt.status === 'No-Show' ? 'text-red-400' : 'text-slate-800'}`}>
                   #{apt.serial}
@@ -1308,7 +1308,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               <div className="flex gap-2">
                 {apt.status === 'Waiting' && (
                   <>
-                    <button onClick={() => startConsultation(apt)} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                    <button onClick={() => startConsultation(apt)} className="px-3 py-1.5 btn-glass-primary text-blue-700 rounded-lg text-sm font-medium hover:shadow-lg">
                       শুরু
                     </button>
                     <button onClick={() => markNoShow(apt.id)} className="px-3 py-1.5 bg-red-100 text-red-600 rounded-lg text-sm font-medium hover:bg-red-200">
@@ -1325,7 +1325,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                   <div className="flex gap-2">
                     <button 
                       onClick={() => viewEditCompletedConsultation(apt)}
-                      className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600"
+                      className="px-3 py-1.5 btn-glass-primary text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-600"
                       title="পরামর্শ দেখুন/সম্পাদনা করুন"
                     >
                       📋 দেখুন/সম্পাদনা
@@ -1378,7 +1378,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
         {['all', 'Waiting', 'In-Progress', 'Completed', 'No-Show', 'Cancelled'].map(status => (
-          <button key={status} onClick={() => setStatusFilter(status)} className={`px-4 py-2 rounded-full text-sm font-medium transition ${statusFilter === status ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+          <button key={status} onClick={() => setStatusFilter(status)} className={`px-4 py-2 rounded-full text-sm font-medium transition ${statusFilter === status ? 'btn-glass-primary text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
             {status === 'all' ? 'সব' : status === 'Waiting' ? 'অপেক্ষমান' : status === 'In-Progress' ? 'চলমান' : status === 'Completed' ? 'সম্পন্ন' : status === 'No-Show' ? 'নো-শো' : 'বাতিল'}
           </button>
         ))}
@@ -1386,8 +1386,8 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
       {/* Day View */}
       {viewMode === 'day' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-200 bg-slate-50">
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="p-4 border-b border-white/30 glass-subtle">
             <h3 className="font-bold text-slate-800">
               {new Date(dateFilter).toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </h3>
@@ -1399,7 +1399,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               <div className="p-8 text-center text-slate-400">এই দিনে কোনো অ্যাপয়েন্টমেন্ট নেই</div>
             ) : (
               filteredAppointments.map((apt) => (
-                <div key={apt.id} className="p-4 flex items-center gap-4 hover:bg-slate-50">
+                <div key={apt.id} className="p-4 flex items-center gap-4 hover:glass-subtle">
                   <div className="w-20 text-center">
                     <div className="text-lg font-bold text-slate-800">{apt.time}</div>
                     <div className="text-xs text-slate-500">#{apt.serial}</div>
@@ -1426,7 +1426,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
       {/* Week View */}
       {viewMode === 'week' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="glass-card rounded-2xl overflow-hidden">
           <div className="grid grid-cols-7 border-b border-slate-200">
             {['শনি', 'রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহ', 'শুক্র'].map((day, i) => (
               <div key={day} className={`p-3 text-center border-r last:border-r-0 ${i === 5 ? 'bg-slate-50' : ''}`}>
@@ -1481,8 +1481,8 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Weekly Schedule */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-200 bg-slate-50">
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="p-4 border-b border-white/30 glass-subtle">
             <h3 className="font-bold text-slate-800">সাপ্তাহিক সময়সূচী</h3>
           </div>
           <div className="divide-y divide-slate-100">
@@ -1531,10 +1531,10 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         </div>
 
         {/* Holidays */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="p-4 border-b border-white/30 glass-subtle flex items-center justify-between">
             <h3 className="font-bold text-slate-800">ছুটির দিন</h3>
-            <button onClick={() => setShowAddHoliday(true)} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            <button onClick={() => setShowAddHoliday(true)} className="px-3 py-1.5 btn-glass-primary text-blue-700 rounded-lg text-sm font-medium hover:shadow-lg">
               + যোগ করুন
             </button>
           </div>
@@ -1559,8 +1559,8 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
           {/* Add Holiday Modal */}
           {showAddHoliday && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="glass-strong rounded-2xl p-6 border border-white/50 shadow-2xl w-full max-w-md">
                 <h3 className="text-lg font-bold mb-4">নতুন ছুটি যোগ করুন</h3>
                 <div className="space-y-4">
                   <div>
@@ -1578,7 +1578,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 </div>
                 <div className="flex gap-3 mt-6">
                   <button onClick={() => setShowAddHoliday(false)} className="flex-1 px-4 py-2 border rounded-lg">বাতিল</button>
-                  <button onClick={addHoliday} className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg">যোগ করুন</button>
+                  <button onClick={addHoliday} className="flex-1 px-4 py-2 btn-glass-primary text-blue-700 rounded-lg">যোগ করুন</button>
                 </div>
               </div>
             </div>
@@ -1595,7 +1595,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         <div className="flex flex-col items-center justify-center h-96 text-slate-400">
           <div className="text-6xl mb-4">👨‍⚕️</div>
           <p>কনসাল্টেশন শুরু করতে কিউ থেকে রোগী নির্বাচন করুন</p>
-          <button onClick={() => setActiveTab('queue')} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg">
+          <button onClick={() => setActiveTab('queue')} className="mt-4 px-4 py-2 btn-glass-primary text-blue-700 rounded-lg">
             কিউতে যান
           </button>
         </div>
@@ -1654,8 +1654,8 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           </div>
 
           {/* SOAP Notes */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-200 bg-slate-50">
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/30 glass-subtle">
               <h3 className="font-bold text-slate-800">SOAP নোট</h3>
             </div>
             <div className="p-4 space-y-4">
@@ -1691,8 +1691,8 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           </div>
 
           {/* Prescription */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/30 glass-subtle flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-800">℞ প্রেসক্রিপশন</h3>
                 {isEditingCompleted && (
@@ -1706,7 +1706,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                     <option key={t.name} value={t.name}>{t.name}</option>
                   ))}
                 </select>
-                <button onClick={() => addMedicine()} className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm font-medium">
+                <button onClick={() => addMedicine()} className="px-3 py-1.5 btn-glass-primary text-blue-700 rounded-lg text-sm font-medium">
                   + ওষুধ যোগ করুন
                 </button>
               </div>
@@ -1846,7 +1846,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           )}
 
           {/* Payment Status & Action Buttons */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <div className="glass-card rounded-2xl p-4">
             <div className="flex items-center justify-between mb-4">
               <label className="text-sm font-medium text-slate-600">পেমেন্ট স্ট্যাটাস:</label>
               <div className="flex gap-2">
@@ -1898,7 +1898,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               <button 
                 onClick={generatePrescription} 
                 disabled={isSavingConsultation}
-                className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-6 py-3 btn-glass-primary text-blue-700 rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span>🖨️</span> প্রেসক্রিপশন প্রিন্ট
               </button>
@@ -1925,7 +1925,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         {/* Right: AI Assistant & History */}
         <div className="space-y-6">
           {/* AI Clinical Assistant - Improved */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-lg">
+          <div className="glass-card rounded-2xl overflow-hidden shadow-lg">
             <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white">
               <div className="flex items-center justify-between">
                 <div>
@@ -2030,8 +2030,8 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           </div>
 
           {/* Patient History */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-200 bg-slate-50">
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/30 glass-subtle">
               <h3 className="font-bold text-slate-800">রোগীর ইতিহাস</h3>
             </div>
             <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
@@ -2332,7 +2332,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Medical News Feed */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="glass-card rounded-2xl overflow-hidden">
           <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
             <h3 className="font-bold flex items-center gap-2">
               <span>📰</span> মেডিকেল নিউজ ফিড
@@ -2351,7 +2351,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 <option value="Pediatrics">শিশুরোগ (Pediatrics)</option>
                 <option value="General Medicine">সাধারণ চিকিৎসা</option>
               </select>
-              <button onClick={fetchMedicalNews} disabled={newsLoading} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50">
+              <button onClick={fetchMedicalNews} disabled={newsLoading} className="px-4 py-2 btn-glass-primary text-blue-700 rounded-lg hover:bg-blue-600 disabled:opacity-50">
                 {newsLoading ? '...' : 'লোড করুন'}
               </button>
             </div>
@@ -2366,7 +2366,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
             ) : (
               <div className="divide-y divide-slate-100">
                 {medicalNews.map((item, i) => (
-                  <div key={i} className="p-4 hover:bg-slate-50">
+                  <div key={i} className="p-4 hover:glass-subtle">
                     <div className="flex items-start gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg ${
                         item.category === 'Research' ? 'bg-purple-500' :
@@ -2392,7 +2392,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
         {/* Guidelines Search */}
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="glass-card rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-green-500 to-teal-600 text-white">
               <h3 className="font-bold flex items-center gap-2">
                 <span>📚</span> গাইডলাইন সার্চ
@@ -2433,8 +2433,8 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           </div>
 
           {/* Quick Reference */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-200 bg-slate-50">
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/30 glass-subtle">
               <h3 className="font-bold text-slate-800">দ্রুত রেফারেন্স</h3>
             </div>
             <div className="p-4 space-y-3">
@@ -2569,7 +2569,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 h-fit">
+        <div className="glass-card rounded-2xl p-4 h-fit">
           <nav className="space-y-1">
             {[
               { id: 'profile', icon: '👤', label: 'প্রোফাইল' },
@@ -2581,7 +2581,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 key={item.id}
                 onClick={() => setSettingsTab(item.id as any)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition text-left ${
-                  settingsTab === item.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+                  settingsTab === item.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:glass-subtle'
                 }`}
               >
                 <span>{item.icon}</span>
@@ -2594,12 +2594,12 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         <div className="lg:col-span-3 space-y-6">
           {settingsTab === 'profile' && (
             <>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-bold text-slate-800 mb-4">প্রোফাইল ছবি</h3>
                 <div className="flex items-center gap-6">
                   <div className="relative">
                     <img src={profileImage} alt="" className="w-24 h-24 rounded-2xl object-cover" />
-                    <label className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-700 transition">
+                    <label className="absolute -bottom-2 -right-2 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center cursor-pointer hover:shadow-lg transition">
                       <span className="text-white text-sm">📷</span>
                       <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                     </label>
@@ -2611,7 +2611,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-bold text-slate-800 mb-4">মৌলিক তথ্য</h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
@@ -2633,7 +2633,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-bold text-slate-800 mb-4">পেশাগত তথ্য</h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
@@ -2668,7 +2668,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 <button 
                   onClick={handleProfileSave} 
                   disabled={saving}
-                  className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="mt-4 px-6 py-2 btn-glass-primary text-blue-700 rounded-lg font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {saving ? (
                     <>
@@ -2682,7 +2682,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           )}
 
           {settingsTab === 'security' && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="glass-card rounded-2xl p-6">
               <h3 className="font-bold text-slate-800 mb-4">পাসওয়ার্ড পরিবর্তন</h3>
               <div className="max-w-md space-y-4">
                 <div>
@@ -2697,7 +2697,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                   <label className="text-sm text-slate-600">নতুন পাসওয়ার্ড নিশ্চিত করুন</label>
                   <input type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm(p => ({...p, confirm: e.target.value}))} className="w-full px-4 py-2 border rounded-lg mt-1" />
                 </div>
-                <button onClick={handlePasswordChange} className="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700">
+                <button onClick={handlePasswordChange} className="px-6 py-2 btn-glass-primary text-blue-700 rounded-lg font-medium hover:shadow-lg">
                   পাসওয়ার্ড পরিবর্তন করুন
                 </button>
               </div>
@@ -2716,7 +2716,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
           {settingsTab === 'billing' && (
             <>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-bold text-slate-800 mb-4">ফি সেটিংস</h3>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
@@ -2731,12 +2731,12 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 <button 
                   onClick={handleProfileSave} 
                   disabled={saving}
-                  className="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-4 px-6 py-2 btn-glass-primary text-blue-700 rounded-lg font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'সংরক্ষণ হচ্ছে...' : 'সংরক্ষণ করুন'}
                 </button>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-bold text-slate-800 mb-4">পেমেন্ট মেথড</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-4 border rounded-xl">
@@ -2756,7 +2756,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                   <button className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-teal-500 hover:text-blue-600 transition">+ নতুন পেমেন্ট মেথড যোগ করুন</button>
                 </div>
               </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-bold text-slate-800 mb-4">এই মাসের সারাংশ</h3>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="p-4 bg-green-50 rounded-xl">
@@ -2777,7 +2777,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           )}
 
           {settingsTab === 'notifications' && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="glass-card rounded-2xl p-6">
               <h3 className="font-bold text-slate-800 mb-4">নোটিফিকেশন সেটিংস</h3>
               <div className="space-y-4">
                 {[
@@ -2817,28 +2817,28 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
 
   // ============ MAIN RENDER ============
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
+    <div className="min-h-screen flex">
+      {/* Sidebar - Glassmorphism */}
+      <aside className="w-64 glass-strong border-r border-white/40 flex flex-col">
         {/* Logo */}
-        <div className="p-4 border-b border-slate-200">
+        <div className="p-4 border-b border-white/30">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">ন</span>
+            <div className="w-10 h-10 glass-card rounded-xl flex items-center justify-center border border-blue-200/40">
+              <span className="text-blue-500 font-bold text-lg">ন</span>
             </div>
             <div>
-              <div className="font-bold text-slate-800">নির্ণয়</div>
+              <div className="font-bold text-slate-700">নির্ণয়</div>
               <div className="text-xs text-slate-500">ডাক্তার প্যানেল</div>
             </div>
           </div>
         </div>
 
         {/* Doctor Profile */}
-        <div className="p-4 border-b border-slate-200">
+        <div className="p-4 border-b border-white/30">
           <div className="flex items-center gap-3">
-            <img src={doctorProfile.image} alt="" className="w-12 h-12 rounded-full" />
+            <img src={doctorProfile.image} alt="" className="w-12 h-12 rounded-full border-2 border-white/50 shadow" />
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-slate-800 truncate">{doctorProfile.nameBn}</div>
+              <div className="font-medium text-slate-700 truncate">{doctorProfile.nameBn}</div>
               <div className="text-xs text-slate-500">{doctorProfile.specialtyBn}</div>
             </div>
           </div>
@@ -2852,14 +2852,14 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               onClick={() => setActiveTab(item.id as TabType)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition ${
                 activeTab === item.id
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-600 hover:bg-slate-50'
+                  ? 'glass-card text-blue-600 font-medium shadow-lg border border-blue-200/40'
+                  : 'text-slate-600 hover:glass-subtle'
               }`}
             >
               <span className="text-xl">{item.icon}</span>
               <span className="flex-1 text-left font-medium">{item.label}</span>
               {item.badge !== undefined && item.badge > 0 && (
-                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
+                <span className="px-2 py-0.5 glass-subtle text-amber-600 rounded-full text-xs font-medium border border-amber-200/40">
                   {item.badge}
                 </span>
               )}
@@ -2868,10 +2868,10 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         </nav>
 
         {/* Logout */}
-        <div className="p-4 border-t border-slate-200">
+        <div className="p-4 border-t border-white/30">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:glass-subtle transition"
           >
             <span className="text-xl">🚪</span>
             <span className="font-medium">লগ আউট</span>
