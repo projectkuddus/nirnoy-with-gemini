@@ -65,6 +65,25 @@ interface Holiday {
   date: string;
   reason: string;
   reasonBn: string;
+  chamberId?: string; // Optional: specific to a chamber
+}
+
+// Chamber Management Types
+interface DoctorChamber {
+  id: string;
+  name: string;
+  nameBn: string;
+  address: string;
+  area: string;
+  city: string;
+  phone: string;
+  fee: number;
+  followUpFee: number;
+  reportFee: number;
+  schedule: Schedule[];
+  holidays: Holiday[];
+  isActive: boolean;
+  isPrimary: boolean;
 }
 
 interface SOAPNote {
@@ -74,7 +93,7 @@ interface SOAPNote {
   plan: string;
 }
 
-type TabType = 'overview' | 'queue' | 'appointments' | 'schedule' | 'consult' | 'analytics' | 'rnd' | 'settings';
+type TabType = 'overview' | 'queue' | 'appointments' | 'chambers' | 'schedule' | 'consult' | 'analytics' | 'rnd' | 'settings';
 
 // ============ MOCK DATA ============
 const DOCTOR_PROFILE = {
@@ -274,6 +293,202 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
   const [schedule, setSchedule] = useState<Schedule[]>(DEFAULT_SCHEDULE);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  
+  // Multi-Chamber State
+  const [chambers, setChambers] = useState<DoctorChamber[]>([]);
+  const [activeChamber, setActiveChamber] = useState<string | null>(null);
+  const [showAddChamber, setShowAddChamber] = useState(false);
+  const [editingChamber, setEditingChamber] = useState<DoctorChamber | null>(null);
+  const [chamberForm, setChamberForm] = useState<Partial<DoctorChamber>>({
+    name: '', nameBn: '', address: '', area: '', city: 'ঢাকা', phone: '',
+    fee: 500, followUpFee: 300, reportFee: 200, isActive: true, isPrimary: false
+  });
+  
+  // Initialize chambers from doctor profile
+  useEffect(() => {
+    if (doctorUser?.chambers && Array.isArray(doctorUser.chambers)) {
+      const existingChambers: DoctorChamber[] = doctorUser.chambers.map((c: any, idx: number) => ({
+        id: c.id || `chamber-${idx}`,
+        name: c.name || 'Chamber',
+        nameBn: c.nameBn || c.name || 'চেম্বার',
+        address: c.address || '',
+        area: c.area || '',
+        city: c.city || 'ঢাকা',
+        phone: c.phone || user?.phone || '',
+        fee: c.fee || 500,
+        followUpFee: c.followUpFee || Math.round((c.fee || 500) * 0.5),
+        reportFee: c.reportFee || Math.round((c.fee || 500) * 0.3),
+        schedule: c.schedule || DEFAULT_SCHEDULE,
+        holidays: c.holidays || [],
+        isActive: c.isActive !== false,
+        isPrimary: idx === 0
+      }));
+      setChambers(existingChambers);
+      if (existingChambers.length > 0 && !activeChamber) {
+        setActiveChamber(existingChambers[0].id);
+      }
+    } else {
+      // Create default chamber if none exists
+      const defaultChamber: DoctorChamber = {
+        id: 'default-chamber',
+        name: doctorProfile.hospital || 'Primary Chamber',
+        nameBn: doctorProfile.hospitalBn || 'প্রধান চেম্বার',
+        address: doctorProfile.chamberAddress || '',
+        area: '',
+        city: 'ঢাকা',
+        phone: doctorProfile.chamberPhone || user?.phone || '',
+        fee: doctorProfile.consultationFee || 500,
+        followUpFee: Math.round((doctorProfile.consultationFee || 500) * 0.5),
+        reportFee: Math.round((doctorProfile.consultationFee || 500) * 0.3),
+        schedule: DEFAULT_SCHEDULE,
+        holidays: [],
+        isActive: true,
+        isPrimary: true
+      };
+      setChambers([defaultChamber]);
+      setActiveChamber(defaultChamber.id);
+    }
+  }, [doctorUser?.chambers]);
+  
+  // Get active chamber data
+  const currentChamber = useMemo(() => 
+    chambers.find(c => c.id === activeChamber) || chambers[0] || null,
+    [chambers, activeChamber]
+  );
+  
+  // Chamber CRUD operations
+  const addChamber = async () => {
+    if (!chamberForm.name?.trim()) return;
+    
+    const newChamber: DoctorChamber = {
+      id: `chamber-${Date.now()}`,
+      name: chamberForm.name || '',
+      nameBn: chamberForm.nameBn || chamberForm.name || '',
+      address: chamberForm.address || '',
+      area: chamberForm.area || '',
+      city: chamberForm.city || 'ঢাকা',
+      phone: chamberForm.phone || '',
+      fee: chamberForm.fee || 500,
+      followUpFee: chamberForm.followUpFee || 300,
+      reportFee: chamberForm.reportFee || 200,
+      schedule: DEFAULT_SCHEDULE,
+      holidays: [],
+      isActive: true,
+      isPrimary: chambers.length === 0
+    };
+    
+    const updatedChambers = [...chambers, newChamber];
+    setChambers(updatedChambers);
+    
+    // Save to Supabase
+    if (isSupabaseConfigured() && user?.id) {
+      try {
+        await supabase
+          .from('doctors')
+          .update({ chambers: updatedChambers })
+          .eq('profile_id', user.id);
+        console.log('[Chambers] ✅ Added new chamber:', newChamber.name);
+      } catch (e) {
+        console.error('[Chambers] ❌ Error saving:', e);
+      }
+    }
+    
+    setShowAddChamber(false);
+    setChamberForm({
+      name: '', nameBn: '', address: '', area: '', city: 'ঢাকা', phone: '',
+      fee: 500, followUpFee: 300, reportFee: 200, isActive: true, isPrimary: false
+    });
+  };
+  
+  const updateChamber = async (chamberId: string, updates: Partial<DoctorChamber>) => {
+    const updatedChambers = chambers.map(c => 
+      c.id === chamberId ? { ...c, ...updates } : c
+    );
+    setChambers(updatedChambers);
+    
+    // Save to Supabase
+    if (isSupabaseConfigured() && user?.id) {
+      try {
+        await supabase
+          .from('doctors')
+          .update({ chambers: updatedChambers })
+          .eq('profile_id', user.id);
+        console.log('[Chambers] ✅ Updated chamber:', chamberId);
+      } catch (e) {
+        console.error('[Chambers] ❌ Error updating:', e);
+      }
+    }
+  };
+  
+  const deleteChamber = async (chamberId: string) => {
+    if (chambers.length <= 1) {
+      alert('অন্তত একটি চেম্বার থাকতে হবে।');
+      return;
+    }
+    
+    const updatedChambers = chambers.filter(c => c.id !== chamberId);
+    // Make first chamber primary if deleted was primary
+    if (chambers.find(c => c.id === chamberId)?.isPrimary && updatedChambers.length > 0) {
+      updatedChambers[0].isPrimary = true;
+    }
+    setChambers(updatedChambers);
+    
+    if (activeChamber === chamberId) {
+      setActiveChamber(updatedChambers[0]?.id || null);
+    }
+    
+    // Save to Supabase
+    if (isSupabaseConfigured() && user?.id) {
+      try {
+        await supabase
+          .from('doctors')
+          .update({ chambers: updatedChambers })
+          .eq('profile_id', user.id);
+        console.log('[Chambers] ✅ Deleted chamber:', chamberId);
+      } catch (e) {
+        console.error('[Chambers] ❌ Error deleting:', e);
+      }
+    }
+  };
+  
+  const setPrimaryChamber = async (chamberId: string) => {
+    const updatedChambers = chambers.map(c => ({
+      ...c,
+      isPrimary: c.id === chamberId
+    }));
+    setChambers(updatedChambers);
+    
+    // Save to Supabase
+    if (isSupabaseConfigured() && user?.id) {
+      try {
+        await supabase
+          .from('doctors')
+          .update({ chambers: updatedChambers })
+          .eq('profile_id', user.id);
+      } catch (e) {
+        console.error('[Chambers] ❌ Error setting primary:', e);
+      }
+    }
+  };
+  
+  // Update schedule for current chamber
+  const updateChamberSchedule = (day: string, field: keyof Schedule, value: any) => {
+    if (!currentChamber) return;
+    
+    const updatedSchedule = currentChamber.schedule.map(s => 
+      s.day === day ? { ...s, [field]: value } : s
+    );
+    updateChamber(currentChamber.id, { schedule: updatedSchedule });
+  };
+  
+  const toggleChamberScheduleDay = (day: string) => {
+    if (!currentChamber) return;
+    
+    const updatedSchedule = currentChamber.schedule.map(s => 
+      s.day === day ? { ...s, enabled: !s.enabled } : s
+    );
+    updateChamber(currentChamber.id, { schedule: updatedSchedule });
+  };
 
   // Fetch real appointments from Supabase - optimized with useCallback
   const fetchAppointments = useCallback(async () => {
@@ -1072,6 +1287,46 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         </div>
       </div>
 
+      {/* Chambers Quick Overview */}
+      {chambers.length > 0 && (
+        <div className="glass-card rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              🏥 আপনার চেম্বারসমূহ
+            </h3>
+            <button onClick={() => setActiveTab('chambers')} className="text-sm text-blue-600 hover:underline">
+              সব দেখুন →
+            </button>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {chambers.filter(c => c.isActive).map((chamber) => (
+              <div
+                key={chamber.id}
+                onClick={() => {
+                  setActiveChamber(chamber.id);
+                  setActiveTab('schedule');
+                }}
+                className={`flex-shrink-0 glass-subtle rounded-xl p-3 cursor-pointer hover:glass transition min-w-[180px] ${
+                  chamber.isPrimary ? 'ring-2 ring-blue-300' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🏥</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-800 truncate text-sm">{chamber.nameBn || chamber.name}</p>
+                    {chamber.isPrimary && <span className="text-[10px] text-blue-600">⭐ প্রাথমিক</span>}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">{chamber.area || chamber.city}</span>
+                  <span className="font-bold text-blue-600">৳{chamber.fee}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Current & Next Patient */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Current Patient */}
@@ -1468,16 +1723,345 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
     </div>
   );
 
-  // ============ RENDER SCHEDULE ============
-  const renderSchedule = () => (
+  // ============ RENDER CHAMBERS ============
+  const renderChambers = () => (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
+          <h2 className="text-2xl font-bold text-slate-800">🏥 চেম্বার ম্যানেজমেন্ট</h2>
+          <p className="text-slate-500">আপনার সকল চেম্বার পরিচালনা করুন</p>
+        </div>
+        <button
+          onClick={() => setShowAddChamber(true)}
+          className="px-4 py-2 btn-glass-primary text-blue-700 rounded-xl font-medium flex items-center gap-2"
+        >
+          <span>➕</span> নতুন চেম্বার
+        </button>
+      </div>
+
+      {/* Chamber Cards */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {chambers.map((chamber) => (
+          <div
+            key={chamber.id}
+            className={`glass-card rounded-2xl overflow-hidden transition-all ${
+              chamber.isPrimary ? 'ring-2 ring-blue-400' : ''
+            } ${!chamber.isActive ? 'opacity-60' : ''}`}
+          >
+            {/* Chamber Header */}
+            <div className={`p-4 ${chamber.isPrimary ? 'bg-gradient-to-r from-blue-50 to-indigo-50' : 'glass-subtle'}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-800">{chamber.nameBn || chamber.name}</h3>
+                    {chamber.isPrimary && (
+                      <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">প্রাথমিক</span>
+                    )}
+                    {!chamber.isActive && (
+                      <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full">নিষ্ক্রিয়</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-500 mt-1">{chamber.address}</p>
+                  {chamber.area && <p className="text-xs text-slate-400">{chamber.area}, {chamber.city}</p>}
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => {
+                      setEditingChamber(chamber);
+                      setChamberForm(chamber);
+                    }}
+                    className="p-2 hover:glass-subtle rounded-lg text-slate-500 hover:text-blue-600 transition"
+                    title="সম্পাদনা"
+                  >
+                    ✏️
+                  </button>
+                  {!chamber.isPrimary && (
+                    <button
+                      onClick={() => deleteChamber(chamber.id)}
+                      className="p-2 hover:glass-subtle rounded-lg text-slate-500 hover:text-red-600 transition"
+                      title="মুছুন"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Chamber Details */}
+            <div className="p-4 space-y-3">
+              {/* Fees */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="glass-subtle p-2 rounded-lg">
+                  <div className="text-lg font-bold text-blue-600">৳{chamber.fee}</div>
+                  <div className="text-[10px] text-slate-500">নতুন</div>
+                </div>
+                <div className="glass-subtle p-2 rounded-lg">
+                  <div className="text-lg font-bold text-green-600">৳{chamber.followUpFee}</div>
+                  <div className="text-[10px] text-slate-500">ফলো-আপ</div>
+                </div>
+                <div className="glass-subtle p-2 rounded-lg">
+                  <div className="text-lg font-bold text-purple-600">৳{chamber.reportFee}</div>
+                  <div className="text-[10px] text-slate-500">রিপোর্ট</div>
+                </div>
+              </div>
+              
+              {/* Phone */}
+              {chamber.phone && (
+                <div className="flex items-center gap-2 text-sm text-slate-600">
+                  <span>📞</span> {chamber.phone}
+                </div>
+              )}
+              
+              {/* Active Days */}
+              <div className="flex flex-wrap gap-1">
+                {chamber.schedule?.filter(s => s.enabled).map(s => (
+                  <span key={s.day} className="px-2 py-0.5 glass-subtle rounded text-xs text-slate-600">
+                    {s.dayBn}
+                  </span>
+                ))}
+              </div>
+              
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                {!chamber.isPrimary && (
+                  <button
+                    onClick={() => setPrimaryChamber(chamber.id)}
+                    className="flex-1 py-2 text-xs glass-subtle hover:glass rounded-lg text-blue-600 transition"
+                  >
+                    ⭐ প্রাথমিক করুন
+                  </button>
+                )}
+                <button
+                  onClick={() => updateChamber(chamber.id, { isActive: !chamber.isActive })}
+                  className={`flex-1 py-2 text-xs rounded-lg transition ${
+                    chamber.isActive 
+                      ? 'glass-subtle hover:glass text-orange-600' 
+                      : 'btn-glass-primary text-blue-700'
+                  }`}
+                >
+                  {chamber.isActive ? '⏸️ নিষ্ক্রিয়' : '▶️ সক্রিয়'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        {/* Add Chamber Card */}
+        <button
+          onClick={() => setShowAddChamber(true)}
+          className="glass-card rounded-2xl p-8 flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-300 transition min-h-[250px]"
+        >
+          <div className="text-4xl mb-2">➕</div>
+          <div className="font-medium">নতুন চেম্বার যোগ করুন</div>
+        </button>
+      </div>
+
+      {/* Add/Edit Chamber Modal */}
+      {(showAddChamber || editingChamber) && (
+        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-strong rounded-2xl p-6 border border-white/50 shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              🏥 {editingChamber ? 'চেম্বার সম্পাদনা' : 'নতুন চেম্বার যোগ করুন'}
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-slate-600 font-medium">নাম (English)</label>
+                  <input
+                    type="text"
+                    value={chamberForm.name || ''}
+                    onChange={(e) => setChamberForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Square Hospital"
+                    className="w-full px-3 py-2 border rounded-xl mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600 font-medium">নাম (বাংলা)</label>
+                  <input
+                    type="text"
+                    value={chamberForm.nameBn || ''}
+                    onChange={(e) => setChamberForm(prev => ({ ...prev, nameBn: e.target.value }))}
+                    placeholder="যেমন: স্কয়ার হাসপাতাল"
+                    className="w-full px-3 py-2 border rounded-xl mt-1"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm text-slate-600 font-medium">ঠিকানা</label>
+                <input
+                  type="text"
+                  value={chamberForm.address || ''}
+                  onChange={(e) => setChamberForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="সম্পূর্ণ ঠিকানা"
+                  className="w-full px-3 py-2 border rounded-xl mt-1"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-slate-600 font-medium">এলাকা</label>
+                  <input
+                    type="text"
+                    value={chamberForm.area || ''}
+                    onChange={(e) => setChamberForm(prev => ({ ...prev, area: e.target.value }))}
+                    placeholder="যেমন: ধানমণ্ডি"
+                    className="w-full px-3 py-2 border rounded-xl mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600 font-medium">শহর</label>
+                  <select
+                    value={chamberForm.city || 'ঢাকা'}
+                    onChange={(e) => setChamberForm(prev => ({ ...prev, city: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-xl mt-1"
+                  >
+                    <option value="ঢাকা">ঢাকা</option>
+                    <option value="চট্টগ্রাম">চট্টগ্রাম</option>
+                    <option value="সিলেট">সিলেট</option>
+                    <option value="রাজশাহী">রাজশাহী</option>
+                    <option value="খুলনা">খুলনা</option>
+                    <option value="বরিশাল">বরিশাল</option>
+                    <option value="রংপুর">রংপুর</option>
+                    <option value="ময়মনসিংহ">ময়মনসিংহ</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm text-slate-600 font-medium">ফোন নম্বর</label>
+                <input
+                  type="tel"
+                  value={chamberForm.phone || ''}
+                  onChange={(e) => setChamberForm(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="01XXX-XXXXXX"
+                  className="w-full px-3 py-2 border rounded-xl mt-1"
+                />
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm text-slate-600 font-medium">নতুন রোগী ফি (৳)</label>
+                  <input
+                    type="number"
+                    value={chamberForm.fee || 500}
+                    onChange={(e) => setChamberForm(prev => ({ ...prev, fee: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-xl mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600 font-medium">ফলো-আপ ফি (৳)</label>
+                  <input
+                    type="number"
+                    value={chamberForm.followUpFee || 300}
+                    onChange={(e) => setChamberForm(prev => ({ ...prev, followUpFee: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-xl mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-600 font-medium">রিপোর্ট ফি (৳)</label>
+                  <input
+                    type="number"
+                    value={chamberForm.reportFee || 200}
+                    onChange={(e) => setChamberForm(prev => ({ ...prev, reportFee: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 border rounded-xl mt-1"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowAddChamber(false);
+                  setEditingChamber(null);
+                  setChamberForm({
+                    name: '', nameBn: '', address: '', area: '', city: 'ঢাকা', phone: '',
+                    fee: 500, followUpFee: 300, reportFee: 200, isActive: true, isPrimary: false
+                  });
+                }}
+                className="flex-1 px-4 py-3 border rounded-xl font-medium"
+              >
+                বাতিল
+              </button>
+              <button
+                onClick={() => {
+                  if (editingChamber) {
+                    updateChamber(editingChamber.id, chamberForm);
+                    setEditingChamber(null);
+                  } else {
+                    addChamber();
+                  }
+                  setChamberForm({
+                    name: '', nameBn: '', address: '', area: '', city: 'ঢাকা', phone: '',
+                    fee: 500, followUpFee: 300, reportFee: 200, isActive: true, isPrimary: false
+                  });
+                }}
+                className="flex-1 px-4 py-3 btn-glass-primary text-blue-700 rounded-xl font-medium"
+              >
+                {editingChamber ? 'আপডেট করুন' : 'যোগ করুন'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ============ RENDER SCHEDULE ============
+  const renderSchedule = () => (
+    <div className="space-y-6">
+      {/* Header with Chamber Selector */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
           <h2 className="text-2xl font-bold text-slate-800">সময়সূচী ম্যানেজমেন্ট</h2>
           <p className="text-slate-500">সাপ্তাহিক সময়সূচী ও ছুটির দিন</p>
         </div>
+        
+        {/* Chamber Selector */}
+        {chambers.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500">চেম্বার:</span>
+            <select
+              value={activeChamber || ''}
+              onChange={(e) => setActiveChamber(e.target.value)}
+              className="px-4 py-2 glass border border-white/50 rounded-xl text-slate-700 font-medium"
+            >
+              {chambers.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.nameBn || c.name} {c.isPrimary ? '⭐' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
+      
+      {/* Current Chamber Info */}
+      {currentChamber && (
+        <div className="glass-card rounded-2xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 glass rounded-xl flex items-center justify-center text-2xl">🏥</div>
+            <div>
+              <h3 className="font-bold text-slate-800">{currentChamber.nameBn || currentChamber.name}</h3>
+              <p className="text-sm text-slate-500">{currentChamber.address}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-lg font-bold text-blue-600">৳{currentChamber.fee}</div>
+              <div className="text-xs text-slate-500">নতুন রোগী</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-green-600">৳{currentChamber.followUpFee}</div>
+              <div className="text-xs text-slate-500">ফলো-আপ</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Weekly Schedule */}
@@ -1486,11 +2070,11 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
             <h3 className="font-bold text-slate-800">সাপ্তাহিক সময়সূচী</h3>
           </div>
           <div className="divide-y divide-slate-100">
-            {schedule.map((day) => (
-              <div key={day.day} className={`p-4 ${!day.enabled ? 'bg-slate-50' : ''}`}>
+            {(currentChamber?.schedule || DEFAULT_SCHEDULE).map((day) => (
+              <div key={day.day} className={`p-4 ${!day.enabled ? 'bg-slate-50/50' : ''}`}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <button onClick={() => toggleScheduleDay(day.day)} className={`w-10 h-6 rounded-full transition ${day.enabled ? 'bg-blue-500' : 'bg-slate-300'}`}>
+                    <button onClick={() => toggleChamberScheduleDay(day.day)} className={`w-10 h-6 rounded-full transition ${day.enabled ? 'bg-blue-500' : 'bg-slate-300'}`}>
                       <div className={`w-4 h-4 bg-white rounded-full shadow transition transform ${day.enabled ? 'translate-x-5' : 'translate-x-1'}`}></div>
                     </button>
                     <span className={`font-bold ${day.enabled ? 'text-slate-800' : 'text-slate-400'}`}>{day.dayBn}</span>
@@ -1504,15 +2088,15 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                   <div className="grid grid-cols-4 gap-3">
                     <div>
                       <label className="text-xs text-slate-500">শুরু</label>
-                      <input type="time" value={day.startTime} onChange={(e) => updateSchedule(day.day, 'startTime', e.target.value)} className="w-full px-2 py-1 border rounded text-sm" />
+                      <input type="time" value={day.startTime} onChange={(e) => updateChamberSchedule(day.day, 'startTime', e.target.value)} className="w-full px-2 py-1 border rounded text-sm" />
                     </div>
                     <div>
                       <label className="text-xs text-slate-500">শেষ</label>
-                      <input type="time" value={day.endTime} onChange={(e) => updateSchedule(day.day, 'endTime', e.target.value)} className="w-full px-2 py-1 border rounded text-sm" />
+                      <input type="time" value={day.endTime} onChange={(e) => updateChamberSchedule(day.day, 'endTime', e.target.value)} className="w-full px-2 py-1 border rounded text-sm" />
                     </div>
                     <div>
                       <label className="text-xs text-slate-500">স্লট (মিনিট)</label>
-                      <select value={day.slotDuration} onChange={(e) => updateSchedule(day.day, 'slotDuration', Number(e.target.value))} className="w-full px-2 py-1 border rounded text-sm">
+                      <select value={day.slotDuration} onChange={(e) => updateChamberSchedule(day.day, 'slotDuration', Number(e.target.value))} className="w-full px-2 py-1 border rounded text-sm">
                         <option value={10}>১০</option>
                         <option value={15}>১৫</option>
                         <option value={20}>২০</option>
@@ -1521,7 +2105,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                     </div>
                     <div>
                       <label className="text-xs text-slate-500">সর্বোচ্চ</label>
-                      <input type="number" value={day.maxPatients} onChange={(e) => updateSchedule(day.day, 'maxPatients', Number(e.target.value))} className="w-full px-2 py-1 border rounded text-sm" />
+                      <input type="number" value={day.maxPatients} onChange={(e) => updateChamberSchedule(day.day, 'maxPatients', Number(e.target.value))} className="w-full px-2 py-1 border rounded text-sm" />
                     </div>
                   </div>
                 )}
@@ -1540,16 +2124,21 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           </div>
           
           <div className="divide-y divide-slate-100">
-            {holidays.length === 0 ? (
+            {(currentChamber?.holidays || []).length === 0 ? (
               <div className="p-8 text-center text-slate-400">কোনো ছুটি নির্ধারিত নেই</div>
             ) : (
-              holidays.map((holiday) => (
+              (currentChamber?.holidays || []).map((holiday) => (
                 <div key={holiday.date} className="p-4 flex items-center justify-between">
                   <div>
                     <div className="font-bold text-slate-800">{holiday.reasonBn || holiday.reason}</div>
                     <div className="text-sm text-slate-500">{new Date(holiday.date).toLocaleDateString('bn-BD')}</div>
                   </div>
-                  <button onClick={() => removeHoliday(holiday.date)} className="text-red-500 hover:text-red-600">
+                  <button onClick={() => {
+                    if (currentChamber) {
+                      const updatedHolidays = currentChamber.holidays.filter(h => h.date !== holiday.date);
+                      updateChamber(currentChamber.id, { holidays: updatedHolidays });
+                    }
+                  }} className="text-red-500 hover:text-red-600">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
                 </div>
@@ -1578,7 +2167,14 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 </div>
                 <div className="flex gap-3 mt-6">
                   <button onClick={() => setShowAddHoliday(false)} className="flex-1 px-4 py-2 border rounded-lg">বাতিল</button>
-                  <button onClick={addHoliday} className="flex-1 px-4 py-2 btn-glass-primary text-blue-700 rounded-lg">যোগ করুন</button>
+                  <button onClick={() => {
+                    if (currentChamber && newHoliday.date && newHoliday.reason) {
+                      const updatedHolidays = [...(currentChamber.holidays || []), newHoliday];
+                      updateChamber(currentChamber.id, { holidays: updatedHolidays });
+                      setNewHoliday({ date: '', reason: '', reasonBn: '' });
+                      setShowAddHoliday(false);
+                    }
+                  }} className="flex-1 px-4 py-2 btn-glass-primary text-blue-700 rounded-lg">যোগ করুন</button>
                 </div>
               </div>
             </div>
@@ -2808,6 +3404,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
     { id: 'overview', icon: '🏠', label: 'ওভারভিউ', labelEn: 'Overview' },
     { id: 'queue', icon: '📋', label: 'আজকের কিউ', labelEn: 'Today Queue', badge: todayStats.waiting },
     { id: 'appointments', icon: '📅', label: 'অ্যাপয়েন্টমেন্ট', labelEn: 'Appointments' },
+    { id: 'chambers', icon: '🏥', label: 'চেম্বার', labelEn: 'Chambers', badge: chambers.length },
     { id: 'schedule', icon: '⏰', label: 'সময়সূচী', labelEn: 'Schedule' },
     { id: 'consult', icon: '👨‍⚕️', label: 'কনসাল্টেশন', labelEn: 'Consultation' },
     { id: 'analytics', icon: '📊', label: 'বিশ্লেষণ', labelEn: 'Analytics' },
@@ -2885,6 +3482,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'queue' && renderQueue()}
           {activeTab === 'appointments' && renderAppointments()}
+          {activeTab === 'chambers' && renderChambers()}
           {activeTab === 'schedule' && renderSchedule()}
           {activeTab === 'consult' && renderConsultation()}
           {activeTab === 'analytics' && renderAnalytics()}
