@@ -214,7 +214,7 @@ export class VoiceService {
 
     const setupMessage = {
       setup: {
-        model: 'models/gemini-3-pro-preview',
+        model: 'models/gemini-2.0-flash-exp',
         generationConfig: {
           responseModalities: ['AUDIO'],
           speechConfig: {
