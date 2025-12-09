@@ -70,7 +70,7 @@ export class AiService {
         userId: data.userId,
         tokensUsed: data.tokensUsed,
         requestType: data.requestType,
-        model: data.model || 'gemini-2.0-flash-exp',
+        model: data.model || 'gemini-3-pro-preview',
         estimatedCostUsd: data.estimatedCostUsd || 0,
         trackedAt: new Date().toISOString(),
       };

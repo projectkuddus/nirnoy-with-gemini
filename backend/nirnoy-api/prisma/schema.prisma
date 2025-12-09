@@ -612,7 +612,7 @@ model AiTokenUsage {
   // Usage tracking
   tokensUsed      Int
   requestType     String   // "CHAT" | "CLINICAL_PLAN" | "MEDICAL_NEWS" | "VOICE"
-  model           String   @default("gemini-2.0-flash-exp")
+  model           String   @default("gemini-3-pro-preview")
 
   // Cost calculation (for billing)
   estimatedCostUsd Float   @default(0)

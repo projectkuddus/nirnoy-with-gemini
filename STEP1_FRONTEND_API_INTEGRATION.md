@@ -158,7 +158,7 @@ const mappedAppointments = data.map(apt => ({
 3. **geminiService.trackAIUsage()** is called with:
    - Estimated tokens used
    - Request type (DOCTOR_CHAT, HEALTH_ASSISTANT, etc.)
-   - Model name (gemini-2.0-flash-exp)
+   - Model name (gemini-3-pro-preview)
 4. **If user is authenticated:**
    - Calls `api.ai.trackTokenUsage()` → Backend API
    - Backend saves to `AiTokenUsage` table
@@ -235,7 +235,7 @@ curl -X POST http://localhost:4000/api/ai/token-usage \
     "userRole": "PATIENT",
     "tokensUsed": 500,
     "requestType": "HEALTH_ASSISTANT",
-    "model": "gemini-2.0-flash-exp",
+    "model": "gemini-3-pro-preview",
     "estimatedCostUsd": 0.00025
   }'
 
