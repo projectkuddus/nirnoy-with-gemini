@@ -562,7 +562,7 @@ const HomeVoiceSection: React.FC = () => {
 
       log('Connecting with user info:', currentUserInfo);
       const session = await clientRef.current.live.connect({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-3-pro-preview',
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: getSystemPrompt(agentName, gender, currentUserInfo),

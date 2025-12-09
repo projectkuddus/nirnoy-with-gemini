@@ -75,7 +75,7 @@ Remember: You help identify problems and guide to doctors. You do NOT diagnose o
 
     try {
       const model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-pro',
+        model: 'gemini-3-pro-preview',
         systemInstruction: `${this.MEDICAL_SYSTEM_INSTRUCTION}
 
 CURRENT PATIENT CONTEXT:
@@ -111,7 +111,7 @@ CONVERSATION MODE: Clinical consultation support. Provide evidence-based recomme
 
     try {
       const model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-pro',
+        model: 'gemini-3-pro-preview',
         systemInstruction: `${this.PATIENT_SYSTEM_INSTRUCTION}
 
 PATIENT INFO: ${patientContext || 'No specific health data'}`,
@@ -140,7 +140,7 @@ PATIENT INFO: ${patientContext || 'No specific health data'}`,
 
     try {
       const model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-pro',
+        model: 'gemini-3-pro-preview',
         generationConfig: { responseMimeType: 'application/json' }
       });
 
@@ -183,7 +183,7 @@ Provide a structured clinical assessment in JSON format:
 
     try {
       const model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-pro',
+        model: 'gemini-3-pro-preview',
         generationConfig: { responseMimeType: 'application/json' }
       });
 
@@ -223,7 +223,7 @@ Provide JSON response:
 
     try {
       const model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-pro',
+        model: 'gemini-3-pro-preview',
         generationConfig: { responseMimeType: 'application/json' }
       });
 
@@ -266,7 +266,7 @@ Include 5-7 recent, significant items.`;
     }
 
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
       
       const prompt = `Classify this patient message: "${message}"
 Categories: Emergency, Urgent, Routine, Administrative
@@ -288,7 +288,7 @@ Return ONLY the category name.`;
     }
 
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      const model = this.genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
 
       const prompt = `Write patient education in Bengali for:
 Diagnosis: ${diagnosis}
