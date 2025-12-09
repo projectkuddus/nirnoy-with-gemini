@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
       // No need to define them manually - they're available via import.meta.env
       resolve: {
         alias: {
-          '@': path.resolve(__dirname, '.'),
+          '@': path.resolve(__dirname, './src'),
         }
       },
       build: {
