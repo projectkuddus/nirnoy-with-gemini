@@ -185,19 +185,130 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
   const healthScore = healthMetrics.score;
 
-  // Patient context for AI
+  // AI Context Mode (self or family)
+  const [aiContextMode, setAiContextMode] = useState<'self' | 'family'>('self');
+  const [selectedFamilyMember, setSelectedFamilyMember] = useState<string | null>(null);
+  const [showAiContext, setShowAiContext] = useState(false);
+  const [showChatSessions, setShowChatSessions] = useState(false);
+
+  // Comprehensive Patient context for AI - includes full health profile
   const patientContext = useMemo(() => {
     if (!patientUser) return '';
-    const parts = [`Name: ${patientUser.name}`];
-    if (patientUser.gender) parts.push(`Gender: ${patientUser.gender}`);
-    if (patientUser.dateOfBirth) parts.push(`DOB: ${patientUser.dateOfBirth}`);
-    if (patientUser.bloodGroup) parts.push(`Blood: ${patientUser.bloodGroup}`);
-    if (patientUser.chronicConditions?.length) parts.push(`Conditions: ${patientUser.chronicConditions.join(', ')}`);
-    if (patientUser.allergies?.length) parts.push(`Allergies: ${patientUser.allergies.join(', ')}`);
-    if (patientUser.heightCm) parts.push(`Height: ${patientUser.heightCm}cm`);
-    if (patientUser.weightKg) parts.push(`Weight: ${patientUser.weightKg}kg`);
-    return parts.join(', ');
-  }, [patientUser]);
+    
+    const context: string[] = [];
+    
+    // === PATIENT PROFILE ===
+    context.push('=== রোগীর তথ্য (Patient Profile) ===');
+    context.push(`নাম (Name): ${patientUser.name}`);
+    if (patientUser.phone) context.push(`ফোন (Phone): ${patientUser.phone}`);
+    if (patientUser.gender) context.push(`লিঙ্গ (Gender): ${patientUser.gender === 'male' ? 'পুরুষ' : 'মহিলা'}`);
+    if (healthMetrics.age) context.push(`বয়স (Age): ${healthMetrics.age} বছর`);
+    if (patientUser.bloodGroup) context.push(`রক্তের গ্রুপ (Blood Group): ${patientUser.bloodGroup}`);
+    
+    // === PHYSICAL METRICS ===
+    if (patientUser.heightCm || patientUser.weightKg) {
+      context.push('\n=== শারীরিক তথ্য (Physical Metrics) ===');
+      if (patientUser.heightCm) context.push(`উচ্চতা (Height): ${patientUser.heightCm} cm`);
+      if (patientUser.weightKg) context.push(`ওজন (Weight): ${patientUser.weightKg} kg`);
+      if (healthMetrics.bmi) context.push(`BMI: ${healthMetrics.bmi} (${healthMetrics.bmiCategory})`);
+    }
+    
+    // === HEALTH SCORE ===
+    context.push(`\nস্বাস্থ্য স্কোর (Health Score): ${healthMetrics.score}/100`);
+    context.push(`ঝুঁকির মাত্রা (Risk Level): ${healthMetrics.riskLevel === 'High' ? 'উচ্চ' : healthMetrics.riskLevel === 'Medium' ? 'মাঝারি' : 'কম'}`);
+    
+    // === CHRONIC CONDITIONS ===
+    if (patientUser.chronicConditions?.length) {
+      context.push('\n=== দীর্ঘমেয়াদী রোগ (Chronic Conditions) ===');
+      patientUser.chronicConditions.forEach(c => context.push(`• ${c}`));
+    }
+    
+    // === ALLERGIES ===
+    if (patientUser.allergies?.length) {
+      context.push('\n=== এলার্জি (Allergies) ===');
+      patientUser.allergies.forEach(a => context.push(`⚠️ ${a}`));
+    }
+    
+    // === MEDICAL HISTORY ===
+    if (medicalHistory) {
+      // Recent Consultations
+      if (medicalHistory.consultations.length > 0) {
+        context.push('\n=== সাম্প্রতিক পরামর্শ (Recent Consultations) ===');
+        medicalHistory.consultations.slice(0, 5).forEach(c => {
+          context.push(`📅 ${new Date(c.consultationDate).toLocaleDateString('bn-BD')}`);
+          if (c.diagnosis) context.push(`   রোগ নির্ণয়: ${c.diagnosis}`);
+          if (c.doctorName) context.push(`   ডাক্তার: ${c.doctorName}`);
+        });
+      }
+      
+      // Current Medications
+      if (medicalHistory.prescriptions.length > 0) {
+        context.push('\n=== বর্তমান ওষুধ (Current Medications) ===');
+        const recentPrescriptions = medicalHistory.prescriptions.slice(0, 10);
+        recentPrescriptions.forEach(p => {
+          context.push(`💊 ${p.medicineName} - ${p.dosage} (${p.duration})`);
+        });
+      }
+      
+      // Test Reports
+      if (medicalHistory.testReports.length > 0) {
+        context.push('\n=== সাম্প্রতিক টেস্ট (Recent Tests) ===');
+        medicalHistory.testReports.slice(0, 5).forEach(t => {
+          context.push(`🔬 ${t.testName} - ${new Date(t.testDate).toLocaleDateString('bn-BD')}`);
+          if (t.findings) context.push(`   ফলাফল: ${t.findings}`);
+        });
+      }
+      
+      // Doctors Consulted
+      if (medicalHistory.doctors.length > 0) {
+        context.push('\n=== যেসব ডাক্তার দেখিয়েছেন (Doctors Consulted) ===');
+        medicalHistory.doctors.forEach(d => {
+          context.push(`👨‍⚕️ ${d.name} (${d.specialty})`);
+        });
+      }
+    }
+    
+    // === UPCOMING APPOINTMENTS ===
+    const upcomingAppts = appointments.filter(a => new Date(a.date) >= new Date() && a.status !== 'cancelled');
+    if (upcomingAppts.length > 0) {
+      context.push('\n=== আসন্ন অ্যাপয়েন্টমেন্ট (Upcoming Appointments) ===');
+      upcomingAppts.slice(0, 3).forEach(a => {
+        context.push(`📅 ${new Date(a.date).toLocaleDateString('bn-BD')} - Dr. ${a.doctorName} (${a.doctorSpecialty})`);
+      });
+    }
+    
+    // === EMERGENCY CONTACT ===
+    if (patientUser.emergencyContactName) {
+      context.push('\n=== জরুরি যোগাযোগ (Emergency Contact) ===');
+      context.push(`👤 ${patientUser.emergencyContactName}: ${patientUser.emergencyContactPhone || 'N/A'}`);
+    }
+    
+    return context.join('\n');
+  }, [patientUser, healthMetrics, medicalHistory, appointments]);
+
+  // Family context for AI (when accessing family health)
+  const familyContext = useMemo(() => {
+    // Get family appointments
+    const familyAppts = appointments.filter(a => a.isFamilyBooking);
+    if (familyAppts.length === 0) return null;
+    
+    const familyMembers: { name: string; relation: string; appointments: typeof familyAppts }[] = [];
+    
+    familyAppts.forEach(apt => {
+      const existing = familyMembers.find(f => f.name === apt.familyMemberName);
+      if (existing) {
+        existing.appointments.push(apt);
+      } else if (apt.familyMemberName) {
+        familyMembers.push({
+          name: apt.familyMemberName,
+          relation: apt.familyRelation || 'পরিবার',
+          appointments: [apt]
+        });
+      }
+    });
+    
+    return familyMembers;
+  }, [appointments]);
 
   // Load profile into form
   useEffect(() => {
@@ -215,16 +326,44 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     }
   }, [patientUser]);
 
-  // Initialize AI chat
+  // Initialize AI chat with comprehensive greeting
   useEffect(() => {
     if (patientUser && messages.length === 0) {
+      // Build personalized greeting
+      let greeting = `আসসালামু আলাইকুম ${patientUser.name}! 👋\n\n`;
+      greeting += `আমি নির্ণয় এআই স্বাস্থ্য সহায়ক - Gemini 3 Pro দ্বারা চালিত। 🤖\n\n`;
+      greeting += `📋 **আমি আপনার সম্পর্কে যা জানি:**\n`;
+      
+      // Add known info
+      const knownInfo: string[] = [];
+      if (healthMetrics.age) knownInfo.push(`• বয়স: ${healthMetrics.age} বছর`);
+      if (patientUser.bloodGroup) knownInfo.push(`• রক্তের গ্রুপ: ${patientUser.bloodGroup}`);
+      if (healthMetrics.bmi) knownInfo.push(`• BMI: ${healthMetrics.bmi} (${healthMetrics.bmiCategory})`);
+      if (patientUser.chronicConditions?.length) knownInfo.push(`• দীর্ঘমেয়াদী অবস্থা: ${patientUser.chronicConditions.join(', ')}`);
+      if (patientUser.allergies?.length) knownInfo.push(`• এলার্জি: ${patientUser.allergies.join(', ')}`);
+      if (medicalHistory?.consultations.length) knownInfo.push(`• মোট পরামর্শ: ${medicalHistory.consultations.length} টি`);
+      if (medicalHistory?.prescriptions.length) knownInfo.push(`• বর্তমান ওষুধ: ${medicalHistory.prescriptions.length} টি`);
+      
+      if (knownInfo.length > 0) {
+        greeting += knownInfo.join('\n');
+      } else {
+        greeting += `• আপনার প্রোফাইল সম্পূর্ণ করুন আরো ভালো সেবা পেতে`;
+      }
+      
+      greeting += `\n\n✨ **আমি সাহায্য করতে পারি:**\n`;
+      greeting += `• স্বাস্থ্য সম্পর্কিত প্রশ্নের উত্তর\n`;
+      greeting += `• আপনার চিকিৎসা ইতিহাস বিশ্লেষণ\n`;
+      greeting += `• ওষুধ ও পার্শ্বপ্রতিক্রিয়া সম্পর্কে জানানো\n`;
+      greeting += `• পরিবারের স্বাস্থ্য তথ্য দেখা\n\n`;
+      greeting += `কীভাবে সাহায্য করতে পারি? 😊`;
+      
       setMessages([{ 
         role: 'assistant', 
-        content: `আসসালামু আলাইকুম ${patientUser.name}! 👋\n\nআমি নির্ণয় এআই। আপনার স্বাস্থ্য সমস্যা বলুন।`,
+        content: greeting,
         timestamp: new Date().toISOString()
       }]);
     }
-  }, [patientUser, messages.length]);
+  }, [patientUser, messages.length, healthMetrics, medicalHistory]);
 
   // Scroll chat
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -249,7 +388,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
 
   const handleLogout = () => { logout(); onLogout?.(); navigate('/', { replace: true }); };
 
-  // AI Chat
+  // AI Chat - Enhanced with full context
   const handleSend = async () => {
     if (!chatInput.trim() || isTyping) return;
     const msg = chatInput.trim();
@@ -260,7 +399,31 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     try {
       const prevContext = await aiChatService.getLatestMessages(patientUser?.id || '');
       const allHistory = [...prevContext, ...messages].map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
-      const reply = await chatWithHealthAssistant(msg, allHistory, patientContext);
+      
+      // Build comprehensive context based on mode
+      let fullContext = `আপনি নির্ণয় এআই স্বাস্থ্য সহায়ক। আপনি Gemini 3 Pro দ্বারা চালিত। সবসময় বাংলায় উত্তর দিন।
+এই রোগীর সম্পূর্ণ তথ্য আপনার কাছে আছে:
+
+${patientContext}`;
+
+      // Add family context if in family mode
+      if (aiContextMode === 'family' && familyContext && selectedFamilyMember) {
+        const member = familyContext.find(f => f.name === selectedFamilyMember);
+        if (member) {
+          fullContext += `\n\n=== পরিবারের সদস্যের তথ্য (Family Member: ${member.name}) ===
+সম্পর্ক: ${member.relation}
+অ্যাপয়েন্টমেন্ট: ${member.appointments.length} টি
+সাম্প্রতিক ভিজিট: ${member.appointments.slice(0, 3).map(a => `${new Date(a.date).toLocaleDateString('bn-BD')} - Dr. ${a.doctorName}`).join(', ')}`;
+        }
+      }
+      
+      fullContext += `\n\nগুরুত্বপূর্ণ নির্দেশনা:
+- এই রোগীর সমস্ত তথ্য মনে রাখুন এবং ব্যক্তিগত পরামর্শ দিন
+- জরুরি অবস্থায় অবশ্যই ডাক্তার দেখাতে বলুন
+- ওষুধের পরামর্শ দিলে বলুন যে ডাক্তারের সাথে আলোচনা করতে
+- সংক্ষিপ্ত, স্পষ্ট এবং সহানুভূতিশীল উত্তর দিন`;
+      
+      const reply = await chatWithHealthAssistant(msg, allHistory, fullContext);
       setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: new Date().toISOString() }]);
       
       // Save conversation
@@ -1466,62 +1629,290 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
             </div>
           )}
 
-          {/* AI ASSISTANT TAB */}
+          {/* AI ASSISTANT TAB - Enhanced with Full Context */}
           {activeTab === 'ai' && (
-            <div className="bg-white rounded-xl border overflow-hidden h-[calc(100vh-200px)] flex flex-col">
-              <div className="bg-blue-600 p-4 text-white">
-                <h2 className="font-bold">🤖 নির্ণয় এআই সহায়ক</h2>
-                <p className="text-sm text-blue-100">আপনার স্বাস্থ্য সমস্যা বলুন • Shift+Enter = নতুন লাইন</p>
+            <div className="flex gap-4 h-[calc(100vh-200px)]">
+              {/* Left Sidebar - Chat Sessions & Context */}
+              <div className={`${showChatSessions ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden`}>
+                <div className="glass-card rounded-2xl h-full overflow-hidden flex flex-col">
+                  {/* Header */}
+                  <div className="p-4 border-b border-white/30">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                      <span>📜</span> চ্যাট ইতিহাস
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">{chatHistory.length} টি কথোপকথন সংরক্ষিত</p>
+                  </div>
+                  
+                  {/* Chat Sessions List */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    {chatHistory.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400">
+                        <div className="text-3xl mb-2">💬</div>
+                        <p className="text-sm">কোনো আগের চ্যাট নেই</p>
+                      </div>
+                    ) : (
+                      chatHistory.map((conv, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (conv.messages) setMessages(conv.messages);
+                            setShowChatSessions(false);
+                          }}
+                          className="w-full text-left p-3 glass-subtle rounded-xl hover:glass transition group"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg glass flex items-center justify-center text-blue-500 shrink-0">
+                              💬
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-700 truncate">
+                                {conv.summary || 'কথোপকথন'}
+                              </p>
+                              <p className="text-xs text-slate-400 mt-1">
+                                {new Date(conv.created_at).toLocaleDateString('bn-BD', { 
+                                  day: 'numeric', month: 'short', year: 'numeric' 
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  
+                  {/* New Chat Button */}
+                  <div className="p-3 border-t border-white/30">
+                    <button
+                      onClick={() => {
+                        setMessages([{
+                          role: 'assistant',
+                          content: `আসসালামু আলাইকুম ${patientUser?.name}! 👋\n\nনতুন কথোপকথন শুরু করা হয়েছে। আপনার স্বাস্থ্য সমস্যা বলুন।`,
+                          timestamp: new Date().toISOString()
+                        }]);
+                        setShowChatSessions(false);
+                      }}
+                      className="w-full py-2 btn-glass-primary rounded-xl text-sm font-medium"
+                    >
+                      ✨ নতুন কথোপকথন
+                    </button>
+                  </div>
+                </div>
               </div>
               
-              {/* Chat History Button */}
-              {chatHistory.length > 0 && (
-                <div className="px-4 py-2 bg-gray-50 border-b">
-                  <details className="text-sm">
-                    <summary className="cursor-pointer text-blue-600">📜 পূর্ববর্তী কথোপকথন ({chatHistory.length})</summary>
-                    <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                      {chatHistory.slice(0, 5).map((conv, i) => (
-                        <button key={i} onClick={() => conv.messages && setMessages(conv.messages)} className="block w-full text-left p-2 bg-white rounded border text-xs hover:bg-blue-50">
-                          {conv.summary || 'কথোপকথন'} - {new Date(conv.created_at).toLocaleDateString('bn-BD')}
-                        </button>
-                      ))}
+              {/* Main Chat Area */}
+              <div className="flex-1 glass-card rounded-2xl overflow-hidden flex flex-col">
+                {/* Header with AI Info */}
+                <div className="glass-strong p-4 border-b border-white/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl glass flex items-center justify-center">
+                        <span className="text-2xl">🤖</span>
+                      </div>
+                      <div>
+                        <h2 className="font-bold text-slate-700 flex items-center gap-2">
+                          নির্ণয় এআই সহায়ক
+                          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">Gemini 3 Pro</span>
+                        </h2>
+                        <p className="text-sm text-slate-500">
+                          {aiContextMode === 'self' ? '👤 আপনার স্বাস্থ্য' : `👨‍👩‍👧‍👦 ${selectedFamilyMember || 'পরিবার'}`}
+                        </p>
+                      </div>
                     </div>
-                  </details>
-                </div>
-              )}
-              
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.map((m, i) => (
-                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] p-3 rounded-xl text-sm whitespace-pre-wrap ${
-                      m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {m.content}
+                    
+                    <div className="flex items-center gap-2">
+                      {/* Chat History Toggle */}
+                      <button
+                        onClick={() => setShowChatSessions(!showChatSessions)}
+                        className={`p-2 rounded-xl transition ${showChatSessions ? 'glass text-blue-600' : 'hover:glass-subtle text-slate-500'}`}
+                        title="চ্যাট ইতিহাস"
+                      >
+                        <span className="text-lg">📜</span>
+                        {chatHistory.length > 0 && (
+                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                            {chatHistory.length}
+                          </span>
+                        )}
+                      </button>
+                      
+                      {/* Context Toggle */}
+                      <button
+                        onClick={() => setShowAiContext(!showAiContext)}
+                        className={`p-2 rounded-xl transition ${showAiContext ? 'glass text-blue-600' : 'hover:glass-subtle text-slate-500'}`}
+                        title="AI যা জানে"
+                      >
+                        <span className="text-lg">🧠</span>
+                      </button>
                     </div>
                   </div>
-                ))}
-                {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 p-3 rounded-xl text-sm animate-pulse">চিন্তা করছি...</div>
+                  
+                  {/* Context Mode Selector */}
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      onClick={() => { setAiContextMode('self'); setSelectedFamilyMember(null); }}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+                        aiContextMode === 'self' ? 'glass text-blue-600 shadow' : 'text-slate-500 hover:glass-subtle'
+                      }`}
+                    >
+                      👤 আমার স্বাস্থ্য
+                    </button>
+                    
+                    {familyContext && familyContext.length > 0 && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setAiContextMode('family')}
+                          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+                            aiContextMode === 'family' ? 'glass text-purple-600 shadow' : 'text-slate-500 hover:glass-subtle'
+                          }`}
+                        >
+                          👨‍👩‍👧‍👦 পরিবার ({familyContext.length})
+                        </button>
+                        
+                        {aiContextMode === 'family' && (
+                          <div className="absolute top-full left-0 mt-2 glass-strong rounded-xl p-2 shadow-xl z-10 min-w-[200px]">
+                            {familyContext.map((member, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setSelectedFamilyMember(member.name)}
+                                className={`w-full text-left p-2 rounded-lg text-sm transition ${
+                                  selectedFamilyMember === member.name ? 'glass text-purple-600' : 'hover:glass-subtle text-slate-600'
+                                }`}
+                              >
+                                <span className="font-medium">{member.name}</span>
+                                <span className="text-xs text-slate-400 ml-2">({member.relation})</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* AI Context Panel */}
+                {showAiContext && (
+                  <div className="glass-subtle p-4 border-b border-white/30 max-h-48 overflow-y-auto">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                        🧠 AI যা জানে
+                      </h4>
+                      <button onClick={() => setShowAiContext(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="glass p-3 rounded-xl">
+                        <div className="text-lg font-bold text-slate-700">{healthMetrics.score}</div>
+                        <div className="text-xs text-slate-500">স্বাস্থ্য স্কোর</div>
+                      </div>
+                      <div className="glass p-3 rounded-xl">
+                        <div className="text-lg font-bold text-slate-700">{healthMetrics.bmi || '-'}</div>
+                        <div className="text-xs text-slate-500">BMI</div>
+                      </div>
+                      <div className="glass p-3 rounded-xl">
+                        <div className="text-lg font-bold text-slate-700">{medicalHistory?.consultations.length || 0}</div>
+                        <div className="text-xs text-slate-500">পরামর্শ</div>
+                      </div>
+                      <div className="glass p-3 rounded-xl">
+                        <div className="text-lg font-bold text-slate-700">{medicalHistory?.prescriptions.length || 0}</div>
+                        <div className="text-xs text-slate-500">ওষুধ</div>
+                      </div>
+                    </div>
+                    {patientUser?.chronicConditions?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {patientUser.chronicConditions.map((c, i) => (
+                          <span key={i} className="px-2 py-1 glass rounded-lg text-xs text-red-600">⚠️ {c}</span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {patientUser?.allergies?.length ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {patientUser.allergies.map((a, i) => (
+                          <span key={i} className="px-2 py-1 glass rounded-lg text-xs text-amber-600">🚫 {a}</span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 )}
-                <div ref={chatEndRef} />
-              </div>
-              
-              <div className="border-t p-4 flex gap-3">
-                <textarea
-                  ref={inputRef}
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="আপনার সমস্যা লিখুন..."
-                  className="flex-1 px-4 py-3 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={2}
-                  disabled={isTyping}
-                />
-                <button onClick={handleSend} disabled={isTyping || !chatInput.trim()} className="px-6 bg-blue-600 text-white rounded-xl disabled:bg-gray-300 self-end py-3">
-                  পাঠান
-                </button>
+                
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {messages.map((m, i) => (
+                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] ${m.role === 'user' ? '' : 'flex gap-3'}`}>
+                        {m.role === 'assistant' && (
+                          <div className="w-8 h-8 rounded-lg glass flex items-center justify-center shrink-0">
+                            🤖
+                          </div>
+                        )}
+                        <div className={`p-4 rounded-2xl text-sm whitespace-pre-wrap ${
+                          m.role === 'user' 
+                            ? 'glass text-slate-700 border border-blue-200/50' 
+                            : 'glass-strong text-slate-700 border border-white/50'
+                        }`}>
+                          {m.content}
+                          {m.timestamp && (
+                            <div className="text-[10px] text-slate-400 mt-2 text-right">
+                              {new Date(m.timestamp).toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {isTyping && (
+                    <div className="flex justify-start">
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-lg glass flex items-center justify-center">
+                          🤖
+                        </div>
+                        <div className="glass-strong p-4 rounded-2xl">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1">
+                              <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></span>
+                              <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
+                              <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
+                            </div>
+                            <span className="text-sm text-slate-500">চিন্তা করছি...</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+                
+                {/* Input Area */}
+                <div className="p-4 border-t border-white/30 glass-subtle">
+                  <div className="flex gap-3">
+                    <textarea
+                      ref={inputRef}
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={aiContextMode === 'family' && selectedFamilyMember 
+                        ? `${selectedFamilyMember} সম্পর্কে জিজ্ঞাসা করুন...`
+                        : "আপনার স্বাস্থ্য সমস্যা লিখুন..."
+                      }
+                      className="flex-1 px-4 py-3 glass border border-white/50 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-700 placeholder-slate-400"
+                      rows={2}
+                      disabled={isTyping}
+                    />
+                    <button
+                      onClick={handleSend}
+                      disabled={isTyping || !chatInput.trim()}
+                      className="px-6 btn-glass-primary rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed self-end py-3 font-medium"
+                    >
+                      {isTyping ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        </span>
+                      ) : (
+                        'পাঠান'
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2 text-center">
+                    Shift+Enter = নতুন লাইন • Enter = পাঠান
+                  </p>
+                </div>
               </div>
             </div>
           )}
