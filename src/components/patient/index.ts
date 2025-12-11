@@ -13,6 +13,8 @@ export { FamilyHealth } from './FamilyHealth';
 export { ChildHealthTracker, STANDARD_VACCINATIONS, DEVELOPMENTAL_MILESTONES } from './ChildHealthTracker';
 export { ElderCareTracker } from './ElderCareTracker';
 export { EmergencyServices } from './EmergencyServices';
+export { NotificationsCenter } from './NotificationsCenter';
+export { SecureMessaging } from './SecureMessaging';
 
 // Re-export types
 export type { ChronicCondition, Allergy, Medication, Surgery, FamilyHistory, Vaccination, MedicalHistoryData } from './MedicalHistoryManager';
@@ -26,4 +28,6 @@ export type { DoctorConnection } from './MyDoctors';
 export type { ChildProfile, GrowthRecord, Vaccination, Milestone } from './ChildHealthTracker';
 export type { ElderProfile, MedicationSchedule, DailyActivity, CheckIn, HealthAlert } from './ElderCareTracker';
 export type { EmergencyContact, NearbyHospital, MedicalIDCard } from './EmergencyServices';
+export type { Notification, AppointmentReminder } from './NotificationsCenter';
+export type { Message, Conversation, Attachment } from './SecureMessaging';
 export type { FamilyMember } from './FamilyHealth';
