@@ -7,7 +7,7 @@ import { useAuth, DoctorProfile } from "../contexts/AuthContext";
 import { openPrescriptionWindow, PrescriptionData } from '../utils/prescriptionPDF';
 import { supabase, isSupabaseConfigured } from '../services/supabaseAuth';
 import { getPatientHistoryForDoctor, CompleteMedicalHistory } from '../services/medicalHistoryService';
-import { PatientManager, PatientRecord } from '../components/doctor/PatientManager';
+import { PatientManager, PatientRecord as PatientRecordFromManager } from '../components/doctor/PatientManager';
 import { PrescriptionBuilder } from '../components/doctor/PrescriptionBuilder';
 
 // ============ TYPES ============
@@ -86,6 +86,14 @@ interface DoctorChamber {
   holidays: Holiday[];
   isActive: boolean;
   isPrimary: boolean;
+}
+
+// Local prescription item for doctor dashboard forms
+interface LocalPrescriptionItem {
+  medicine: string;
+  dosage: string;
+  duration: string;
+  instruction: string;
 }
 
 interface SOAPNote {
@@ -265,13 +273,13 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     name: user.name,
     nameBn: user.nameBn || user.name,
     specialty: (Array.isArray(doctorUser.specializations) && doctorUser.specializations.length > 0) 
-      ? (typeof doctorUser.specializations[0] === 'string' ? doctorUser.specializations[0] : doctorUser.specializations[0]?.name || 'General')
+      ? doctorUser.specializations[0]
       : 'General',
     specialtyBn: (Array.isArray(doctorUser.specializations) && doctorUser.specializations.length > 0) 
-      ? (typeof doctorUser.specializations[0] === 'string' ? doctorUser.specializations[0] : doctorUser.specializations[0]?.name || 'সাধারণ চিকিৎসা')
+      ? doctorUser.specializations[0]
       : 'সাধারণ চিকিৎসা',
     degrees: (Array.isArray(doctorUser.qualifications) && doctorUser.qualifications.length > 0)
-      ? doctorUser.qualifications.map(q => typeof q === 'string' ? q : q.degree).join(', ')
+      ? doctorUser.qualifications.join(', ')
       : 'MBBS',
     image: user.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name) + '&background=0d9488&color=fff&size=200',
     hospital: (Array.isArray(doctorUser.chambers) && doctorUser.chambers.length > 0) ? doctorUser.chambers[0]?.name : 'Chamber',
@@ -611,7 +619,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [isEditingCompleted, setIsEditingCompleted] = useState(false);
   const [existingConsultationId, setExistingConsultationId] = useState<string | null>(null);
-  const [existingPrescriptions, setExistingPrescriptions] = useState<PrescriptionItem[]>([]);
+  const [existingPrescriptions, setExistingPrescriptions] = useState<LocalPrescriptionItem[]>([]);
   const [consultationError, setConsultationError] = useState<string | null>(null);
   const [consultationSuccess, setConsultationSuccess] = useState(false);
   const [isSavingConsultation, setIsSavingConsultation] = useState(false);
@@ -619,7 +627,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   
   // Consultation state
   const [soapNote, setSoapNote] = useState<SOAPNote>({ subjective: '', objective: '', assessment: '', plan: '' });
-  const [prescription, setPrescription] = useState<PrescriptionItem[]>([]);
+  const [prescription, setPrescription] = useState<LocalPrescriptionItem[]>([]);
   const [diagnosis, setDiagnosis] = useState('');
   const [followUpDays, setFollowUpDays] = useState(7);
   const [advice, setAdvice] = useState<string[]>([]);
@@ -803,7 +811,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
 
       // Load existing prescriptions (keep them separate)
       if (prescriptionData && prescriptionData.length > 0) {
-        const existingPresc: PrescriptionItem[] = prescriptionData.map(p => ({
+        const existingPresc: LocalPrescriptionItem[] = prescriptionData.map(p => ({
           medicine: p.medicine_name,
           dosage: p.dosage,
           duration: p.duration,
@@ -936,7 +944,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
     }
   };
 
-  const updateMedicine = (index: number, field: keyof PrescriptionItem, value: string) => {
+  const updateMedicine = (index: number, field: keyof LocalPrescriptionItem, value: string) => {
     setPrescription(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m));
   };
 
@@ -1231,7 +1239,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const handleAIChat = async () => {
     if (!aiInput.trim() || !selectedPatient) return;
     
-    const userMsg: ChatMessage = { role: 'user', text: aiInput, timestamp: Date.now() };
+    const userMsg: ChatMessage = { id: `msg-${Date.now()}`, role: 'user', content: aiInput, timestamp: new Date().toISOString() };
     setAiChat(prev => [...prev, userMsg]);
     setAiInput('');
     setIsAiThinking(true);
@@ -1244,10 +1252,10 @@ Allergies: ${selectedPatient.allergies.join(', ') || 'None'}
 Chief Complaint: ${selectedAppointment?.chiefComplaint || 'Not specified'}
 SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.assessment}`;
 
-      const response = await chatWithDoctorAssistant(`${context}\n\nDoctor's Query: "${aiInput}"`, aiChat.map(m => m.text));
-      setAiChat(prev => [...prev, { role: 'assistant', text: response, timestamp: Date.now() }]);
+      const response = await chatWithDoctorAssistant(`${context}\n\nDoctor's Query: "${aiInput}"`, aiChat.map(m => m.content));
+      setAiChat(prev => [...prev, { id: `msg-${Date.now()}`, role: 'assistant', content: response, timestamp: new Date().toISOString() }]);
     } catch (e) {
-      setAiChat(prev => [...prev, { role: 'assistant', text: 'AI সহায়তা পেতে সমস্যা হচ্ছে।', timestamp: Date.now() }]);
+      setAiChat(prev => [...prev, { id: `msg-${Date.now()}`, role: 'assistant', content: 'AI সহায়তা পেতে সমস্যা হচ্ছে।', timestamp: new Date().toISOString() }]);
     }
     setIsAiThinking(false);
   };
