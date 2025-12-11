@@ -21,6 +21,8 @@ export { PatientDocumentsService } from './patientDocuments';
 export { PrescriptionsService } from './prescriptions';
 export { HealthInsightsService, INSIGHT_TEMPLATES } from './healthInsights';
 export { FamilyService } from './familyService';
+export { MessagingService } from './messagingService';
+export { NotificationsService } from './notificationsService';
 
 // Re-export types
 export type { ChatMessage } from './aiConversations';
@@ -31,4 +33,5 @@ export type { PatientDocument, DocumentInsert, DOCUMENT_TYPE_LABELS } from './pa
 export type { Prescription, PrescribedMedicine, PrescriptionEnriched } from './prescriptions';
 export type { HealthInsight, HealthInsightInput } from './healthInsights';
 export type { FamilyGroup, FamilyMemberDB, FamilyMemberEnriched } from './familyService';
-
+export type { Message, Attachment, Conversation } from './messagingService';
+export type { Notification, AppointmentReminder, NotificationPreferences } from './notificationsService';
