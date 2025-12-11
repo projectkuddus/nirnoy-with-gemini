@@ -10,6 +10,7 @@ export { HealthDashboard } from './HealthDashboard';
 export { MyDoctors } from './MyDoctors';
 export { DocumentUpload } from './DocumentUpload';
 export { FamilyHealth } from './FamilyHealth';
+export { ChildHealthTracker, STANDARD_VACCINATIONS, DEVELOPMENTAL_MILESTONES } from './ChildHealthTracker';
 
 // Re-export types
 export type { ChronicCondition, Allergy, Medication, Surgery, FamilyHistory, Vaccination, MedicalHistoryData } from './MedicalHistoryManager';
@@ -20,3 +21,5 @@ export type { TimelineEvent } from './HealthTimeline';
 export type { Medication as MedicationData, Prescription as PrescriptionData } from './MedicationTracker';
 export type { VitalSign, HealthGoal, HealthInsight, HealthRisk } from './HealthDashboard';
 export type { DoctorConnection } from './MyDoctors';
+export type { ChildProfile, GrowthRecord, Vaccination, Milestone } from './ChildHealthTracker';
+export type { FamilyMember } from './FamilyHealth';
