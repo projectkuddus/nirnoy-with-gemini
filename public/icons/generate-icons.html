@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Nirnoy Icon Generator</title>
+  <style>
+    body { 
+      font-family: 'Inter', sans-serif; 
+      padding: 20px; 
+      background: #f8fafc; 
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { color: #1e40af; }
+    .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; margin-top: 20px; }
+    .icon-item { 
+      background: white; 
+      padding: 20px; 
+      border-radius: 12px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .icon-item canvas { display: block; margin: 0 auto 10px; }
+    .icon-item button { 
+      background: #3b82f6; 
+      color: white; 
+      border: none; 
+      padding: 8px 16px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      font-size: 14px;
+    }
+    .icon-item button:hover { background: #2563eb; }
+    .instructions { 
+      background: #dbeafe; 
+      padding: 20px; 
+      border-radius: 12px; 
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 Nirnoy Icon Generator</h1>
+    
+    <div class="instructions">
+      <h3>Instructions:</h3>
+      <p>Click "Download" on each icon to save it. Then upload these files to <code>/public/icons/</code> folder.</p>
+      <p>Icons needed for complete SEO:</p>
+      <ul>
+        <li>apple-touch-icon.png (180x180)</li>
+        <li>favicon-32x32.png</li>
+        <li>favicon-16x16.png</li>
+        <li>android-icon-192x192.png</li>
+        <li>icon-512x512.png</li>
+      </ul>
+    </div>
+    
+    <div class="icon-grid" id="iconGrid"></div>
+  </div>
+
+  <script>
+    const sizes = [
+      { name: 'apple-touch-icon', size: 180 },
+      { name: 'apple-touch-icon-57x57', size: 57 },
+      { name: 'apple-touch-icon-60x60', size: 60 },
+      { name: 'apple-touch-icon-72x72', size: 72 },
+      { name: 'apple-touch-icon-76x76', size: 76 },
+      { name: 'apple-touch-icon-114x114', size: 114 },
+      { name: 'apple-touch-icon-120x120', size: 120 },
+      { name: 'apple-touch-icon-144x144', size: 144 },
+      { name: 'apple-touch-icon-152x152', size: 152 },
+      { name: 'apple-touch-icon-180x180', size: 180 },
+      { name: 'favicon-16x16', size: 16 },
+      { name: 'favicon-32x32', size: 32 },
+      { name: 'favicon-96x96', size: 96 },
+      { name: 'android-icon-192x192', size: 192 },
+      { name: 'icon-192x192', size: 192 },
+      { name: 'icon-512x512', size: 512 },
+      { name: 'ms-icon-144x144', size: 144 }
+    ];
+
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      canvas.width = size;
+      canvas.height = size;
+      
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#3b82f6');
+      gradient.addColorStop(1, '#1e40af');
+      
+      // Rounded rectangle
+      const radius = size * 0.18;
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, radius);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      
+      // Shadow
+      ctx.shadowColor = 'rgba(30, 58, 138, 0.3)';
+      ctx.shadowBlur = size * 0.05;
+      ctx.shadowOffsetY = size * 0.02;
+      
+      // Text (Bengali ন)
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = 'white';
+      ctx.font = `bold ${size * 0.55}px 'Noto Sans Bengali', Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('ন', size / 2, size / 2 + size * 0.05);
+    }
+
+    function downloadCanvas(canvas, filename) {
+      const link = document.createElement('a');
+      link.download = filename + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    const grid = document.getElementById('iconGrid');
+    
+    sizes.forEach(({ name, size }) => {
+      const item = document.createElement('div');
+      item.className = 'icon-item';
+      
+      const canvas = document.createElement('canvas');
+      drawIcon(canvas, size);
+      
+      const label = document.createElement('p');
+      label.textContent = `${name} (${size}x${size})`;
+      
+      const btn = document.createElement('button');
+      btn.textContent = 'Download';
+      btn.onclick = () => downloadCanvas(canvas, name);
+      
+      item.appendChild(canvas);
+      item.appendChild(label);
+      item.appendChild(btn);
+      grid.appendChild(item);
+    });
+
+    // Download all button
+    const downloadAllBtn = document.createElement('button');
+    downloadAllBtn.textContent = '⬇️ Download All Icons';
+    downloadAllBtn.style.cssText = 'margin: 20px 0; padding: 15px 30px; font-size: 18px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer;';
+    downloadAllBtn.onclick = () => {
+      sizes.forEach(({ name, size }, index) => {
+        setTimeout(() => {
+          const canvas = document.createElement('canvas');
+          drawIcon(canvas, size);
+          downloadCanvas(canvas, name);
+        }, index * 200);
+      });
+    };
+    document.querySelector('.container').insertBefore(downloadAllBtn, document.getElementById('iconGrid'));
+  </script>
+</body>
+</html>
+
