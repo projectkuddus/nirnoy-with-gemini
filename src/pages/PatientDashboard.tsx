@@ -34,6 +34,15 @@ import {
   type DoctorConnection
 } from '../components/patient';
 
+// Import Supabase Services for Patient Features
+import { 
+  VitalsService, 
+  HealthGoalsService, 
+  PatientDoctorConnectionsService, 
+  PatientDocumentsService,
+  PrescriptionsService 
+} from '../services/supabase';
+
 // ============ TYPES ============
 type TabId = 'home' | 'appointments' | 'medical-history' | 'health-records' | 'my-doctors' | 'doctors' | 'ai' | 'medication' | 'health-insights' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback' | 'profile' | 'prescriptions';
 
@@ -136,6 +145,15 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   
   // Doctor visits (mock for now, will be from Supabase)
   const [doctorVisits, setDoctorVisits] = useState<any[]>([]);
+  
+  // Patient Features State (Phase 2)
+  const [vitals, setVitals] = useState<VitalSign[]>([]);
+  const [healthGoals, setHealthGoals] = useState<HealthGoal[]>([]);
+  const [healthInsights, setHealthInsights] = useState<HealthInsight[]>([]);
+  const [doctorConnections, setDoctorConnections] = useState<DoctorConnection[]>([]);
+  const [patientDocuments, setPatientDocuments] = useState<HealthRecord[]>([]);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [loadingFeatures, setLoadingFeatures] = useState(false);
   
   const patientUser = useMemo(() => (user && (role === 'patient' || role === 'PATIENT')) ? user as PatientProfile : null, [user, role]);
 
@@ -410,6 +428,111 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   useEffect(() => {
     if (activeTab === 'ai') loadChatHistory();
   }, [activeTab, loadChatHistory]);
+
+  // Load Patient Features Data (Phase 2)
+  const loadPatientFeatures = useCallback(async () => {
+    if (!patientUser || !isSupabaseConfigured()) return;
+    
+    setLoadingFeatures(true);
+    try {
+      // Load vitals
+      const vitalsData = await VitalsService.getPatientVitals(patientUser.id, { limit: 50 });
+      if (vitalsData.length > 0) {
+        setVitals(vitalsData.map(v => ({
+          id: v.id,
+          type: v.vital_type as any,
+          value: v.vital_type === 'blood_pressure' ? `${v.value}/${v.secondary_value || 0}` : v.value,
+          secondaryValue: v.secondary_value,
+          unit: v.unit,
+          measuredAt: v.measured_at,
+          notes: v.notes,
+          source: v.source as any,
+        })));
+      }
+
+      // Load health goals
+      const goalsData = await HealthGoalsService.getPatientGoals(patientUser.id);
+      if (goalsData.length > 0) {
+        setHealthGoals(goalsData.map(g => ({
+          id: g.id,
+          title: g.title,
+          titleBn: g.title_bn || g.title,
+          type: g.goal_type,
+          targetValue: g.target_value,
+          currentValue: g.current_value,
+          unit: g.unit,
+          startDate: g.start_date,
+          endDate: g.end_date,
+          frequency: g.frequency,
+          streak: g.streak_count,
+          progress: HealthGoalsService.calculateProgress(g),
+        })));
+      }
+
+      // Load doctor connections
+      const connectionsData = await PatientDoctorConnectionsService.getPatientConnections(patientUser.id);
+      if (connectionsData.length > 0) {
+        setDoctorConnections(connectionsData as any);
+      }
+
+      // Load documents
+      const documentsData = await PatientDocumentsService.getPatientDocuments(patientUser.id, { limit: 50 });
+      if (documentsData.length > 0) {
+        setPatientDocuments(documentsData.map(d => ({
+          id: d.id,
+          userId: d.patient_id,
+          type: d.document_type as any,
+          title: d.title,
+          description: d.description,
+          fileUrl: d.file_url,
+          fileName: d.file_name,
+          fileSize: d.file_size,
+          mimeType: d.mime_type,
+          doctorName: d.doctor_name,
+          hospitalName: d.hospital_name,
+          recordDate: d.document_date,
+          uploadedAt: d.uploaded_at,
+          tags: d.tags,
+          isSharedWithDoctors: d.is_shared_with_doctors,
+        })));
+      }
+
+      // Load prescriptions
+      const prescriptionsData = await PrescriptionsService.getPatientPrescriptions(patientUser.id);
+      if (prescriptionsData.length > 0) {
+        setPrescriptions(prescriptionsData.map(p => ({
+          id: p.id,
+          appointmentId: p.appointmentId,
+          doctorId: p.doctorId,
+          doctorName: p.doctorName,
+          doctorNameBn: p.doctorNameBn,
+          doctorSpecialty: p.doctorSpecialty,
+          doctorImage: p.doctorImage,
+          chamberName: p.chamberName,
+          date: p.date,
+          diagnosis: p.diagnosis,
+          diagnosisBn: p.diagnosisBn,
+          medicines: p.medicines,
+          advice: p.advice,
+          followUpDate: p.followUpDate,
+          fileUrl: p.fileUrl,
+          isActive: p.isActive,
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading patient features:', error);
+    } finally {
+      setLoadingFeatures(false);
+    }
+  }, [patientUser]);
+
+  // Load features on relevant tabs
+  useEffect(() => {
+    const featureTabs: TabId[] = ['health-insights', 'health-records', 'my-doctors', 'prescriptions', 'medication', 'profile'];
+    if (featureTabs.includes(activeTab)) {
+      loadPatientFeatures();
+    }
+  }, [activeTab, loadPatientFeatures]);
 
   const handleLogout = () => { logout(); onLogout?.(); navigate('/', { replace: true }); };
 
@@ -1943,17 +2066,70 @@ ${patientContext}`;
           )}
 
           {/* MEDICATION TAB */}
-          {activeTab === 'medication' && (
+          {activeTab === 'medication' && patientUser && (
             <div className="bg-white rounded-xl p-6 border">
               {isPremium ? (
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800 mb-4">💊 ওষুধ রিমাইন্ডার</h2>
-                  <div className="text-center py-12">
-                    <div className="text-5xl mb-4">💊</div>
-                    <h3 className="text-lg font-medium text-gray-700">শীঘ্রই আসছে</h3>
-                    <p className="text-gray-500 mt-2">ওষুধ খাওয়ার সময় মনে করিয়ে দেবে</p>
-                  </div>
-                </div>
+                <MedicationTracker
+                  medications={prescriptions.flatMap(p => 
+                    p.medicines.map(m => ({
+                      id: m.id,
+                      name: m.name,
+                      genericName: m.genericName,
+                      dosage: m.dosage,
+                      frequency: m.frequency,
+                      times: m.reminderTimes || ['08:00', '20:00'],
+                      duration: m.duration,
+                      instruction: m.instruction || '',
+                      startDate: m.startDate || p.date,
+                      endDate: m.endDate,
+                      prescriptionId: p.id,
+                      doctorName: p.doctorName,
+                      isActive: p.isActive,
+                      remindersEnabled: m.reminder,
+                    }))
+                  )}
+                  prescriptions={prescriptions.map(p => ({
+                    id: p.id,
+                    date: p.date,
+                    doctorName: p.doctorName,
+                    doctorSpecialty: p.doctorSpecialty,
+                    diagnosis: p.diagnosis || '',
+                    diagnosisBn: p.diagnosisBn,
+                    medications: p.medicines.map(m => ({
+                      id: m.id,
+                      name: m.name,
+                      genericName: m.genericName,
+                      dosage: m.dosage,
+                      frequency: m.frequency,
+                      times: m.reminderTimes || ['08:00', '20:00'],
+                      duration: m.duration,
+                      instruction: m.instruction || '',
+                      startDate: m.startDate || p.date,
+                      endDate: m.endDate,
+                      isActive: p.isActive,
+                    })),
+                    advice: p.advice,
+                    followUpDate: p.followUpDate,
+                    documentUrl: p.fileUrl,
+                  }))}
+                  onToggleTaken={(medicationId, date, time, taken) => {
+                    console.log('Toggle taken:', medicationId, date, time, taken);
+                    // TODO: Implement when medication_adherence table is ready
+                  }}
+                  onToggleReminder={(medicationId, enabled) => {
+                    console.log('Toggle reminder:', medicationId, enabled);
+                    // TODO: Implement when medication_reminders table is ready
+                  }}
+                  onViewPrescription={(prescription) => {
+                    if (prescription.documentUrl) {
+                      window.open(prescription.documentUrl, '_blank');
+                    }
+                  }}
+                  onRefillRequest={(medication) => {
+                    console.log('Request refill:', medication);
+                    // TODO: Implement refill request functionality
+                  }}
+                />
               ) : (
                 <div className="text-center py-12">
                   <div className="text-5xl mb-4">🔒</div>
@@ -2197,17 +2373,47 @@ ${patientContext}`;
           {activeTab === 'health-insights' && patientUser && (
             <HealthDashboard
               profile={patientUser}
-              vitals={[]}
-              goals={[]}
-              insights={[]}
+              vitals={vitals}
+              goals={healthGoals}
+              insights={healthInsights}
               risks={[]}
               onAddVital={async (vital) => {
-                console.log('Add vital:', vital);
-                // TODO: Implement vital saving to Supabase
+                const result = await VitalsService.addVital({
+                  patient_id: patientUser.id,
+                  vital_type: vital.type,
+                  value: typeof vital.value === 'string' ? parseFloat(vital.value.split('/')[0]) : vital.value,
+                  secondary_value: vital.secondaryValue,
+                  unit: vital.unit,
+                  measured_at: vital.measuredAt,
+                  source: vital.source,
+                  notes: vital.notes,
+                });
+                if (result) {
+                  await loadPatientFeatures();
+                }
               }}
               onAddGoal={async (goal) => {
-                console.log('Add goal:', goal);
-                // TODO: Implement goal saving to Supabase
+                const result = await HealthGoalsService.createGoal({
+                  patient_id: patientUser.id,
+                  goal_type: goal.type,
+                  title: goal.title,
+                  title_bn: goal.titleBn,
+                  target_value: goal.targetValue,
+                  unit: goal.unit,
+                  frequency: goal.frequency,
+                  start_date: goal.startDate,
+                  end_date: goal.endDate,
+                });
+                if (result) {
+                  await loadPatientFeatures();
+                }
+              }}
+              onUpdateGoal={async (goalId, currentValue) => {
+                await HealthGoalsService.updateProgress(goalId, patientUser.id, currentValue);
+                await loadPatientFeatures();
+              }}
+              onDismissInsight={(insightId) => {
+                setHealthInsights(prev => prev.filter(i => i.id !== insightId));
               }}
             />
           )}
@@ -2216,14 +2422,28 @@ ${patientContext}`;
           {activeTab === 'health-records' && patientUser && (
             <HealthRecords
               userId={patientUser.id}
-              records={[]}
+              records={patientDocuments}
               onRecordAdd={async (record) => {
-                console.log('Add record:', record);
-                // TODO: Implement record saving to Supabase
+                await PatientDocumentsService.addDocument({
+                  patient_id: patientUser.id,
+                  document_type: record.type as any,
+                  title: record.title,
+                  description: record.description,
+                  file_url: record.fileUrl || '',
+                  file_name: record.fileName,
+                  file_size: record.fileSize,
+                  mime_type: record.mimeType,
+                  document_date: record.recordDate,
+                  doctor_name: record.doctorName,
+                  hospital_name: record.hospitalName,
+                  tags: record.tags,
+                  is_shared_with_doctors: record.isSharedWithDoctors,
+                });
+                await loadPatientFeatures();
               }}
               onRecordDelete={async (recordId) => {
-                console.log('Delete record:', recordId);
-                // TODO: Implement record deletion from Supabase
+                await PatientDocumentsService.deleteDocument(recordId);
+                await loadPatientFeatures();
               }}
             />
           )}
@@ -2231,12 +2451,34 @@ ${patientContext}`;
           {/* MY DOCTORS TAB */}
           {activeTab === 'my-doctors' && patientUser && (
             <MyDoctors
-              doctors={[]}
+              doctors={doctorConnections}
+              onToggleFavorite={async (doctorId) => {
+                const connection = doctorConnections.find(d => d.doctorId === doctorId);
+                if (connection) {
+                  await PatientDoctorConnectionsService.toggleFavorite(connection.id);
+                  await loadPatientFeatures();
+                }
+              }}
+              onSetPrimary={async (doctorId) => {
+                await PatientDoctorConnectionsService.setPrimaryDoctor(patientUser.id, doctorId);
+                await loadPatientFeatures();
+              }}
               onBookAppointment={(doctorId, chamberId) => {
                 navigate(`/doctors/${doctorId}${chamberId ? `?chamber=${chamberId}` : ''}`);
               }}
               onViewProfile={(doctorId) => {
                 navigate(`/doctors/${doctorId}`);
+              }}
+              onViewHistory={(doctorId) => {
+                setActiveTab('medical-history');
+                // TODO: Filter history by doctor
+              }}
+              onRemoveConnection={async (doctorId) => {
+                const connection = doctorConnections.find(d => d.doctorId === doctorId);
+                if (connection) {
+                  await PatientDoctorConnectionsService.removeConnection(connection.id);
+                  await loadPatientFeatures();
+                }
               }}
             />
           )}
@@ -2244,9 +2486,23 @@ ${patientContext}`;
           {/* PRESCRIPTIONS TAB */}
           {activeTab === 'prescriptions' && patientUser && (
             <PrescriptionTracker
-              prescriptions={[]}
+              prescriptions={prescriptions}
+              onToggleReminder={async (prescriptionId, medicineId, enabled, times) => {
+                // TODO: Implement reminder toggle when we have the medications table
+                console.log('Toggle reminder:', prescriptionId, medicineId, enabled, times);
+              }}
+              onMarkComplete={async (prescriptionId) => {
+                await PrescriptionsService.markComplete(prescriptionId);
+                await loadPatientFeatures();
+              }}
               onViewPDF={(prescription) => {
-                console.log('View PDF:', prescription);
+                if (prescription.fileUrl) {
+                  window.open(prescription.fileUrl, '_blank');
+                }
+              }}
+              onReorderMedicine={(medicine) => {
+                // TODO: Implement medicine reorder functionality
+                console.log('Reorder medicine:', medicine);
               }}
             />
           )}

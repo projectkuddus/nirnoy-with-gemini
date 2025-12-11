@@ -2214,6 +2214,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
     const patientImage = selectedAppointment.patientImage || selectedPatient?.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(patientName)}&background=3b82f6&color=fff&size=200`;
 
     return (
+      <>
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left: Patient Info & SOAP */}
         <div className="lg:col-span-2 space-y-6">
@@ -2731,9 +2732,9 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
               doctorDegrees={doctorProfile.degrees}
               doctorSpecialty={doctorProfile.specialty}
               doctorBmdcNo={doctorProfile.bmdcNo}
-              chamberName={activeChamberData?.nameBn || doctorProfile.hospitalBn}
-              chamberAddress={activeChamberData?.address || doctorProfile.chamberAddress}
-              chamberPhone={activeChamberData?.phone || doctorProfile.chamberPhone}
+              chamberName={currentChamber?.nameBn || doctorProfile.hospitalBn}
+              chamberAddress={currentChamber?.address || doctorProfile.chamberAddress}
+              chamberPhone={currentChamber?.phone || doctorProfile.chamberPhone}
               patientName={selectedAppointment?.patientName || ''}
               patientNameBn={selectedAppointment?.patientNameBn}
               patientAge={selectedAppointment?.patientAge || 0}
@@ -2760,6 +2761,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           </div>
         </div>
       )}
+      </>
     );
   };
 
