@@ -189,15 +189,6 @@ export const triagePatientMessage = async (msgText: string): Promise<string> => 
 // =============================================
 
 /**
- * Generate SOAP note from raw input
- */
-export const generateSOAPNote = async (rawInput: string, vitals: string): Promise<string> => {
-  // This can be implemented later if needed
-  console.warn('generateSOAPNote: Not implemented in backend yet');
-  return '{}';
-};
-
-/**
  * Generate patient summary
  */
 export const generatePatientSummary = async (patientData: string): Promise<string> => {
