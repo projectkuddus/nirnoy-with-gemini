@@ -25,6 +25,7 @@ import {
   MyDoctors,
   MedicationTracker,
   FamilyHealth,
+  EmergencyServices,
   type MedicalHistoryData,
   type HealthRecord,
   type Appointment as AppointmentType,
@@ -33,7 +34,10 @@ import {
   type HealthGoal,
   type HealthInsight,
   type DoctorConnection,
-  type FamilyMember
+  type FamilyMember,
+  type EmergencyContact,
+  type NearbyHospital,
+  type MedicalIDCard
 } from '../components/patient';
 
 // Import Supabase Services for Patient Features
@@ -48,7 +52,7 @@ import {
 } from '../services/supabase';
 
 // ============ TYPES ============
-type TabId = 'home' | 'appointments' | 'medical-history' | 'health-records' | 'my-doctors' | 'doctors' | 'ai' | 'medication' | 'health-insights' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback' | 'profile' | 'prescriptions' | 'family';
+type TabId = 'home' | 'appointments' | 'medical-history' | 'health-records' | 'my-doctors' | 'doctors' | 'ai' | 'medication' | 'health-insights' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback' | 'profile' | 'prescriptions' | 'family' | 'emergency';
 
 interface AppointmentData {
   id: string;
@@ -89,6 +93,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'health-records', icon: '📁', label: 'Health Records', labelBn: 'স্বাস্থ্য রেকর্ড' },
   { id: 'my-doctors', icon: '👨‍⚕️', label: 'My Doctors', labelBn: 'আমার ডাক্তাররা' },
   { id: 'family', icon: '👨‍👩‍👧‍👦', label: 'Family Health', labelBn: 'পরিবারের স্বাস্থ্য' },
+  { id: 'emergency', icon: '🆘', label: 'Emergency', labelBn: 'জরুরি সেবা' },
   { id: 'doctors', icon: '🔍', label: 'Find Doctors', labelBn: 'ডাক্তার খুঁজুন' },
   { id: 'ai', icon: '🤖', label: 'AI Assistant', labelBn: 'এআই সহায়ক' },
   { id: 'medication', icon: '⏰', label: 'Medication Tracker', labelBn: 'ওষুধ ট্র্যাকার', paid: true },
@@ -2607,6 +2612,114 @@ ${patientContext}`;
               onInviteMember={() => {
                 // TODO: Open invite modal
                 console.log('Invite member clicked');
+              }}
+            />
+          )}
+
+          {/* EMERGENCY SERVICES TAB */}
+          {activeTab === 'emergency' && patientUser && (
+            <EmergencyServices
+              medicalId={{
+                name: patientUser.name || '',
+                nameBn: patientUser.name || '',
+                dateOfBirth: patientUser.dateOfBirth || '',
+                gender: patientUser.gender || '',
+                bloodGroup: patientUser.bloodGroup || '',
+                allergies: patientUser.allergies || [],
+                chronicConditions: patientUser.chronicConditions || [],
+                currentMedications: prescriptions
+                  .filter(p => p.status === 'active')
+                  .flatMap(p => p.medicines?.map(m => m.name) || []),
+                emergencyContacts: patientUser.emergencyContactPhone ? [{
+                  id: '1',
+                  name: patientUser.emergencyContactName || 'Emergency Contact',
+                  phone: patientUser.emergencyContactPhone,
+                  relation: 'Emergency Contact',
+                  isPrimary: true,
+                }] : [],
+                insuranceInfo: undefined,
+              }}
+              emergencyContacts={patientUser.emergencyContactPhone ? [{
+                id: '1',
+                name: patientUser.emergencyContactName || 'Emergency Contact',
+                phone: patientUser.emergencyContactPhone,
+                relation: 'Emergency Contact',
+                isPrimary: true,
+              }] : []}
+              nearbyHospitals={[
+                // Bangladesh major hospitals - static data for now
+                {
+                  id: '1',
+                  name: 'Dhaka Medical College Hospital',
+                  nameBn: 'ঢাকা মেডিকেল কলেজ হাসপাতাল',
+                  type: 'government',
+                  address: 'Secretariat Road, Dhaka',
+                  addressBn: 'সচিবালয় রোড, ঢাকা',
+                  phone: '02-9556682',
+                  emergencyPhone: '02-9556682',
+                  distance: 2.5,
+                  rating: 4.2,
+                  isOpen24Hours: true,
+                  hasAmbulance: true,
+                  specialties: ['General', 'Emergency', 'Surgery'],
+                  location: { lat: 23.7270, lng: 90.3976 },
+                },
+                {
+                  id: '2',
+                  name: 'Square Hospital',
+                  nameBn: 'স্কয়ার হাসপাতাল',
+                  type: 'private',
+                  address: '18/F, Bir Uttam Qazi Nuruzzaman Sarak, West Panthapath',
+                  addressBn: '১৮/এফ, বীর উত্তম কাজী নুরুজ্জামান সড়ক, পশ্চিম পান্থপথ',
+                  phone: '10616',
+                  emergencyPhone: '10616',
+                  distance: 3.0,
+                  rating: 4.5,
+                  isOpen24Hours: true,
+                  hasAmbulance: true,
+                  specialties: ['Cardiology', 'Neurology', 'Oncology', 'Emergency'],
+                  location: { lat: 23.7525, lng: 90.3784 },
+                },
+                {
+                  id: '3',
+                  name: 'United Hospital',
+                  nameBn: 'ইউনাইটেড হাসপাতাল',
+                  type: 'private',
+                  address: 'Plot 15, Road 71, Gulshan-2',
+                  addressBn: 'প্লট ১৫, রোড ৭১, গুলশান-২',
+                  phone: '8431661-5',
+                  emergencyPhone: '8836000',
+                  distance: 5.2,
+                  rating: 4.6,
+                  isOpen24Hours: true,
+                  hasAmbulance: true,
+                  specialties: ['Multi-specialty', 'Emergency', 'ICU'],
+                  location: { lat: 23.7947, lng: 90.4155 },
+                },
+                {
+                  id: '4',
+                  name: 'National Heart Foundation',
+                  nameBn: 'জাতীয় হৃদরোগ ইনস্টিটিউট',
+                  type: 'specialized',
+                  address: 'Plot 7/2, Section 2, Mirpur',
+                  addressBn: 'প্লট ৭/২, সেকশন ২, মিরপুর',
+                  phone: '02-8053134',
+                  emergencyPhone: '02-8053134',
+                  distance: 6.0,
+                  rating: 4.4,
+                  isOpen24Hours: true,
+                  hasAmbulance: true,
+                  specialties: ['Cardiology', 'Cardiac Surgery'],
+                  location: { lat: 23.8041, lng: 90.3634 },
+                },
+              ]}
+              onEmergencyCall={(type, target) => {
+                console.log('Emergency call:', type, target);
+                // Native call is handled by href
+              }}
+              onShareLocation={(contacts) => {
+                console.log('Share location with:', contacts);
+                // TODO: Implement location sharing
               }}
             />
           )}
