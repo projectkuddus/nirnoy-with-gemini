@@ -7,6 +7,7 @@ import { useAuth, DoctorProfile } from "../contexts/AuthContext";
 import { openPrescriptionWindow, PrescriptionData } from '../utils/prescriptionPDF';
 import { supabase, isSupabaseConfigured } from '../services/supabaseAuth';
 import { getPatientHistoryForDoctor, CompleteMedicalHistory } from '../services/medicalHistoryService';
+import { PatientManager, PatientRecord } from '../components/doctor/PatientManager';
 
 // ============ TYPES ============
 interface PatientRecord {
@@ -93,7 +94,7 @@ interface SOAPNote {
   plan: string;
 }
 
-type TabType = 'overview' | 'queue' | 'appointments' | 'chambers' | 'schedule' | 'consult' | 'analytics' | 'rnd' | 'settings';
+type TabType = 'overview' | 'queue' | 'patients' | 'appointments' | 'chambers' | 'schedule' | 'consult' | 'analytics' | 'rnd' | 'settings';
 
 // ============ MOCK DATA ============
 const DOCTOR_PROFILE = {
@@ -3149,6 +3150,67 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
     }
   };
 
+  // ============ RENDER PATIENTS ============
+  const renderPatients = () => {
+    // Handle patient selection for consultation
+    const handleSelectPatient = (patient: PatientRecord) => {
+      // Find or create an appointment for this patient
+      const existingAppt = appointments.find(a => a.patientId === patient.id && a.status === 'Waiting');
+      if (existingAppt) {
+        setSelectedAppointment(existingAppt);
+      } else {
+        // Create a mock appointment for walk-in consultation
+        setSelectedAppointment({
+          id: `walk-in-${Date.now()}`,
+          patientId: patient.id,
+          patientName: patient.name,
+          patientNameBn: patient.nameBn,
+          patientImage: patient.profileImage,
+          patientPhone: patient.phone,
+          patientAge: patient.age,
+          patientGender: patient.gender,
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          serial: 0,
+          type: 'Follow-up',
+          status: 'In-Progress',
+          chiefComplaint: patient.diagnosis,
+          fee: doctorProfile.consultationFee,
+          paymentStatus: 'Pending'
+        });
+      }
+      setActiveTab('consult');
+    };
+
+    // Handle patient update
+    const handleUpdatePatient = (updatedPatient: PatientRecord) => {
+      // In real app, this would update in Supabase
+      console.log('Patient updated:', updatedPatient);
+      // For now, we'll just log - in real implementation, update the state
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">রোগী তালিকা</h2>
+            <p className="text-slate-500">আপনার সকল রোগীর তথ্য দেখুন ও পরিচালনা করুন</p>
+          </div>
+          <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-2">
+            <span>➕</span>
+            <span>নতুন রোগী</span>
+          </button>
+        </div>
+
+        <PatientManager
+          patients={PATIENTS}
+          onSelectPatient={handleSelectPatient}
+          onUpdatePatient={handleUpdatePatient}
+        />
+      </div>
+    );
+  };
+
   // ============ RENDER SETTINGS ============
   const renderSettings = () => (
     <div className="space-y-6">
@@ -3403,6 +3465,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
   const sidebarItems = [
     { id: 'overview', icon: '🏠', label: 'ওভারভিউ', labelEn: 'Overview' },
     { id: 'queue', icon: '📋', label: 'আজকের কিউ', labelEn: 'Today Queue', badge: todayStats.waiting },
+    { id: 'patients', icon: '👥', label: 'রোগী তালিকা', labelEn: 'Patients', badge: PATIENTS.length },
     { id: 'appointments', icon: '📅', label: 'অ্যাপয়েন্টমেন্ট', labelEn: 'Appointments' },
     { id: 'chambers', icon: '🏥', label: 'চেম্বার', labelEn: 'Chambers', badge: chambers.length },
     { id: 'schedule', icon: '⏰', label: 'সময়সূচী', labelEn: 'Schedule' },
@@ -3481,6 +3544,7 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
         <div className="p-6">
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'queue' && renderQueue()}
+          {activeTab === 'patients' && renderPatients()}
           {activeTab === 'appointments' && renderAppointments()}
           {activeTab === 'chambers' && renderChambers()}
           {activeTab === 'schedule' && renderSchedule()}
