@@ -169,6 +169,23 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [familyAppointments, setFamilyAppointments] = useState<any[]>([]);
   const [loadingFamily, setLoadingFamily] = useState(false);
+  const [currentFamilyId, setCurrentFamilyId] = useState<string | null>(null);
+  
+  // Family Member Modal State
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
+  const [memberFormData, setMemberFormData] = useState({
+    name: '',
+    nameBn: '',
+    relation: 'child' as 'self' | 'spouse' | 'child' | 'parent' | 'sibling' | 'grandparent' | 'other',
+    dateOfBirth: '',
+    gender: 'Male' as 'Male' | 'Female',
+    bloodGroup: '',
+    phone: '',
+    chronicConditions: '',
+    allergies: '',
+  });
+  const [savingMember, setSavingMember] = useState(false);
   
   const patientUser = useMemo(() => (user && (role === 'patient' || role === 'PATIENT')) ? user as PatientProfile : null, [user, role]);
 
@@ -579,6 +596,7 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       // Get or create family
       const family = await FamilyService.getOrCreateFamily(patientUser.id, patientUser.name);
       if (family) {
+        setCurrentFamilyId(family.id);
         // Load family members
         const members = await FamilyService.getFamilyMembers(family.id);
         setFamilyMembers(members.map(m => ({
@@ -616,6 +634,91 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
       setLoadingFamily(false);
     }
   }, [patientUser]);
+
+  // Family Member CRUD Handlers
+  const handleOpenAddMember = () => {
+    setMemberFormData({
+      name: '',
+      nameBn: '',
+      relation: 'child',
+      dateOfBirth: '',
+      gender: 'Male',
+      bloodGroup: '',
+      phone: '',
+      chronicConditions: '',
+      allergies: '',
+    });
+    setEditingMember(null);
+    setShowAddMemberModal(true);
+  };
+
+  const handleOpenEditMember = (member: FamilyMember) => {
+    setMemberFormData({
+      name: member.name,
+      nameBn: member.nameBn || '',
+      relation: member.relation,
+      dateOfBirth: member.dateOfBirth || '',
+      gender: member.gender,
+      bloodGroup: member.bloodGroup || '',
+      phone: member.phone || '',
+      chronicConditions: member.chronicConditions?.join(', ') || '',
+      allergies: member.allergies?.join(', ') || '',
+    });
+    setEditingMember(member);
+    setShowAddMemberModal(true);
+  };
+
+  const handleSaveMember = async () => {
+    if (!currentFamilyId || !memberFormData.name || savingMember) return;
+    
+    setSavingMember(true);
+    try {
+      const memberData = {
+        name: memberFormData.name,
+        name_bn: memberFormData.nameBn || undefined,
+        relation: memberFormData.relation,
+        date_of_birth: memberFormData.dateOfBirth || undefined,
+        gender: memberFormData.gender,
+        blood_group: memberFormData.bloodGroup || undefined,
+        phone: memberFormData.phone || undefined,
+        chronic_conditions: memberFormData.chronicConditions 
+          ? memberFormData.chronicConditions.split(',').map(s => s.trim()).filter(Boolean)
+          : undefined,
+        allergies: memberFormData.allergies 
+          ? memberFormData.allergies.split(',').map(s => s.trim()).filter(Boolean)
+          : undefined,
+      };
+
+      if (editingMember) {
+        // Update existing member
+        await FamilyService.updateMember(editingMember.id, memberData);
+      } else {
+        // Add new member
+        await FamilyService.addMember({
+          family_id: currentFamilyId,
+          ...memberData,
+        });
+      }
+      
+      setShowAddMemberModal(false);
+      await loadFamilyData();
+    } catch (error) {
+      console.error('Error saving family member:', error);
+    } finally {
+      setSavingMember(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm('আপনি কি এই সদস্যকে মুছে ফেলতে চান?')) return;
+    
+    try {
+      await FamilyService.removeMember(memberId);
+      await loadFamilyData();
+    } catch (error) {
+      console.error('Error removing family member:', error);
+    }
+  };
 
   // Load features on relevant tabs
   useEffect(() => {
@@ -2591,28 +2694,19 @@ ${patientContext}`;
                 time: a.scheduled_time,
               }))}
               onSelectMember={(member) => {
-                console.log('Selected member:', member);
-                // TODO: Navigate to member details
+                // Member details shown in FamilyHealth modal
               }}
-              onAddMember={() => {
-                // TODO: Open add member modal
-                console.log('Add member clicked');
-              }}
+              onAddMember={handleOpenAddMember}
               onBookAppointment={(memberId) => {
+                // Navigate to doctors with member context
                 navigate('/doctors');
               }}
               onViewRecords={(memberId) => {
-                // TODO: View member records
-                console.log('View records for:', memberId);
+                // Navigate to health records tab (filtered by member if we implement that)
+                setActiveTab('health-records');
               }}
-              onEditMember={(member) => {
-                // TODO: Open edit member modal
-                console.log('Edit member:', member);
-              }}
-              onInviteMember={() => {
-                // TODO: Open invite modal
-                console.log('Invite member clicked');
-              }}
+              onEditMember={handleOpenEditMember}
+              onInviteMember={handleOpenAddMember}
             />
           )}
 
@@ -2887,6 +2981,176 @@ ${patientContext}`;
                 <div className="text-center py-8 text-gray-500">
                   <p>বিস্তারিত লোড করতে সমস্যা হয়েছে।</p>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Family Member Modal */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowAddMemberModal(false)}>
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-blue-600 text-white p-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-xl font-bold">
+                {editingMember ? '✏️ সদস্য সম্পাদনা' : '👨‍👩‍👧‍👦 নতুন সদস্য যোগ করুন'}
+              </h2>
+              <button onClick={() => setShowAddMemberModal(false)} className="text-white hover:text-gray-200">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">নাম *</label>
+                <input
+                  type="text"
+                  value={memberFormData.name}
+                  onChange={(e) => setMemberFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="সদস্যের নাম লিখুন"
+                />
+              </div>
+
+              {/* Relation */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">সম্পর্ক *</label>
+                <select
+                  value={memberFormData.relation}
+                  onChange={(e) => setMemberFormData(prev => ({ ...prev, relation: e.target.value as any }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="spouse">স্বামী/স্ত্রী</option>
+                  <option value="child">সন্তান</option>
+                  <option value="parent">বাবা/মা</option>
+                  <option value="sibling">ভাই/বোন</option>
+                  <option value="grandparent">দাদা/দাদি/নানা/নানি</option>
+                  <option value="other">অন্যান্য</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Date of Birth */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">জন্ম তারিখ</label>
+                  <input
+                    type="date"
+                    value={memberFormData.dateOfBirth}
+                    onChange={(e) => setMemberFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">লিঙ্গ</label>
+                  <select
+                    value={memberFormData.gender}
+                    onChange={(e) => setMemberFormData(prev => ({ ...prev, gender: e.target.value as 'Male' | 'Female' }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="Male">পুরুষ</option>
+                    <option value="Female">মহিলা</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Blood Group */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">রক্তের গ্রুপ</label>
+                  <select
+                    value={memberFormData.bloodGroup}
+                    onChange={(e) => setMemberFormData(prev => ({ ...prev, bloodGroup: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">নির্বাচন করুন</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                  </select>
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ফোন নম্বর</label>
+                  <input
+                    type="tel"
+                    value={memberFormData.phone}
+                    onChange={(e) => setMemberFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="01XXXXXXXXX"
+                  />
+                </div>
+              </div>
+
+              {/* Chronic Conditions */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">দীর্ঘমেয়াদী রোগ</label>
+                <input
+                  type="text"
+                  value={memberFormData.chronicConditions}
+                  onChange={(e) => setMemberFormData(prev => ({ ...prev, chronicConditions: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="ডায়াবেটিস, উচ্চ রক্তচাপ (কমা দিয়ে আলাদা করুন)"
+                />
+              </div>
+
+              {/* Allergies */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">এলার্জি</label>
+                <input
+                  type="text"
+                  value={memberFormData.allergies}
+                  onChange={(e) => setMemberFormData(prev => ({ ...prev, allergies: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="পেনিসিলিন, চিংড়ি (কমা দিয়ে আলাদা করুন)"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleSaveMember}
+                  disabled={!memberFormData.name || savingMember}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {savingMember ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      সংরক্ষণ হচ্ছে...
+                    </>
+                  ) : (
+                    <>✓ {editingMember ? 'আপডেট করুন' : 'যোগ করুন'}</>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowAddMemberModal(false)}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50"
+                >
+                  বাতিল
+                </button>
+              </div>
+
+              {/* Delete Member (only for edit mode and not self) */}
+              {editingMember && editingMember.relation !== 'self' && (
+                <button
+                  onClick={() => {
+                    handleRemoveMember(editingMember.id);
+                    setShowAddMemberModal(false);
+                  }}
+                  className="w-full py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm"
+                >
+                  🗑️ এই সদস্যকে মুছে ফেলুন
+                </button>
               )}
             </div>
           </div>
