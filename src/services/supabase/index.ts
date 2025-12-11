@@ -19,6 +19,7 @@ export { HealthGoalsService } from './healthGoals';
 export { PatientDoctorConnectionsService } from './patientDoctorConnections';
 export { PatientDocumentsService } from './patientDocuments';
 export { PrescriptionsService } from './prescriptions';
+export { HealthInsightsService, INSIGHT_TEMPLATES } from './healthInsights';
 
 // Re-export types
 export type { ChatMessage } from './aiConversations';
@@ -27,4 +28,5 @@ export type { HealthGoal, HealthGoalInsert, GoalProgress, GOAL_TEMPLATES } from 
 export type { PatientDoctorConnection, DoctorConnectionEnriched } from './patientDoctorConnections';
 export type { PatientDocument, DocumentInsert, DOCUMENT_TYPE_LABELS } from './patientDocuments';
 export type { Prescription, PrescribedMedicine, PrescriptionEnriched } from './prescriptions';
+export type { HealthInsight, HealthInsightInput } from './healthInsights';
 

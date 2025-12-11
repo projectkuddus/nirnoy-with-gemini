@@ -40,7 +40,8 @@ import {
   HealthGoalsService, 
   PatientDoctorConnectionsService, 
   PatientDocumentsService,
-  PrescriptionsService 
+  PrescriptionsService,
+  HealthInsightsService 
 } from '../services/supabase';
 
 // ============ TYPES ============
@@ -518,6 +519,35 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
           fileUrl: p.fileUrl,
           isActive: p.isActive,
         })));
+      }
+
+      // Load health insights
+      const insightsData = await HealthInsightsService.getPatientInsights(patientUser.id, { limit: 10 });
+      if (insightsData.length > 0) {
+        setHealthInsights(insightsData.map(i => ({
+          id: i.id,
+          type: i.insight_type,
+          category: i.category,
+          title: i.title,
+          titleBn: i.title_bn,
+          description: i.description,
+          descriptionBn: i.description_bn,
+          actionLabel: i.action_label,
+          actionLabelBn: i.action_label_bn,
+          actionUrl: i.action_url,
+          priority: i.priority,
+          isRead: i.is_read,
+          createdAt: i.created_at,
+        })));
+      }
+
+      // Generate new insights based on current data (only if we have data)
+      if (vitalsData.length > 0 || prescriptionsData.length > 0) {
+        await HealthInsightsService.generateInsightsForPatient(patientUser.id, {
+          vitals: vitalsData,
+          prescriptions: prescriptionsData,
+          profile: patientUser,
+        });
       }
     } catch (error) {
       console.error('Error loading patient features:', error);
