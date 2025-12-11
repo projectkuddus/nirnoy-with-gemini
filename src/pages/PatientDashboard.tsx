@@ -26,6 +26,8 @@ import {
   MedicationTracker,
   FamilyHealth,
   EmergencyServices,
+  ChildHealthTracker,
+  ElderCareTracker,
   type MedicalHistoryData,
   type HealthRecord,
   type Appointment as AppointmentType,
@@ -37,7 +39,9 @@ import {
   type FamilyMember,
   type EmergencyContact,
   type NearbyHospital,
-  type MedicalIDCard
+  type MedicalIDCard,
+  type ChildProfile,
+  type ElderProfile
 } from '../components/patient';
 
 // Import Supabase Services for Patient Features
@@ -186,6 +190,10 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     allergies: '',
   });
   const [savingMember, setSavingMember] = useState(false);
+  
+  // Selected Family Member Detail View State
+  const [selectedMemberForDetail, setSelectedMemberForDetail] = useState<FamilyMember | null>(null);
+  const [showMemberDetailModal, setShowMemberDetailModal] = useState(false);
   
   const patientUser = useMemo(() => (user && (role === 'patient' || role === 'PATIENT')) ? user as PatientProfile : null, [user, role]);
 
@@ -2682,32 +2690,135 @@ ${patientContext}`;
 
           {/* FAMILY HEALTH TAB */}
           {activeTab === 'family' && patientUser && (
-            <FamilyHealth
-              members={familyMembers}
-              upcomingAppointments={familyAppointments.map(a => ({
-                id: a.id,
-                memberId: a.memberId,
-                memberName: a.memberName,
-                doctorName: a.doctors?.profiles?.name || 'Doctor',
-                specialty: a.doctors?.specialties?.[0] || 'General',
-                date: a.scheduled_date,
-                time: a.scheduled_time,
-              }))}
-              onSelectMember={(member) => {
-                // Member details shown in FamilyHealth modal
-              }}
-              onAddMember={handleOpenAddMember}
-              onBookAppointment={(memberId) => {
-                // Navigate to doctors with member context
-                navigate('/doctors');
-              }}
-              onViewRecords={(memberId) => {
-                // Navigate to health records tab (filtered by member if we implement that)
-                setActiveTab('health-records');
-              }}
-              onEditMember={handleOpenEditMember}
-              onInviteMember={handleOpenAddMember}
-            />
+            <>
+              <FamilyHealth
+                members={familyMembers}
+                upcomingAppointments={familyAppointments.map(a => ({
+                  id: a.id,
+                  memberId: a.memberId,
+                  memberName: a.memberName,
+                  doctorName: a.doctors?.profiles?.name || 'Doctor',
+                  specialty: a.doctors?.specialties?.[0] || 'General',
+                  date: a.scheduled_date,
+                  time: a.scheduled_time,
+                }))}
+                onSelectMember={(member) => {
+                  // Show detailed view for child or elder
+                  if (member.relation === 'child' || member.relation === 'parent' || member.relation === 'grandparent') {
+                    setSelectedMemberForDetail(member);
+                    setShowMemberDetailModal(true);
+                  }
+                }}
+                onAddMember={handleOpenAddMember}
+                onBookAppointment={(memberId) => {
+                  // Navigate to doctors with member context
+                  navigate('/doctors');
+                }}
+                onViewRecords={(memberId) => {
+                  // Navigate to health records tab (filtered by member if we implement that)
+                  setActiveTab('health-records');
+                }}
+                onEditMember={handleOpenEditMember}
+                onInviteMember={handleOpenAddMember}
+              />
+              
+              {/* Child/Elder Health Detail Modal */}
+              {showMemberDetailModal && selectedMemberForDetail && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowMemberDetailModal(false)}>
+                  <div className="bg-white/90 backdrop-blur-xl rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+                    <div className="sticky top-0 bg-white/80 backdrop-blur p-4 border-b flex items-center justify-between z-10">
+                      <h2 className="text-xl font-bold text-slate-800">
+                        {selectedMemberForDetail.relation === 'child' ? '👶 শিশু স্বাস্থ্য ট্র্যাকার' : '👴 প্রবীণ যত্ন'}
+                      </h2>
+                      <button 
+                        onClick={() => setShowMemberDetailModal(false)}
+                        className="p-2 hover:bg-slate-100 rounded-full"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="p-6">
+                      {selectedMemberForDetail.relation === 'child' ? (
+                        <ChildHealthTracker
+                          child={{
+                            id: selectedMemberForDetail.id,
+                            name: selectedMemberForDetail.name,
+                            nameBn: selectedMemberForDetail.nameBn,
+                            dateOfBirth: selectedMemberForDetail.dateOfBirth,
+                            gender: selectedMemberForDetail.gender,
+                            bloodGroup: selectedMemberForDetail.bloodGroup,
+                            growthRecords: [], // TODO: Load from DB
+                            vaccinations: [], // TODO: Load from DB
+                            milestones: [], // TODO: Load from DB
+                            allergies: selectedMemberForDetail.allergies,
+                          }}
+                          onAddGrowthRecord={(record) => {
+                            console.log('Add growth record:', record);
+                            // TODO: Save to Supabase
+                          }}
+                          onMarkVaccination={(vaccinationId, givenDate) => {
+                            console.log('Mark vaccination:', vaccinationId, givenDate);
+                            // TODO: Save to Supabase
+                          }}
+                          onAchieveMilestone={(milestoneId, date) => {
+                            console.log('Achieve milestone:', milestoneId, date);
+                            // TODO: Save to Supabase
+                          }}
+                        />
+                      ) : (
+                        <ElderCareTracker
+                          elder={{
+                            id: selectedMemberForDetail.id,
+                            name: selectedMemberForDetail.name,
+                            nameBn: selectedMemberForDetail.nameBn,
+                            dateOfBirth: selectedMemberForDetail.dateOfBirth,
+                            gender: selectedMemberForDetail.gender,
+                            bloodGroup: selectedMemberForDetail.bloodGroup,
+                            chronicConditions: selectedMemberForDetail.chronicConditions || [],
+                            allergies: selectedMemberForDetail.allergies || [],
+                            currentMedications: [], // TODO: Load from DB
+                            mobilityStatus: 'independent',
+                            cognitiveStatus: 'normal',
+                            dailyActivities: [],
+                            checkIns: [],
+                            primaryCaregiver: patientUser.emergencyContactName ? {
+                              name: patientUser.emergencyContactName,
+                              phone: patientUser.emergencyContactPhone || '',
+                              relation: 'Family'
+                            } : undefined,
+                          }}
+                          onRecordCheckIn={(checkIn) => {
+                            console.log('Record check-in:', checkIn);
+                            // TODO: Save to Supabase
+                          }}
+                          onCompleteActivity={(activityId) => {
+                            console.log('Complete activity:', activityId);
+                            // TODO: Save to Supabase
+                          }}
+                          onRecordMedicationTaken={(medicationId, time) => {
+                            console.log('Record medication:', medicationId, time);
+                            // TODO: Save to Supabase
+                          }}
+                          onEmergencyCall={() => {
+                            // Trigger emergency call
+                            if (patientUser.emergencyContactPhone) {
+                              window.location.href = `tel:${patientUser.emergencyContactPhone}`;
+                            } else {
+                              window.location.href = 'tel:999';
+                            }
+                          }}
+                          onCallCaregiver={() => {
+                            if (patientUser.emergencyContactPhone) {
+                              window.location.href = `tel:${patientUser.emergencyContactPhone}`;
+                            }
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* EMERGENCY SERVICES TAB */}
