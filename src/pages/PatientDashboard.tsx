@@ -14,8 +14,28 @@ import { chatWithHealthAssistant } from '../services/geminiService';
 import { aiChatService, authService, supabase, isSupabaseConfigured } from '../services/supabaseAuth';
 import { getPatientMedicalHistory, CompleteMedicalHistory, getPatientHistoryForDoctor } from '../services/medicalHistoryService';
 
+// Import Patient Components
+import { 
+  ProfileManager, 
+  MedicalHistoryManager, 
+  HealthRecords,
+  AppointmentManager,
+  PrescriptionTracker,
+  HealthDashboard,
+  MyDoctors,
+  MedicationTracker,
+  type MedicalHistoryData,
+  type HealthRecord,
+  type Appointment as AppointmentType,
+  type Prescription,
+  type VitalSign,
+  type HealthGoal,
+  type HealthInsight,
+  type DoctorConnection
+} from '../components/patient';
+
 // ============ TYPES ============
-type TabId = 'home' | 'appointments' | 'medical-history' | 'doctors' | 'ai' | 'medication' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback';
+type TabId = 'home' | 'appointments' | 'medical-history' | 'health-records' | 'my-doctors' | 'doctors' | 'ai' | 'medication' | 'health-insights' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback' | 'profile' | 'prescriptions';
 
 interface AppointmentData {
   id: string;
@@ -48,11 +68,16 @@ interface NavItem {
 // ============ NAVIGATION CONFIG ============
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', icon: '🏠', label: 'Home', labelBn: 'হোম' },
+  { id: 'profile', icon: '👤', label: 'My Profile', labelBn: 'আমার প্রোফাইল' },
+  { id: 'health-insights', icon: '📊', label: 'Health Dashboard', labelBn: 'স্বাস্থ্য ড্যাশবোর্ড' },
   { id: 'appointments', icon: '📅', label: 'My Appointments', labelBn: 'আমার অ্যাপয়েন্টমেন্ট' },
+  { id: 'prescriptions', icon: '💊', label: 'Prescriptions', labelBn: 'প্রেসক্রিপশন' },
   { id: 'medical-history', icon: '📋', label: 'Medical History', labelBn: 'চিকিৎসা ইতিহাস' },
-  { id: 'doctors', icon: '👨‍⚕️', label: 'Find Doctors', labelBn: 'ডাক্তার খুঁজুন' },
+  { id: 'health-records', icon: '📁', label: 'Health Records', labelBn: 'স্বাস্থ্য রেকর্ড' },
+  { id: 'my-doctors', icon: '👨‍⚕️', label: 'My Doctors', labelBn: 'আমার ডাক্তাররা' },
+  { id: 'doctors', icon: '🔍', label: 'Find Doctors', labelBn: 'ডাক্তার খুঁজুন' },
   { id: 'ai', icon: '🤖', label: 'AI Assistant', labelBn: 'এআই সহায়ক' },
-  { id: 'medication', icon: '💊', label: 'Medication', labelBn: 'ওষুধ রিমাইন্ডার', paid: true },
+  { id: 'medication', icon: '⏰', label: 'Medication Tracker', labelBn: 'ওষুধ ট্র্যাকার', paid: true },
   { id: 'food-scan', icon: '📷', label: 'Ki Khacchi', labelBn: 'কি খাচ্ছি', paid: true },
   { id: 'quiz', icon: '🎯', label: 'Health Quiz', labelBn: 'স্বাস্থ্য কুইজ', paid: true },
   { id: 'food-chart', icon: '🥗', label: 'Food Chart', labelBn: 'খাদ্য তালিকা', paid: true },
@@ -2154,6 +2179,76 @@ ${patientContext}`;
                 )}
               </div>
             </div>
+          )}
+
+          {/* PROFILE TAB */}
+          {activeTab === 'profile' && patientUser && (
+            <ProfileManager
+              profile={patientUser}
+              onSave={async (updates) => {
+                if (updateProfile) {
+                  await updateProfile(updates);
+                }
+              }}
+            />
+          )}
+
+          {/* HEALTH INSIGHTS TAB */}
+          {activeTab === 'health-insights' && patientUser && (
+            <HealthDashboard
+              profile={patientUser}
+              vitals={[]}
+              goals={[]}
+              insights={[]}
+              risks={[]}
+              onAddVital={async (vital) => {
+                console.log('Add vital:', vital);
+                // TODO: Implement vital saving to Supabase
+              }}
+              onAddGoal={async (goal) => {
+                console.log('Add goal:', goal);
+                // TODO: Implement goal saving to Supabase
+              }}
+            />
+          )}
+
+          {/* HEALTH RECORDS TAB */}
+          {activeTab === 'health-records' && patientUser && (
+            <HealthRecords
+              userId={patientUser.id}
+              records={[]}
+              onRecordAdd={async (record) => {
+                console.log('Add record:', record);
+                // TODO: Implement record saving to Supabase
+              }}
+              onRecordDelete={async (recordId) => {
+                console.log('Delete record:', recordId);
+                // TODO: Implement record deletion from Supabase
+              }}
+            />
+          )}
+
+          {/* MY DOCTORS TAB */}
+          {activeTab === 'my-doctors' && patientUser && (
+            <MyDoctors
+              doctors={[]}
+              onBookAppointment={(doctorId, chamberId) => {
+                navigate(`/doctors/${doctorId}${chamberId ? `?chamber=${chamberId}` : ''}`);
+              }}
+              onViewProfile={(doctorId) => {
+                navigate(`/doctors/${doctorId}`);
+              }}
+            />
+          )}
+
+          {/* PRESCRIPTIONS TAB */}
+          {activeTab === 'prescriptions' && patientUser && (
+            <PrescriptionTracker
+              prescriptions={[]}
+              onViewPDF={(prescription) => {
+                console.log('View PDF:', prescription);
+              }}
+            />
           )}
         </div>
       </main>

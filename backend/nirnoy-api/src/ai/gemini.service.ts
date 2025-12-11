@@ -309,4 +309,245 @@ Use friendly, simple Bengali.`;
       return 'Error generating instructions.';
     }
   }
+
+  /**
+   * Generate SOAP note from clinical input
+   */
+  async generateSOAPNote(chiefComplaint: string, vitals: string, examination: string): Promise<any> {
+    if (!this.genAI) {
+      return { error: 'AI service not configured' };
+    }
+
+    try {
+      const model = this.genAI.getGenerativeModel({ 
+        model: 'gemini-3-pro-preview',
+        generationConfig: { responseMimeType: 'application/json' }
+      });
+
+      const prompt = `Generate a professional SOAP note from the following clinical information:
+
+Chief Complaint: ${chiefComplaint}
+Vitals: ${vitals}
+Examination Findings: ${examination}
+
+Format as JSON:
+{
+  "subjective": "Patient's description of symptoms, history, duration, associated factors",
+  "objective": "Clinical findings, vitals, examination results, lab values if any",
+  "assessment": "Clinical assessment with differential diagnoses ranked by likelihood",
+  "plan": "Treatment plan including investigations, medications, follow-up, patient education"
+}
+
+Write professionally but concisely. Include specific medical terminology.`;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { raw: text };
+      }
+    } catch (error) {
+      this.logger.error('Error generating SOAP note:', error);
+      return { error: 'Failed to generate SOAP note' };
+    }
+  }
+
+  /**
+   * Medical calculator - performs various clinical calculations
+   */
+  async calculateMedical(calculationType: string, parameters: Record<string, any>): Promise<any> {
+    if (!this.genAI) {
+      return { error: 'AI service not configured' };
+    }
+
+    try {
+      const model = this.genAI.getGenerativeModel({ 
+        model: 'gemini-3-pro-preview',
+        generationConfig: { responseMimeType: 'application/json' }
+      });
+
+      const prompt = `Perform this medical calculation:
+Calculator: ${calculationType}
+Parameters: ${JSON.stringify(parameters)}
+
+Common calculators include: GFR (CKD-EPI), BMI, BSA, CHADS2-VASc, HAS-BLED, MELD, Child-Pugh, CURB-65, Wells Score DVT/PE, Glasgow Coma Scale, Drug Dosing by weight/renal function.
+
+Provide JSON response:
+{
+  "result": "Calculated value with unit",
+  "interpretation": "Clinical interpretation of the result",
+  "category": "Risk/severity category if applicable",
+  "formula": "Formula used",
+  "recommendations": "Clinical recommendations based on result",
+  "references": "Guideline references"
+}`;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { raw: text };
+      }
+    } catch (error) {
+      this.logger.error('Error in medical calculation:', error);
+      return { error: 'Failed to perform calculation' };
+    }
+  }
+
+  /**
+   * Get differential diagnoses for symptoms
+   */
+  async getDifferentialDiagnosis(symptoms: string[], patientInfo: string): Promise<any> {
+    if (!this.genAI) {
+      return { error: 'AI service not configured' };
+    }
+
+    try {
+      const model = this.genAI.getGenerativeModel({ 
+        model: 'gemini-3-pro-preview',
+        generationConfig: { responseMimeType: 'application/json' }
+      });
+
+      const prompt = `Generate differential diagnoses for this clinical presentation:
+
+Symptoms: ${symptoms.join(', ')}
+Patient Info: ${patientInfo}
+
+Provide JSON response ordered by likelihood:
+{
+  "differentials": [
+    {
+      "diagnosis": "Diagnosis name",
+      "probability": "High/Medium/Low",
+      "supportingFeatures": ["Feature 1", "Feature 2"],
+      "rulingOutFeatures": ["Feature that argues against"],
+      "keyInvestigations": ["Test to confirm/rule out"],
+      "urgency": "Emergency/Urgent/Routine"
+    }
+  ],
+  "redFlags": ["Critical symptoms to watch for"],
+  "mustNotMiss": "Most dangerous diagnosis that must not be missed"
+}`;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { raw: text };
+      }
+    } catch (error) {
+      this.logger.error('Error getting differentials:', error);
+      return { error: 'Failed to generate differential diagnoses' };
+    }
+  }
+
+  /**
+   * Search treatment guidelines
+   */
+  async searchGuidelines(condition: string, specialty?: string): Promise<any> {
+    if (!this.genAI) {
+      return { error: 'AI service not configured' };
+    }
+
+    try {
+      const model = this.genAI.getGenerativeModel({ 
+        model: 'gemini-3-pro-preview',
+        generationConfig: { responseMimeType: 'application/json' }
+      });
+
+      const prompt = `Summarize current treatment guidelines for:
+Condition: ${condition}
+Specialty focus: ${specialty || 'General'}
+
+Provide JSON response:
+{
+  "condition": "${condition}",
+  "guidelines": [
+    {
+      "source": "WHO/AHA/ESC/NICE/ACC etc.",
+      "year": "Latest update year",
+      "keyRecommendations": ["Recommendation 1", "Recommendation 2"],
+      "firstLinetreatment": "First-line treatment options",
+      "alternatives": "Alternative options",
+      "contraindications": "Key contraindications"
+    }
+  ],
+  "summary": "Brief summary of consensus recommendations",
+  "controversies": "Areas of ongoing debate",
+  "bangladeshContext": "Specific considerations for Bangladesh healthcare setting"
+}`;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { raw: text };
+      }
+    } catch (error) {
+      this.logger.error('Error searching guidelines:', error);
+      return { error: 'Failed to search guidelines' };
+    }
+  }
+
+  /**
+   * Generate prescription suggestions based on diagnosis
+   */
+  async suggestPrescription(diagnosis: string, patientInfo: string, contraindications?: string[]): Promise<any> {
+    if (!this.genAI) {
+      return { error: 'AI service not configured' };
+    }
+
+    try {
+      const model = this.genAI.getGenerativeModel({ 
+        model: 'gemini-3-pro-preview',
+        generationConfig: { responseMimeType: 'application/json' }
+      });
+
+      const prompt = `Suggest evidence-based medication for this case:
+
+Diagnosis: ${diagnosis}
+Patient Info: ${patientInfo}
+Contraindications/Allergies: ${contraindications?.join(', ') || 'None specified'}
+
+Focus on medications available in Bangladesh. Provide JSON:
+{
+  "suggestions": [
+    {
+      "medication": "Generic drug name",
+      "brandExamples": ["Bangladesh brand names"],
+      "dosage": "Standard adult dose",
+      "frequency": "Frequency",
+      "duration": "Typical duration",
+      "instructions": "Instructions in Bengali and English",
+      "rationale": "Why this medication"
+    }
+  ],
+  "warnings": ["Important warnings"],
+  "monitoringRequired": "What to monitor",
+  "lifestyle": ["Lifestyle advice"]
+}
+
+IMPORTANT: These are suggestions only. Doctor must exercise clinical judgment.`;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { raw: text };
+      }
+    } catch (error) {
+      this.logger.error('Error suggesting prescription:', error);
+      return { error: 'Failed to suggest prescription' };
+    }
+  }
 }

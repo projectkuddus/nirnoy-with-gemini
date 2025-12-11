@@ -207,19 +207,93 @@ export const generatePatientSummary = async (patientData: string): Promise<strin
 };
 
 /**
- * Search medical guidelines
+ * Search treatment guidelines
  */
-export const searchMedicalGuidelines = async (query: string): Promise<string> => {
-  // This can be implemented later if needed
-  console.warn('searchMedicalGuidelines: Not implemented in backend yet');
-  return 'No guidelines found.';
+export const searchMedicalGuidelines = async (condition: string, specialty?: string): Promise<string> => {
+  try {
+    const result = await apiCall('doctor/guidelines', { condition, specialty });
+    return JSON.stringify(result.guidelines);
+  } catch (error) {
+    console.error('Error searching guidelines:', error);
+    return '{}';
+  }
 };
 
 /**
- * Analyze patient cohorts
+ * Generate SOAP note from clinical input
+ */
+export const generateSOAPNote = async (
+  chiefComplaint: string,
+  vitals: string,
+  examination?: string
+): Promise<string> => {
+  try {
+    const result = await apiCall('doctor/soap-note', { chiefComplaint, vitals, examination });
+    return JSON.stringify(result.soapNote);
+  } catch (error) {
+    console.error('Error generating SOAP note:', error);
+    return '{}';
+  }
+};
+
+/**
+ * Perform medical calculations (GFR, BMI, CHADS2-VASc, etc.)
+ */
+export const calculateMedical = async (
+  calculationType: string,
+  parameters: Record<string, any>
+): Promise<string> => {
+  try {
+    const result = await apiCall('doctor/medical-calculator', { calculationType, parameters });
+    return JSON.stringify(result.result);
+  } catch (error) {
+    console.error('Error in medical calculation:', error);
+    return '{}';
+  }
+};
+
+/**
+ * Get differential diagnoses for symptoms
+ */
+export const getDifferentialDiagnosis = async (
+  symptoms: string[],
+  patientInfo?: string
+): Promise<string> => {
+  try {
+    const result = await apiCall('doctor/differential-diagnosis', { symptoms, patientInfo });
+    return JSON.stringify(result.differentials);
+  } catch (error) {
+    console.error('Error getting differentials:', error);
+    return '{}';
+  }
+};
+
+/**
+ * Get prescription suggestions for a diagnosis
+ */
+export const getPrescriptionSuggestions = async (
+  diagnosis: string,
+  patientInfo?: string,
+  contraindications?: string[]
+): Promise<string> => {
+  try {
+    const result = await apiCall('doctor/prescription-suggestion', { 
+      diagnosis, 
+      patientInfo, 
+      contraindications 
+    });
+    return JSON.stringify(result.suggestions);
+  } catch (error) {
+    console.error('Error getting prescription suggestions:', error);
+    return '{}';
+  }
+};
+
+/**
+ * Analyze patient cohorts (for analytics)
  */
 export const analyzePatientCohorts = async (patientsJson: string): Promise<string> => {
-  // This can be implemented later if needed
+  // This can be implemented later if needed for admin analytics
   console.warn('analyzePatientCohorts: Not implemented in backend yet');
   return '[]';
 };

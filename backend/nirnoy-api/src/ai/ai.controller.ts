@@ -63,6 +63,59 @@ class TriageDto {
   message: string;
 }
 
+class SOAPNoteDto {
+  @IsString()
+  chiefComplaint: string;
+
+  @IsOptional()
+  @IsString()
+  vitals?: string;
+
+  @IsOptional()
+  @IsString()
+  examination?: string;
+}
+
+class MedicalCalculatorDto {
+  @IsString()
+  calculationType: string;
+
+  parameters: Record<string, any>;
+}
+
+class DifferentialDiagnosisDto {
+  @IsArray()
+  @IsString({ each: true })
+  symptoms: string[];
+
+  @IsOptional()
+  @IsString()
+  patientInfo?: string;
+}
+
+class GuidelinesSearchDto {
+  @IsString()
+  condition: string;
+
+  @IsOptional()
+  @IsString()
+  specialty?: string;
+}
+
+class PrescriptionSuggestionDto {
+  @IsString()
+  diagnosis: string;
+
+  @IsOptional()
+  @IsString()
+  patientInfo?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  contraindications?: string[];
+}
+
 class SaveConversationDto {
   @IsOptional()
   @IsString()
@@ -138,6 +191,73 @@ export class AiController {
   async medicalNews(@Query('specialty') specialty?: string) {
     const news = await this.geminiService.getMedicalNews(specialty);
     return { news };
+  }
+
+  /**
+   * POST /api/ai/doctor/soap-note
+   * Generate SOAP note from clinical input
+   */
+  @Post('doctor/soap-note')
+  async generateSOAPNote(@Body() dto: SOAPNoteDto) {
+    const soapNote = await this.geminiService.generateSOAPNote(
+      dto.chiefComplaint,
+      dto.vitals || '',
+      dto.examination || '',
+    );
+    return { soapNote };
+  }
+
+  /**
+   * POST /api/ai/doctor/medical-calculator
+   * Perform medical calculations (GFR, BMI, CHADS2-VASc, etc.)
+   */
+  @Post('doctor/medical-calculator')
+  async medicalCalculator(@Body() dto: MedicalCalculatorDto) {
+    const result = await this.geminiService.calculateMedical(
+      dto.calculationType,
+      dto.parameters,
+    );
+    return { result };
+  }
+
+  /**
+   * POST /api/ai/doctor/differential-diagnosis
+   * Get differential diagnoses for symptoms
+   */
+  @Post('doctor/differential-diagnosis')
+  async differentialDiagnosis(@Body() dto: DifferentialDiagnosisDto) {
+    const differentials = await this.geminiService.getDifferentialDiagnosis(
+      dto.symptoms,
+      dto.patientInfo || '',
+    );
+    return { differentials };
+  }
+
+  /**
+   * POST /api/ai/doctor/guidelines
+   * Search treatment guidelines
+   */
+  @Post('doctor/guidelines')
+  async searchGuidelines(@Body() dto: GuidelinesSearchDto) {
+    const guidelines = await this.geminiService.searchGuidelines(
+      dto.condition,
+      dto.specialty,
+    );
+    return { guidelines };
+  }
+
+  /**
+   * POST /api/ai/doctor/prescription-suggestion
+   * Get prescription suggestions for a diagnosis
+   */
+  @Post('doctor/prescription-suggestion')
+  async prescriptionSuggestion(@Body() dto: PrescriptionSuggestionDto) {
+    const suggestions = await this.geminiService.suggestPrescription(
+      dto.diagnosis,
+      dto.patientInfo || '',
+      dto.contraindications,
+    );
+    return { suggestions };
   }
 
   // =============================================

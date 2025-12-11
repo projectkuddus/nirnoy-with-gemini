@@ -1,112 +1,119 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { PatientProfile } from '../../contexts/AuthContext';
 
 // ============ TYPES ============
-export interface PatientProfileData {
-  id: string;
+interface EmergencyContact {
   name: string;
-  nameBn?: string;
-  email: string;
   phone: string;
-  dateOfBirth: string;
-  gender: 'Male' | 'Female' | 'Other';
-  bloodGroup: string;
-  
-  // Physical
-  heightCm?: number;
-  weightKg?: number;
-  
-  // Address
-  address?: string;
-  area?: string;
-  city?: string;
-  postalCode?: string;
-  
-  // Emergency Contact
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  emergencyContactRelation?: string;
-  
-  // Medical Info
-  chronicConditions?: string[];
-  allergies?: string[];
-  currentMedications?: string[];
-  pastSurgeries?: string[];
-  
-  // Family History
-  familyHistory?: {
-    condition: string;
-    relation: string;
-  }[];
-  
-  // Vaccination Records
-  vaccinations?: {
-    name: string;
-    date: string;
-    nextDue?: string;
-  }[];
-  
-  // Profile
-  image?: string;
-  healthId?: string;
-  
-  // Preferences
-  preferredLanguage?: 'bn' | 'en';
-  notificationPreferences?: {
-    sms: boolean;
-    email: boolean;
-    push: boolean;
-  };
+  relationship: string;
 }
 
 interface ProfileManagerProps {
-  profile: PatientProfileData;
-  onSave: (profile: PatientProfileData) => Promise<void>;
-  onCancel?: () => void;
+  profile: PatientProfile;
+  onSave: (updates: Partial<PatientProfile>) => Promise<void>;
+  onClose?: () => void;
 }
 
-// ============ BLOOD GROUPS ============
+// ============ CONSTANTS ============
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-// ============ COMMON CONDITIONS ============
-const COMMON_CONDITIONS = [
-  'Diabetes', 'Hypertension', 'Asthma', 'Heart Disease', 'Thyroid',
-  'Arthritis', 'Kidney Disease', 'Liver Disease', 'Cancer', 'COPD',
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'পুরুষ', labelEn: 'Male' },
+  { value: 'female', label: 'মহিলা', labelEn: 'Female' },
+  { value: 'other', label: 'অন্যান্য', labelEn: 'Other' },
 ];
 
-// ============ COMMON ALLERGIES ============
-const COMMON_ALLERGIES = [
-  'Penicillin', 'Sulfa Drugs', 'Aspirin', 'NSAIDs', 'Peanuts',
-  'Shellfish', 'Eggs', 'Milk', 'Dust', 'Pollen',
+const RELATIONSHIP_OPTIONS = [
+  { value: 'spouse', label: 'স্বামী/স্ত্রী' },
+  { value: 'parent', label: 'বাবা/মা' },
+  { value: 'child', label: 'সন্তান' },
+  { value: 'sibling', label: 'ভাই/বোন' },
+  { value: 'friend', label: 'বন্ধু' },
+  { value: 'other', label: 'অন্যান্য' },
 ];
 
-// ============ COMMON VACCINES ============
-const COMMON_VACCINES = [
-  'COVID-19', 'Hepatitis B', 'Hepatitis A', 'Tetanus', 'Flu',
-  'Typhoid', 'MMR', 'Polio', 'BCG', 'Pneumonia',
+const DISTRICTS = [
+  'ঢাকা', 'চট্টগ্রাম', 'সিলেট', 'রাজশাহী', 'খুলনা', 'রংপুর', 'বরিশাল', 'ময়মনসিংহ',
+  'গাজীপুর', 'নারায়ণগঞ্জ', 'কক্সবাজার', 'কুমিল্লা', 'যশোর', 'দিনাজপুর',
 ];
 
 // ============ PROFILE MANAGER COMPONENT ============
 export const ProfileManager: React.FC<ProfileManagerProps> = ({
-  profile: initialProfile,
+  profile,
   onSave,
-  onCancel,
+  onClose,
 }) => {
   // State
-  const [profile, setProfile] = useState<PatientProfileData>(initialProfile);
-  const [activeTab, setActiveTab] = useState<'basic' | 'address' | 'medical' | 'family' | 'vaccination'>('basic');
+  const [activeTab, setActiveTab] = useState<'personal' | 'health' | 'contact' | 'preferences'>('personal');
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error'; text: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Update profile field
-  const updateField = useCallback(<K extends keyof PatientProfileData>(
-    field: K,
-    value: PatientProfileData[K]
-  ) => {
-    setProfile(prev => ({ ...prev, [field]: value }));
-    setError(null);
-    setSuccess(null);
+  // Form state
+  const [formData, setFormData] = useState({
+    // Personal
+    name: profile.name || '',
+    nameBn: profile.nameBn || '',
+    email: profile.email || '',
+    phone: profile.phone || '',
+    dateOfBirth: profile.dateOfBirth || '',
+    gender: profile.gender || '',
+    bloodGroup: profile.bloodGroup || '',
+    profileImage: profile.profileImage || '',
+    
+    // Health
+    heightCm: profile.heightCm?.toString() || '',
+    weightKg: profile.weightKg?.toString() || '',
+    chronicConditions: profile.chronicConditions?.join(', ') || '',
+    allergies: profile.allergies?.join(', ') || '',
+    currentMedications: profile.currentMedications?.join(', ') || '',
+    pastSurgeries: profile.pastSurgeries?.join(', ') || '',
+    familyMedicalHistory: profile.familyMedicalHistory || '',
+    
+    // Contact
+    address: profile.address || '',
+    area: profile.area || '',
+    city: profile.city || 'ঢাকা',
+    emergencyContactName: profile.emergencyContactName || '',
+    emergencyContactPhone: profile.emergencyContactPhone || '',
+    emergencyContactRelation: profile.emergencyContactRelation || '',
+    
+    // Preferences
+    preferredLanguage: profile.preferredLanguage || 'bn',
+    notificationPreferences: profile.notificationPreferences || { sms: true, email: true, push: true },
+  });
+
+  // Calculate profile completeness
+  const profileCompleteness = React.useMemo(() => {
+    const fields = [
+      formData.name,
+      formData.email,
+      formData.phone,
+      formData.dateOfBirth,
+      formData.gender,
+      formData.bloodGroup,
+      formData.heightCm,
+      formData.weightKg,
+      formData.address,
+      formData.emergencyContactName,
+      formData.emergencyContactPhone,
+    ];
+    const filledFields = fields.filter(f => f && f.trim()).length;
+    return Math.round((filledFields / fields.length) * 100);
+  }, [formData]);
+
+  // Calculate Health ID
+  const healthId = React.useMemo(() => {
+    const prefix = 'NR';
+    const year = new Date().getFullYear().toString().slice(-2);
+    const idPart = profile.id?.slice(-6).toUpperCase() || '000000';
+    return `${prefix}${year}${idPart}`;
+  }, [profile.id]);
+
+  // Update form field
+  const updateField = useCallback((field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setSaveMessage(null);
   }, []);
 
   // Handle image upload
@@ -114,216 +121,151 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        setError('ছবির সাইজ ২MB এর বেশি হতে পারবে না');
+        setSaveMessage({ type: 'error', text: 'ছবির সাইজ ২MB এর কম হতে হবে' });
         return;
       }
       const reader = new FileReader();
       reader.onload = () => {
-        updateField('image', reader.result as string);
+        updateField('profileImage', reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   }, [updateField]);
 
-  // Toggle array item
-  const toggleArrayItem = useCallback((
-    field: 'chronicConditions' | 'allergies' | 'currentMedications' | 'pastSurgeries',
-    item: string
-  ) => {
-    setProfile(prev => {
-      const current = prev[field] || [];
-      const updated = current.includes(item)
-        ? current.filter(i => i !== item)
-        : [...current, item];
-      return { ...prev, [field]: updated };
-    });
-  }, []);
-
-  // Add custom item
-  const addCustomItem = useCallback((
-    field: 'chronicConditions' | 'allergies' | 'currentMedications' | 'pastSurgeries',
-    item: string
-  ) => {
-    if (item.trim()) {
-      setProfile(prev => ({
-        ...prev,
-        [field]: [...(prev[field] || []), item.trim()],
-      }));
-    }
-  }, []);
-
-  // Remove item
-  const removeArrayItem = useCallback((
-    field: 'chronicConditions' | 'allergies' | 'currentMedications' | 'pastSurgeries',
-    index: number
-  ) => {
-    setProfile(prev => ({
-      ...prev,
-      [field]: (prev[field] || []).filter((_, i) => i !== index),
-    }));
-  }, []);
-
-  // Add family history
-  const addFamilyHistory = useCallback(() => {
-    setProfile(prev => ({
-      ...prev,
-      familyHistory: [...(prev.familyHistory || []), { condition: '', relation: '' }],
-    }));
-  }, []);
-
-  // Update family history
-  const updateFamilyHistory = useCallback((index: number, field: 'condition' | 'relation', value: string) => {
-    setProfile(prev => ({
-      ...prev,
-      familyHistory: prev.familyHistory?.map((fh, i) => 
-        i === index ? { ...fh, [field]: value } : fh
-      ),
-    }));
-  }, []);
-
-  // Remove family history
-  const removeFamilyHistory = useCallback((index: number) => {
-    setProfile(prev => ({
-      ...prev,
-      familyHistory: prev.familyHistory?.filter((_, i) => i !== index),
-    }));
-  }, []);
-
-  // Add vaccination
-  const addVaccination = useCallback(() => {
-    setProfile(prev => ({
-      ...prev,
-      vaccinations: [...(prev.vaccinations || []), { name: '', date: '' }],
-    }));
-  }, []);
-
-  // Update vaccination
-  const updateVaccination = useCallback((index: number, field: 'name' | 'date' | 'nextDue', value: string) => {
-    setProfile(prev => ({
-      ...prev,
-      vaccinations: prev.vaccinations?.map((v, i) => 
-        i === index ? { ...v, [field]: value } : v
-      ),
-    }));
-  }, []);
-
-  // Remove vaccination
-  const removeVaccination = useCallback((index: number) => {
-    setProfile(prev => ({
-      ...prev,
-      vaccinations: prev.vaccinations?.filter((_, i) => i !== index),
-    }));
-  }, []);
-
-  // Calculate BMI
-  const bmi = profile.heightCm && profile.weightKg
-    ? (profile.weightKg / Math.pow(profile.heightCm / 100, 2)).toFixed(1)
-    : null;
-
-  const getBMICategory = (bmi: number) => {
-    if (bmi < 18.5) return { label: 'কম ওজন', color: 'text-blue-600' };
-    if (bmi < 25) return { label: 'স্বাভাবিক', color: 'text-green-600' };
-    if (bmi < 30) return { label: 'অতিরিক্ত ওজন', color: 'text-amber-600' };
-    return { label: 'স্থূলতা', color: 'text-red-600' };
-  };
-
-  // Calculate age
-  const age = profile.dateOfBirth
-    ? Math.floor((Date.now() - new Date(profile.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-    : null;
-
-  // Generate Health ID
-  const generateHealthId = useCallback(() => {
-    const prefix = 'NRN';
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    updateField('healthId', `${prefix}-${timestamp}-${random}`);
-  }, [updateField]);
-
-  // Handle save
+  // Save profile
   const handleSave = useCallback(async () => {
     setIsSaving(true);
-    setError(null);
-    setSuccess(null);
-    
+    setSaveMessage(null);
+
     try {
-      // Validation
-      if (!profile.name?.trim()) throw new Error('নাম আবশ্যক');
-      if (!profile.phone?.trim()) throw new Error('ফোন নম্বর আবশ্যক');
-      if (!profile.dateOfBirth) throw new Error('জন্ম তারিখ আবশ্যক');
-      if (!profile.gender) throw new Error('লিঙ্গ নির্বাচন করুন');
-      
-      await onSave(profile);
-      setSuccess('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
-    } catch (err: any) {
-      setError(err.message || 'প্রোফাইল সংরক্ষণে সমস্যা হয়েছে');
+      const updates: Partial<PatientProfile> = {
+        name: formData.name,
+        nameBn: formData.nameBn,
+        email: formData.email,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender as 'male' | 'female' | 'other',
+        bloodGroup: formData.bloodGroup,
+        profileImage: formData.profileImage,
+        heightCm: formData.heightCm ? parseInt(formData.heightCm) : undefined,
+        weightKg: formData.weightKg ? parseFloat(formData.weightKg) : undefined,
+        chronicConditions: formData.chronicConditions ? formData.chronicConditions.split(',').map(s => s.trim()).filter(Boolean) : [],
+        allergies: formData.allergies ? formData.allergies.split(',').map(s => s.trim()).filter(Boolean) : [],
+        currentMedications: formData.currentMedications ? formData.currentMedications.split(',').map(s => s.trim()).filter(Boolean) : [],
+        pastSurgeries: formData.pastSurgeries ? formData.pastSurgeries.split(',').map(s => s.trim()).filter(Boolean) : [],
+        familyMedicalHistory: formData.familyMedicalHistory,
+        address: formData.address,
+        area: formData.area,
+        city: formData.city,
+        emergencyContactName: formData.emergencyContactName,
+        emergencyContactPhone: formData.emergencyContactPhone,
+        emergencyContactRelation: formData.emergencyContactRelation,
+        preferredLanguage: formData.preferredLanguage as 'bn' | 'en',
+      };
+
+      await onSave(updates);
+      setSaveMessage({ type: 'success', text: 'প্রোফাইল সফলভাবে আপডেট হয়েছে! ✅' });
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setSaveMessage({ type: 'error', text: 'প্রোফাইল আপডেট করতে সমস্যা হয়েছে' });
     } finally {
       setIsSaving(false);
     }
-  }, [profile, onSave]);
+  }, [formData, onSave]);
 
-  // Tabs
+  // Tabs config
   const tabs = [
-    { id: 'basic', label: 'মৌলিক তথ্য', icon: '👤' },
-    { id: 'address', label: 'ঠিকানা', icon: '📍' },
-    { id: 'medical', label: 'চিকিৎসা তথ্য', icon: '🩺' },
-    { id: 'family', label: 'পারিবারিক ইতিহাস', icon: '👨‍👩‍👧‍👦' },
-    { id: 'vaccination', label: 'টিকা', icon: '💉' },
+    { id: 'personal', label: 'ব্যক্তিগত তথ্য', icon: '👤' },
+    { id: 'health', label: 'স্বাস্থ্য তথ্য', icon: '❤️' },
+    { id: 'contact', label: 'যোগাযোগ', icon: '📞' },
+    { id: 'preferences', label: 'সেটিংস', icon: '⚙️' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">প্রোফাইল ব্যবস্থাপনা</h2>
-          <p className="text-slate-500">আপনার সম্পূর্ণ স্বাস্থ্য প্রোফাইল আপডেট করুন</p>
-        </div>
-        <div className="flex gap-2">
-          {onCancel && (
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 glass-subtle text-slate-600 rounded-lg hover:bg-slate-100 transition"
-            >
-              বাতিল
-            </button>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
-          >
-            {isSaving ? '⏳ সংরক্ষণ হচ্ছে...' : '💾 সংরক্ষণ করুন'}
-          </button>
-        </div>
-      </div>
-
-      {/* Messages */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 flex items-center gap-2">
-          <span>⚠️</span> {error}
-        </div>
-      )}
-      {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 flex items-center gap-2">
-          <span>✅</span> {success}
-        </div>
-      )}
-
-      {/* Health ID Card */}
-      {profile.healthId && (
-        <div className="glass-card p-4 bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-slate-500">আপনার স্বাস্থ্য আইডি</div>
-              <div className="text-xl font-bold font-mono text-blue-600">{profile.healthId}</div>
+      <div className="glass-card p-6">
+        <div className="flex items-start gap-6">
+          {/* Profile Image */}
+          <div className="relative group">
+            <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-xl">
+              {formData.profileImage ? (
+                <img
+                  src={formData.profileImage}
+                  alt={formData.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center text-white text-4xl">
+                  {formData.name?.charAt(0) || '?'}
+                </div>
+              )}
             </div>
-            <div className="text-right">
-              <div className="text-xs text-slate-500">QR কোড শীঘ্রই</div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0 right-0 w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 transition shadow-lg opacity-0 group-hover:opacity-100"
+            >
+              📷
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+          </div>
+
+          {/* Basic Info */}
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-slate-800">{formData.name || 'নাম যোগ করুন'}</h2>
+            <p className="text-slate-500">{formData.email || 'ইমেইল যোগ করুন'}</p>
+            <div className="flex items-center gap-4 mt-3">
+              <div className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-sm font-medium">
+                🆔 Health ID: {healthId}
+              </div>
+              {formData.bloodGroup && (
+                <div className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium">
+                  🩸 {formData.bloodGroup}
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Completeness */}
+          <div className="text-center">
+            <div className="relative w-20 h-20">
+              <svg className="w-20 h-20 transform -rotate-90">
+                <circle
+                  cx="40"
+                  cy="40"
+                  r="35"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  className="text-slate-100"
+                />
+                <circle
+                  cx="40"
+                  cy="40"
+                  r="35"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="none"
+                  strokeDasharray={220}
+                  strokeDashoffset={220 - (220 * profileCompleteness) / 100}
+                  strokeLinecap="round"
+                  className={profileCompleteness >= 80 ? 'text-green-500' : profileCompleteness >= 50 ? 'text-amber-500' : 'text-red-500'}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-lg font-bold text-slate-700">{profileCompleteness}%</span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">প্রোফাইল সম্পূর্ণ</p>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Tabs */}
       <div className="glass-card p-2 flex gap-1 overflow-x-auto">
@@ -344,53 +286,18 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'basic' && (
+      {activeTab === 'personal' && (
         <div className="glass-card p-6 space-y-6">
-          {/* Photo */}
-          <div className="flex items-center gap-6">
-            <div className="relative">
-              <img
-                src={profile.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'U')}&background=3b82f6&color=fff&size=200`}
-                alt={profile.name}
-                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 transition shadow-lg text-sm"
-              >
-                📷
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-slate-700">প্রোফাইল ছবি</h3>
-              <p className="text-sm text-slate-500">JPG, PNG। সর্বোচ্চ 2MB।</p>
-              {!profile.healthId && (
-                <button
-                  onClick={generateHealthId}
-                  className="mt-2 px-3 py-1 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600"
-                >
-                  🆔 স্বাস্থ্য আইডি তৈরি করুন
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Name */}
+          <h3 className="font-bold text-slate-800 text-lg">👤 ব্যক্তিগত তথ্য</h3>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">নাম *</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">নাম (English)</label>
               <input
                 type="text"
-                value={profile.name || ''}
+                value={formData.name}
                 onChange={(e) => updateField('name', e.target.value)}
-                placeholder="আপনার পূর্ণ নাম"
+                placeholder="Your name"
                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
               />
             </div>
@@ -398,69 +305,64 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <label className="block text-sm font-medium text-slate-600 mb-1">নাম (বাংলায়)</label>
               <input
                 type="text"
-                value={profile.nameBn || ''}
+                value={formData.nameBn}
                 onChange={(e) => updateField('nameBn', e.target.value)}
-                placeholder="বাংলায় নাম"
+                placeholder="আপনার নাম"
                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
               />
             </div>
           </div>
 
-          {/* Contact */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">ফোন *</label>
-              <input
-                type="tel"
-                value={profile.phone || ''}
-                onChange={(e) => updateField('phone', e.target.value)}
-                placeholder="01XXXXXXXXX"
-                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">ইমেইল</label>
               <input
                 type="email"
-                value={profile.email || ''}
+                value={formData.email}
                 onChange={(e) => updateField('email', e.target.value)}
                 placeholder="email@example.com"
                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">ফোন</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => updateField('phone', e.target.value)}
+                placeholder="01XXXXXXXXX"
+                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
           </div>
 
-          {/* DOB, Gender, Blood */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">জন্ম তারিখ *</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">জন্ম তারিখ</label>
               <input
                 type="date"
-                value={profile.dateOfBirth || ''}
+                value={formData.dateOfBirth}
                 onChange={(e) => updateField('dateOfBirth', e.target.value)}
                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
               />
-              {age !== null && (
-                <div className="text-xs text-slate-500 mt-1">বয়স: {age} বছর</div>
-              )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">লিঙ্গ *</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">লিঙ্গ</label>
               <select
-                value={profile.gender || ''}
-                onChange={(e) => updateField('gender', e.target.value as any)}
+                value={formData.gender}
+                onChange={(e) => updateField('gender', e.target.value)}
                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
               >
                 <option value="">নির্বাচন করুন</option>
-                <option value="Male">পুরুষ</option>
-                <option value="Female">মহিলা</option>
-                <option value="Other">অন্যান্য</option>
+                {GENDER_OPTIONS.map(g => (
+                  <option key={g.value} value={g.value}>{g.label}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">রক্তের গ্রুপ</label>
               <select
-                value={profile.bloodGroup || ''}
+                value={formData.bloodGroup}
                 onChange={(e) => updateField('bloodGroup', e.target.value)}
                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
               >
@@ -471,16 +373,21 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               </select>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Height, Weight, BMI */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {activeTab === 'health' && (
+        <div className="glass-card p-6 space-y-6">
+          <h3 className="font-bold text-slate-800 text-lg">❤️ স্বাস্থ্য তথ্য</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">উচ্চতা (সেমি)</label>
+              <label className="block text-sm font-medium text-slate-600 mb-1">উচ্চতা (সে.মি.)</label>
               <input
                 type="number"
-                value={profile.heightCm || ''}
-                onChange={(e) => updateField('heightCm', e.target.value ? parseInt(e.target.value) : undefined)}
-                placeholder="170"
+                value={formData.heightCm}
+                onChange={(e) => updateField('heightCm', e.target.value)}
+                placeholder="165"
                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
               />
             </div>
@@ -489,60 +396,147 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
               <input
                 type="number"
                 step="0.1"
-                value={profile.weightKg || ''}
-                onChange={(e) => updateField('weightKg', e.target.value ? parseFloat(e.target.value) : undefined)}
-                placeholder="70"
+                value={formData.weightKg}
+                onChange={(e) => updateField('weightKg', e.target.value)}
+                placeholder="65"
+                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">দীর্ঘস্থায়ী রোগ (কমা দিয়ে আলাদা করুন)</label>
+            <input
+              type="text"
+              value={formData.chronicConditions}
+              onChange={(e) => updateField('chronicConditions', e.target.value)}
+              placeholder="যেমন: ডায়াবেটিস, উচ্চ রক্তচাপ"
+              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">এলার্জি (কমা দিয়ে আলাদা করুন)</label>
+            <input
+              type="text"
+              value={formData.allergies}
+              onChange={(e) => updateField('allergies', e.target.value)}
+              placeholder="যেমন: পেনিসিলিন, চিংড়ি"
+              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">বর্তমান ওষুধ (কমা দিয়ে আলাদা করুন)</label>
+            <input
+              type="text"
+              value={formData.currentMedications}
+              onChange={(e) => updateField('currentMedications', e.target.value)}
+              placeholder="যেমন: Metformin 500mg, Amlodipine 5mg"
+              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">পূর্ববর্তী সার্জারি (কমা দিয়ে আলাদা করুন)</label>
+            <input
+              type="text"
+              value={formData.pastSurgeries}
+              onChange={(e) => updateField('pastSurgeries', e.target.value)}
+              placeholder="যেমন: Appendectomy 2020"
+              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">পারিবারিক চিকিৎসা ইতিহাস</label>
+            <textarea
+              value={formData.familyMedicalHistory}
+              onChange={(e) => updateField('familyMedicalHistory', e.target.value)}
+              placeholder="পরিবারে কোনো বংশগত রোগ থাকলে লিখুন..."
+              rows={3}
+              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300 resize-none"
+            />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'contact' && (
+        <div className="glass-card p-6 space-y-6">
+          <h3 className="font-bold text-slate-800 text-lg">📞 যোগাযোগের তথ্য</h3>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">ঠিকানা</label>
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => updateField('address', e.target.value)}
+              placeholder="বাড়ি নং, রোড, এলাকা"
+              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">এলাকা</label>
+              <input
+                type="text"
+                value={formData.area}
+                onChange={(e) => updateField('area', e.target.value)}
+                placeholder="ধানমন্ডি, গুলশান..."
                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">BMI</label>
-              <div className={`p-3 border border-slate-200 rounded-lg bg-slate-50 ${bmi ? getBMICategory(parseFloat(bmi)).color : ''} font-medium`}>
-                {bmi ? `${bmi} (${getBMICategory(parseFloat(bmi)).label})` : '-'}
-              </div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">শহর</label>
+              <select
+                value={formData.city}
+                onChange={(e) => updateField('city', e.target.value)}
+                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
+              >
+                {DISTRICTS.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Emergency Contact */}
-          <div className="p-4 glass-subtle rounded-xl">
-            <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+          <div className="border-t border-slate-200 pt-6">
+            <h4 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
               🚨 জরুরি যোগাযোগ
-            </h3>
+            </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">নাম</label>
                 <input
                   type="text"
-                  value={profile.emergencyContactName || ''}
+                  value={formData.emergencyContactName}
                   onChange={(e) => updateField('emergencyContactName', e.target.value)}
-                  placeholder="যোগাযোগকারীর নাম"
-                  className="w-full p-2 border border-slate-200 rounded-lg"
+                  placeholder="জরুরি সময়ে যোগাযোগ করার জন্য"
+                  className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">ফোন</label>
                 <input
                   type="tel"
-                  value={profile.emergencyContactPhone || ''}
+                  value={formData.emergencyContactPhone}
                   onChange={(e) => updateField('emergencyContactPhone', e.target.value)}
                   placeholder="01XXXXXXXXX"
-                  className="w-full p-2 border border-slate-200 rounded-lg"
+                  className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">সম্পর্ক</label>
                 <select
-                  value={profile.emergencyContactRelation || ''}
+                  value={formData.emergencyContactRelation}
                   onChange={(e) => updateField('emergencyContactRelation', e.target.value)}
-                  className="w-full p-2 border border-slate-200 rounded-lg"
+                  className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
                 >
                   <option value="">নির্বাচন করুন</option>
-                  <option value="Spouse">স্বামী/স্ত্রী</option>
-                  <option value="Parent">মা/বাবা</option>
-                  <option value="Child">সন্তান</option>
-                  <option value="Sibling">ভাই/বোন</option>
-                  <option value="Friend">বন্ধু</option>
-                  <option value="Other">অন্যান্য</option>
+                  {RELATIONSHIP_OPTIONS.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -550,332 +544,101 @@ export const ProfileManager: React.FC<ProfileManagerProps> = ({
         </div>
       )}
 
-      {activeTab === 'address' && (
-        <div className="glass-card p-6 space-y-4">
-          <h3 className="font-semibold text-slate-700">📍 ঠিকানা</h3>
+      {activeTab === 'preferences' && (
+        <div className="glass-card p-6 space-y-6">
+          <h3 className="font-bold text-slate-800 text-lg">⚙️ সেটিংস</h3>
           
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">সম্পূর্ণ ঠিকানা</label>
-            <textarea
-              value={profile.address || ''}
-              onChange={(e) => updateField('address', e.target.value)}
-              placeholder="বাড়ি, রোড, এলাকা..."
-              rows={3}
-              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300 resize-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">এলাকা</label>
-              <input
-                type="text"
-                value={profile.area || ''}
-                onChange={(e) => updateField('area', e.target.value)}
-                placeholder="যেমন: ধানমন্ডি"
-                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">শহর</label>
-              <input
-                type="text"
-                value={profile.city || ''}
-                onChange={(e) => updateField('city', e.target.value)}
-                placeholder="যেমন: ঢাকা"
-                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">পোস্টাল কোড</label>
-              <input
-                type="text"
-                value={profile.postalCode || ''}
-                onChange={(e) => updateField('postalCode', e.target.value)}
-                placeholder="1205"
-                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'medical' && (
-        <div className="glass-card p-6 space-y-6">
-          {/* Chronic Conditions */}
-          <div>
-            <h3 className="font-semibold text-slate-700 mb-3">🩺 দীর্ঘস্থায়ী রোগ</h3>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {COMMON_CONDITIONS.map(condition => (
-                <button
-                  key={condition}
-                  onClick={() => toggleArrayItem('chronicConditions', condition)}
-                  className={`px-3 py-1.5 rounded-full text-sm transition ${
-                    profile.chronicConditions?.includes(condition)
-                      ? 'bg-red-500 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {condition}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {profile.chronicConditions?.filter(c => !COMMON_CONDITIONS.includes(c)).map((condition, idx) => (
-                <span key={idx} className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm flex items-center gap-2">
-                  {condition}
-                  <button onClick={() => removeArrayItem('chronicConditions', profile.chronicConditions!.indexOf(condition))}>×</button>
-                </span>
-              ))}
-            </div>
-            <input
-              type="text"
-              placeholder="অন্যান্য রোগ যোগ করুন (Enter চাপুন)"
-              className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  addCustomItem('chronicConditions', (e.target as HTMLInputElement).value);
-                  (e.target as HTMLInputElement).value = '';
-                }
-              }}
-            />
-          </div>
-
-          {/* Allergies */}
-          <div>
-            <h3 className="font-semibold text-slate-700 mb-3">⚠️ এলার্জি</h3>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {COMMON_ALLERGIES.map(allergy => (
-                <button
-                  key={allergy}
-                  onClick={() => toggleArrayItem('allergies', allergy)}
-                  className={`px-3 py-1.5 rounded-full text-sm transition ${
-                    profile.allergies?.includes(allergy)
-                      ? 'bg-amber-500 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {allergy}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {profile.allergies?.filter(a => !COMMON_ALLERGIES.includes(a)).map((allergy, idx) => (
-                <span key={idx} className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm flex items-center gap-2">
-                  {allergy}
-                  <button onClick={() => removeArrayItem('allergies', profile.allergies!.indexOf(allergy))}>×</button>
-                </span>
-              ))}
-            </div>
-            <input
-              type="text"
-              placeholder="অন্যান্য এলার্জি যোগ করুন (Enter চাপুন)"
-              className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  addCustomItem('allergies', (e.target as HTMLInputElement).value);
-                  (e.target as HTMLInputElement).value = '';
-                }
-              }}
-            />
-          </div>
-
-          {/* Current Medications */}
-          <div>
-            <h3 className="font-semibold text-slate-700 mb-3">💊 বর্তমান ওষুধ</h3>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {profile.currentMedications?.map((med, idx) => (
-                <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm flex items-center gap-2">
-                  {med}
-                  <button onClick={() => removeArrayItem('currentMedications', idx)}>×</button>
-                </span>
-              ))}
-            </div>
-            <input
-              type="text"
-              placeholder="ওষুধের নাম যোগ করুন (Enter চাপুন)"
-              className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  addCustomItem('currentMedications', (e.target as HTMLInputElement).value);
-                  (e.target as HTMLInputElement).value = '';
-                }
-              }}
-            />
-          </div>
-
-          {/* Past Surgeries */}
-          <div>
-            <h3 className="font-semibold text-slate-700 mb-3">🏥 পূর্ববর্তী সার্জারি/প্রসিডিউর</h3>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {profile.pastSurgeries?.map((surgery, idx) => (
-                <span key={idx} className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm flex items-center gap-2">
-                  {surgery}
-                  <button onClick={() => removeArrayItem('pastSurgeries', idx)}>×</button>
-                </span>
-              ))}
-            </div>
-            <input
-              type="text"
-              placeholder="সার্জারি/প্রসিডিউর যোগ করুন (Enter চাপুন)"
-              className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  addCustomItem('pastSurgeries', (e.target as HTMLInputElement).value);
-                  (e.target as HTMLInputElement).value = '';
-                }
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'family' && (
-        <div className="glass-card p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-slate-700">👨‍👩‍👧‍👦 পারিবারিক রোগের ইতিহাস</h3>
-            <button
-              onClick={addFamilyHistory}
-              className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
-            >
-              + যোগ করুন
-            </button>
-          </div>
-          
-          <p className="text-sm text-slate-500">
-            আপনার পরিবারে কোন বংশগত রোগ আছে কি? এটি আপনার স্বাস্থ্য মূল্যায়নে সাহায্য করবে।
-          </p>
-
-          <div className="space-y-3">
-            {profile.familyHistory?.map((fh, idx) => (
-              <div key={idx} className="flex gap-3 items-start p-3 glass-subtle rounded-xl">
-                <div className="flex-1">
-                  <label className="block text-xs text-slate-500 mb-1">রোগ</label>
-                  <input
-                    type="text"
-                    value={fh.condition}
-                    onChange={(e) => updateFamilyHistory(idx, 'condition', e.target.value)}
-                    placeholder="যেমন: Diabetes, Heart Disease"
-                    className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="w-32">
-                  <label className="block text-xs text-slate-500 mb-1">সম্পর্ক</label>
-                  <select
-                    value={fh.relation}
-                    onChange={(e) => updateFamilyHistory(idx, 'relation', e.target.value)}
-                    className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                  >
-                    <option value="">নির্বাচন</option>
-                    <option value="Father">বাবা</option>
-                    <option value="Mother">মা</option>
-                    <option value="Grandfather">দাদা/নানা</option>
-                    <option value="Grandmother">দাদি/নানি</option>
-                    <option value="Sibling">ভাই/বোন</option>
-                  </select>
-                </div>
-                <button
-                  onClick={() => removeFamilyHistory(idx)}
-                  className="mt-6 p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                >
-                  🗑️
-                </button>
-              </div>
-            ))}
-
-            {(!profile.familyHistory || profile.familyHistory.length === 0) && (
-              <p className="text-center text-slate-400 py-8">কোনো পারিবারিক রোগের ইতিহাস যোগ করা হয়নি</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'vaccination' && (
-        <div className="glass-card p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-slate-700">💉 টিকা রেকর্ড</h3>
-            <button
-              onClick={addVaccination}
-              className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
-            >
-              + যোগ করুন
-            </button>
-          </div>
-
-          {/* Quick Add */}
-          <div className="flex flex-wrap gap-2">
-            {COMMON_VACCINES.map(vaccine => (
+            <label className="block text-sm font-medium text-slate-600 mb-2">পছন্দের ভাষা</label>
+            <div className="flex gap-4">
               <button
-                key={vaccine}
-                onClick={() => {
-                  if (!profile.vaccinations?.find(v => v.name === vaccine)) {
-                    setProfile(prev => ({
-                      ...prev,
-                      vaccinations: [...(prev.vaccinations || []), { name: vaccine, date: '' }],
-                    }));
-                  }
-                }}
-                disabled={profile.vaccinations?.some(v => v.name === vaccine)}
-                className={`px-3 py-1.5 rounded-full text-sm transition ${
-                  profile.vaccinations?.some(v => v.name === vaccine)
-                    ? 'bg-green-100 text-green-700'
+                onClick={() => updateField('preferredLanguage', 'bn')}
+                className={`flex-1 py-3 rounded-xl font-medium transition ${
+                  formData.preferredLanguage === 'bn'
+                    ? 'bg-blue-500 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {vaccine}
+                বাংলা
               </button>
-            ))}
+              <button
+                onClick={() => updateField('preferredLanguage', 'en')}
+                className={`flex-1 py-3 rounded-xl font-medium transition ${
+                  formData.preferredLanguage === 'en'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                English
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-3">
-            {profile.vaccinations?.map((vaccine, idx) => (
-              <div key={idx} className="flex gap-3 items-start p-3 glass-subtle rounded-xl">
-                <div className="flex-1">
-                  <label className="block text-xs text-slate-500 mb-1">টিকার নাম</label>
-                  <input
-                    type="text"
-                    value={vaccine.name}
-                    onChange={(e) => updateVaccination(idx, 'name', e.target.value)}
-                    placeholder="টিকার নাম"
-                    className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="w-36">
-                  <label className="block text-xs text-slate-500 mb-1">গ্রহণের তারিখ</label>
-                  <input
-                    type="date"
-                    value={vaccine.date}
-                    onChange={(e) => updateVaccination(idx, 'date', e.target.value)}
-                    className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="w-36">
-                  <label className="block text-xs text-slate-500 mb-1">পরবর্তী ডোজ</label>
-                  <input
-                    type="date"
-                    value={vaccine.nextDue || ''}
-                    onChange={(e) => updateVaccination(idx, 'nextDue', e.target.value)}
-                    className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                  />
-                </div>
-                <button
-                  onClick={() => removeVaccination(idx)}
-                  className="mt-6 p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                >
-                  🗑️
-                </button>
-              </div>
-            ))}
-
-            {(!profile.vaccinations || profile.vaccinations.length === 0) && (
-              <p className="text-center text-slate-400 py-8">কোনো টিকা রেকর্ড যোগ করা হয়নি</p>
-            )}
+          <div className="border-t border-slate-200 pt-6">
+            <h4 className="font-semibold text-slate-700 mb-4">🔔 নোটিফিকেশন সেটিংস</h4>
+            <div className="space-y-3">
+              {[
+                { key: 'sms', label: 'এসএমএস নোটিফিকেশন', icon: '📱' },
+                { key: 'email', label: 'ইমেইল নোটিফিকেশন', icon: '📧' },
+                { key: 'push', label: 'পুশ নোটিফিকেশন', icon: '🔔' },
+              ].map(notif => (
+                <label key={notif.key} className="flex items-center justify-between p-3 glass-subtle rounded-lg cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <span>{notif.icon}</span>
+                    <span className="text-slate-700">{notif.label}</span>
+                  </div>
+                  <div className={`w-12 h-6 rounded-full transition ${
+                    (formData.notificationPreferences as any)?.[notif.key] ? 'bg-blue-500' : 'bg-slate-300'
+                  } relative`}>
+                    <div className={`absolute w-5 h-5 bg-white rounded-full top-0.5 transition ${
+                      (formData.notificationPreferences as any)?.[notif.key] ? 'right-0.5' : 'left-0.5'
+                    }`} />
+                    <input
+                      type="checkbox"
+                      checked={(formData.notificationPreferences as any)?.[notif.key] || false}
+                      onChange={(e) => updateField('notificationPreferences', {
+                        ...formData.notificationPreferences,
+                        [notif.key]: e.target.checked,
+                      })}
+                      className="sr-only"
+                    />
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
       )}
+
+      {/* Save Message */}
+      {saveMessage && (
+        <div className={`p-4 rounded-xl ${
+          saveMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+        }`}>
+          {saveMessage.text}
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex gap-4">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 glass-subtle text-slate-600 rounded-xl font-medium hover:bg-slate-100 transition"
+          >
+            বাতিল
+          </button>
+        )}
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition disabled:opacity-50"
+        >
+          {isSaving ? '⏳ সংরক্ষণ হচ্ছে...' : '💾 সংরক্ষণ করুন'}
+        </button>
+      </div>
     </div>
   );
 };
 
 export default ProfileManager;
-
