@@ -8,6 +8,7 @@ import { openPrescriptionWindow, PrescriptionData } from '../utils/prescriptionP
 import { supabase, isSupabaseConfigured } from '../services/supabaseAuth';
 import { getPatientHistoryForDoctor, CompleteMedicalHistory } from '../services/medicalHistoryService';
 import { PatientManager, PatientRecord } from '../components/doctor/PatientManager';
+import { PrescriptionBuilder } from '../components/doctor/PrescriptionBuilder';
 
 // ============ TYPES ============
 interface PatientRecord {
@@ -300,6 +301,9 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ onLogout }) =>
   const [activeChamber, setActiveChamber] = useState<string | null>(null);
   const [showAddChamber, setShowAddChamber] = useState(false);
   const [editingChamber, setEditingChamber] = useState<DoctorChamber | null>(null);
+  
+  // Advanced Prescription Builder State
+  const [showAdvancedPrescription, setShowAdvancedPrescription] = useState(false);
   const [chamberForm, setChamberForm] = useState<Partial<DoctorChamber>>({
     name: '', nameBn: '', address: '', area: '', city: 'ঢাকা', phone: '',
     fee: 500, followUpFee: 300, reportFee: 200, isActive: true, isPrimary: false
@@ -2306,6 +2310,9 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
                 <button onClick={() => addMedicine()} className="px-3 py-1.5 btn-glass-primary text-blue-700 rounded-lg text-sm font-medium">
                   + ওষুধ যোগ করুন
                 </button>
+                <button onClick={() => setShowAdvancedPrescription(true)} className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600">
+                  🚀 অ্যাডভান্সড বিল্ডার
+                </button>
               </div>
             </div>
             
@@ -2713,6 +2720,46 @@ SOAP Notes: S: ${soapNote.subjective}, O: ${soapNote.objective}, A: ${soapNote.a
           </div>
         </div>
       </div>
+
+      {/* Advanced Prescription Builder Modal */}
+      {showAdvancedPrescription && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-auto">
+          <div className="glass-strong rounded-2xl max-w-6xl w-full max-h-[95vh] overflow-auto p-6">
+            <PrescriptionBuilder
+              doctorName={doctorProfile.name}
+              doctorNameBn={doctorProfile.nameBn}
+              doctorDegrees={doctorProfile.degrees}
+              doctorSpecialty={doctorProfile.specialty}
+              doctorBmdcNo={doctorProfile.bmdcNo}
+              chamberName={activeChamberData?.nameBn || doctorProfile.hospitalBn}
+              chamberAddress={activeChamberData?.address || doctorProfile.chamberAddress}
+              chamberPhone={activeChamberData?.phone || doctorProfile.chamberPhone}
+              patientName={selectedAppointment?.patientName || ''}
+              patientNameBn={selectedAppointment?.patientNameBn}
+              patientAge={selectedAppointment?.patientAge || 0}
+              patientGender={selectedAppointment?.patientGender || 'Male'}
+              patientPhone={selectedAppointment?.patientPhone}
+              patientId={selectedAppointment?.patientId}
+              patientAllergies={selectedPatient?.allergies || []}
+              initialDiagnosis={diagnosis}
+              initialMedicines={prescription}
+              onSave={(prescriptionData) => {
+                // Update the prescription state with data from builder
+                setDiagnosis(prescriptionData.diagnosis);
+                setPrescription(prescriptionData.medicines.map(m => ({
+                  medicine: m.medicine,
+                  dosage: m.dosage,
+                  duration: m.duration,
+                  instruction: m.instruction || '',
+                })));
+                setAdvice(prescriptionData.advice || []);
+                setShowAdvancedPrescription(false);
+              }}
+              onClose={() => setShowAdvancedPrescription(false)}
+            />
+          </div>
+        </div>
+      )}
     );
   };
 
