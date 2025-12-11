@@ -24,6 +24,7 @@ import {
   HealthDashboard,
   MyDoctors,
   MedicationTracker,
+  FamilyHealth,
   type MedicalHistoryData,
   type HealthRecord,
   type Appointment as AppointmentType,
@@ -31,7 +32,8 @@ import {
   type VitalSign,
   type HealthGoal,
   type HealthInsight,
-  type DoctorConnection
+  type DoctorConnection,
+  type FamilyMember
 } from '../components/patient';
 
 // Import Supabase Services for Patient Features
@@ -41,11 +43,12 @@ import {
   PatientDoctorConnectionsService, 
   PatientDocumentsService,
   PrescriptionsService,
-  HealthInsightsService 
+  HealthInsightsService,
+  FamilyService 
 } from '../services/supabase';
 
 // ============ TYPES ============
-type TabId = 'home' | 'appointments' | 'medical-history' | 'health-records' | 'my-doctors' | 'doctors' | 'ai' | 'medication' | 'health-insights' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback' | 'profile' | 'prescriptions';
+type TabId = 'home' | 'appointments' | 'medical-history' | 'health-records' | 'my-doctors' | 'doctors' | 'ai' | 'medication' | 'health-insights' | 'food-scan' | 'quiz' | 'food-chart' | 'incentives' | 'advanced-ai' | 'feedback' | 'profile' | 'prescriptions' | 'family';
 
 interface AppointmentData {
   id: string;
@@ -85,6 +88,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'medical-history', icon: '📋', label: 'Medical History', labelBn: 'চিকিৎসা ইতিহাস' },
   { id: 'health-records', icon: '📁', label: 'Health Records', labelBn: 'স্বাস্থ্য রেকর্ড' },
   { id: 'my-doctors', icon: '👨‍⚕️', label: 'My Doctors', labelBn: 'আমার ডাক্তাররা' },
+  { id: 'family', icon: '👨‍👩‍👧‍👦', label: 'Family Health', labelBn: 'পরিবারের স্বাস্থ্য' },
   { id: 'doctors', icon: '🔍', label: 'Find Doctors', labelBn: 'ডাক্তার খুঁজুন' },
   { id: 'ai', icon: '🤖', label: 'AI Assistant', labelBn: 'এআই সহায়ক' },
   { id: 'medication', icon: '⏰', label: 'Medication Tracker', labelBn: 'ওষুধ ট্র্যাকার', paid: true },
@@ -155,6 +159,11 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
   const [patientDocuments, setPatientDocuments] = useState<HealthRecord[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loadingFeatures, setLoadingFeatures] = useState(false);
+  
+  // Family Health State (Phase 3)
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [familyAppointments, setFamilyAppointments] = useState<any[]>([]);
+  const [loadingFamily, setLoadingFamily] = useState(false);
   
   const patientUser = useMemo(() => (user && (role === 'patient' || role === 'PATIENT')) ? user as PatientProfile : null, [user, role]);
 
@@ -556,13 +565,63 @@ export const PatientDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout
     }
   }, [patientUser]);
 
+  // Load Family Data (Phase 3)
+  const loadFamilyData = useCallback(async () => {
+    if (!patientUser || !isSupabaseConfigured()) return;
+    
+    setLoadingFamily(true);
+    try {
+      // Get or create family
+      const family = await FamilyService.getOrCreateFamily(patientUser.id, patientUser.name);
+      if (family) {
+        // Load family members
+        const members = await FamilyService.getFamilyMembers(family.id);
+        setFamilyMembers(members.map(m => ({
+          id: m.id,
+          name: m.name,
+          nameBn: m.name_bn,
+          relation: m.relation,
+          relationLabel: m.relation_label || m.relation,
+          dateOfBirth: m.date_of_birth || '',
+          gender: m.gender || 'Male',
+          bloodGroup: m.blood_group,
+          phone: m.phone,
+          image: m.avatar_url,
+          heightCm: m.height_cm,
+          weightKg: m.weight_kg,
+          chronicConditions: m.chronic_conditions,
+          allergies: m.allergies,
+          currentMedications: m.current_medications,
+          canBook: m.can_book,
+          canViewRecords: m.can_view_records,
+          isAdmin: m.is_admin,
+          healthScore: m.healthScore,
+          lastCheckup: m.lastCheckup,
+          upcomingAppointments: m.upcomingAppointments,
+          medicationsCount: m.medicationsCount,
+        })));
+
+        // Load family appointments
+        const appointments = await FamilyService.getFamilyAppointments(family.id);
+        setFamilyAppointments(appointments);
+      }
+    } catch (error) {
+      console.error('Error loading family data:', error);
+    } finally {
+      setLoadingFamily(false);
+    }
+  }, [patientUser]);
+
   // Load features on relevant tabs
   useEffect(() => {
     const featureTabs: TabId[] = ['health-insights', 'health-records', 'my-doctors', 'prescriptions', 'medication', 'profile'];
     if (featureTabs.includes(activeTab)) {
       loadPatientFeatures();
     }
-  }, [activeTab, loadPatientFeatures]);
+    if (activeTab === 'family') {
+      loadFamilyData();
+    }
+  }, [activeTab, loadPatientFeatures, loadFamilyData]);
 
   const handleLogout = () => { logout(); onLogout?.(); navigate('/', { replace: true }); };
 
@@ -2509,6 +2568,45 @@ ${patientContext}`;
                   await PatientDoctorConnectionsService.removeConnection(connection.id);
                   await loadPatientFeatures();
                 }
+              }}
+            />
+          )}
+
+          {/* FAMILY HEALTH TAB */}
+          {activeTab === 'family' && patientUser && (
+            <FamilyHealth
+              members={familyMembers}
+              upcomingAppointments={familyAppointments.map(a => ({
+                id: a.id,
+                memberId: a.memberId,
+                memberName: a.memberName,
+                doctorName: a.doctors?.profiles?.name || 'Doctor',
+                specialty: a.doctors?.specialties?.[0] || 'General',
+                date: a.scheduled_date,
+                time: a.scheduled_time,
+              }))}
+              onSelectMember={(member) => {
+                console.log('Selected member:', member);
+                // TODO: Navigate to member details
+              }}
+              onAddMember={() => {
+                // TODO: Open add member modal
+                console.log('Add member clicked');
+              }}
+              onBookAppointment={(memberId) => {
+                navigate('/doctors');
+              }}
+              onViewRecords={(memberId) => {
+                // TODO: View member records
+                console.log('View records for:', memberId);
+              }}
+              onEditMember={(member) => {
+                // TODO: Open edit member modal
+                console.log('Edit member:', member);
+              }}
+              onInviteMember={() => {
+                // TODO: Open invite modal
+                console.log('Invite member clicked');
               }}
             />
           )}
